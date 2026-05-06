@@ -58,6 +58,16 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success("로그인 성공"));
     }
 
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout(HttpServletRequest httpRequest) {
+        SecurityContextHolder.clearContext();
+        var session = httpRequest.getSession(false);
+        if (session != null) {
+            session.invalidate();
+        }
+        return ResponseEntity.ok(ApiResponse.success("로그아웃 성공"));
+    }
+
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<UserResponse>> me(
             @AuthenticationPrincipal UserDetails userDetails) {
