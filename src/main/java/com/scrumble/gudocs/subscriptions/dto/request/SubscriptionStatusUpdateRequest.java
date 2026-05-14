@@ -1,4 +1,4 @@
-package com.scrumble.gudocs.subscriptions.dto;
+package com.scrumble.gudocs.subscriptions.dto.request;
 
 import com.scrumble.gudocs.subscriptions.entity.SubscriptionStatus;
 import jakarta.validation.constraints.NotNull;

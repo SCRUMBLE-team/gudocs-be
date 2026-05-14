@@ -1,7 +1,10 @@
 package com.scrumble.gudocs.subscriptions.controller;
 
 import com.scrumble.gudocs.global.response.ApiResponse;
-import com.scrumble.gudocs.subscriptions.dto.*;
+import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionCreateRequest;
+import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionStatusUpdateRequest;
+import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionUpdateRequest;
+import com.scrumble.gudocs.subscriptions.dto.response.SubscriptionResponse;
 import com.scrumble.gudocs.subscriptions.service.SubscriptionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

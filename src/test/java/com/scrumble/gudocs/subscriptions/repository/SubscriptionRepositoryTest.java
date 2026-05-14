@@ -52,7 +52,7 @@ class SubscriptionRepositoryTest {
 
         assertThat(result).hasSize(2);
         assertThat(result).extracting(Subscription::getServiceName)
-                .containsExactlyInAnyOrder("Netflix", "YouTube");
+                .containsExactly("YouTube", "Netflix");
     }
 
     @Test

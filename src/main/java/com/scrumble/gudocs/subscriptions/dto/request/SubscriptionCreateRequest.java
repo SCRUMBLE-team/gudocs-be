@@ -1,4 +1,4 @@
-package com.scrumble.gudocs.subscriptions.dto;
+package com.scrumble.gudocs.subscriptions.dto.request;
 
 import com.scrumble.gudocs.subscriptions.entity.BillingCycle;
 import com.scrumble.gudocs.subscriptions.entity.PaymentMethod;
@@ -17,6 +17,7 @@ public record SubscriptionCreateRequest(
 
         @NotNull(message = "결제 금액은 필수입니다.")
         @Min(value = 1, message = "결제 금액은 1원 이상이어야 합니다.")
+        @Max(value = 10_000_000, message = "결제 금액은 10,000,000원 이하여야 합니다.")
         Long price,
 
         @NotNull(message = "결제 주기는 필수입니다.")

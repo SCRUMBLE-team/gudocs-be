@@ -1,22 +1,19 @@
 package com.scrumble.gudocs.subscriptions.entity;
 
+import com.scrumble.gudocs.global.entity.BaseEntity;
 import com.scrumble.gudocs.users.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
-import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedDate;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import java.time.LocalDateTime;
+import java.util.Objects;
 
 @Entity
 @Table(name = "subscriptions")
-@EntityListeners(AuditingEntityListener.class)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
-public class Subscription {
+public class Subscription extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -55,14 +52,6 @@ public class Subscription {
     @Builder.Default
     private SubscriptionStatus status = SubscriptionStatus.ACTIVE;
 
-    @CreatedDate
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    @LastModifiedDate
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
-
     public void update(String serviceName, SubscriptionCategory category, Long price,
                        BillingCycle billingCycle, Integer billingDay, Integer billingMonth,
                        PaymentMethod paymentMethod) {
@@ -71,11 +60,11 @@ public class Subscription {
         if (price != null) this.price = price;
         if (billingCycle != null) this.billingCycle = billingCycle;
         if (billingDay != null) this.billingDay = billingDay;
-        this.billingMonth = billingMonth;
+        if (billingMonth != null) this.billingMonth = billingMonth;
         if (paymentMethod != null) this.paymentMethod = paymentMethod;
     }
 
     public void updateStatus(SubscriptionStatus status) {
-        this.status = status;
+        this.status = Objects.requireNonNull(status, "status must not be null");
     }
 }

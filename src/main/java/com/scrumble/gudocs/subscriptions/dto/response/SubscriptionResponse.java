@@ -1,4 +1,4 @@
-package com.scrumble.gudocs.subscriptions.dto;
+package com.scrumble.gudocs.subscriptions.dto.response;
 
 import com.scrumble.gudocs.subscriptions.entity.*;
 
