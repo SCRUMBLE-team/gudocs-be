@@ -46,7 +46,7 @@ public class DashboardService {
                 .toList();
 
         long monthlyTotal = calculateMonthlyTotal(active);
-        List<SubscriptionResponse> recent = all.stream().limit(3).map(SubscriptionResponse::from).toList();
+        List<SubscriptionResponse> recent = active.stream().limit(3).map(SubscriptionResponse::from).toList();
         List<CategorySummary> categories = calculateCategorySummaries(active, monthlyTotal);
         List<UpcomingNotification> upcoming = calculateUpcomingNotifications(active, today);
 
@@ -58,7 +58,7 @@ public class DashboardService {
     }
 
     private long monthlyAmount(Subscription s) {
-        return s.getBillingCycle() == BillingCycle.MONTHLY ? s.getPrice() : s.getPrice() / 12;
+        return s.getBillingCycle() == BillingCycle.MONTHLY ? s.getPrice() : Math.round((double) s.getPrice() / 12);
     }
 
     private List<CategorySummary> calculateCategorySummaries(List<Subscription> active, long total) {
