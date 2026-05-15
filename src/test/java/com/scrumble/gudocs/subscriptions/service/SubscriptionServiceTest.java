@@ -1,9 +1,12 @@
 package com.scrumble.gudocs.subscriptions.service;
 
+import com.scrumble.gudocs.common.fixture.UserFixture;
 import com.scrumble.gudocs.global.exception.BusinessException;
 import com.scrumble.gudocs.global.exception.ErrorCode;
-import com.scrumble.gudocs.subscriptions.dto.request.*;
-import com.scrumble.gudocs.subscriptions.dto.response.*;
+import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionCreateRequest;
+import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionStatusUpdateRequest;
+import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionUpdateRequest;
+import com.scrumble.gudocs.subscriptions.dto.response.SubscriptionResponse;
 import com.scrumble.gudocs.subscriptions.entity.*;
 import com.scrumble.gudocs.subscriptions.repository.SubscriptionRepository;
 import com.scrumble.gudocs.users.entity.User;
@@ -35,14 +38,6 @@ class SubscriptionServiceTest {
     @InjectMocks
     private SubscriptionService subscriptionService;
 
-    private User testUser() {
-        return User.builder()
-                .name("테스터")
-                .email("test@example.com")
-                .passwordHash("hashed")
-                .build();
-    }
-
     private Subscription testSubscription(User user) {
         return Subscription.builder()
                 .user(user)
@@ -57,7 +52,7 @@ class SubscriptionServiceTest {
 
     @Test
     void 구독_등록_성공() {
-        User user = testUser();
+        User user = UserFixture.create();
         SubscriptionCreateRequest request = new SubscriptionCreateRequest(
                 "Netflix", SubscriptionCategory.OTT, 17000L,
                 BillingCycle.MONTHLY, 15, null, PaymentMethod.CARD
@@ -74,7 +69,7 @@ class SubscriptionServiceTest {
 
     @Test
     void 구독_등록_연간결제_월_없음_실패() {
-        User user = testUser();
+        User user = UserFixture.create();
         SubscriptionCreateRequest request = new SubscriptionCreateRequest(
                 "Netflix", SubscriptionCategory.OTT, 17000L,
                 BillingCycle.YEARLY, 15, null, PaymentMethod.CARD
@@ -89,7 +84,7 @@ class SubscriptionServiceTest {
 
     @Test
     void 구독_등록_연간결제_월_성공() {
-        User user = testUser();
+        User user = UserFixture.create();
         SubscriptionCreateRequest request = new SubscriptionCreateRequest(
                 "Adobe", SubscriptionCategory.DESIGN, 60000L,
                 BillingCycle.YEARLY, 1, 3, PaymentMethod.CARD
@@ -104,7 +99,7 @@ class SubscriptionServiceTest {
 
     @Test
     void 구독_등록_월간결제_결제월_입력_실패() {
-        User user = testUser();
+        User user = UserFixture.create();
         SubscriptionCreateRequest request = new SubscriptionCreateRequest(
                 "Netflix", SubscriptionCategory.OTT, 17000L,
                 BillingCycle.MONTHLY, 15, 5, PaymentMethod.CARD
@@ -119,7 +114,7 @@ class SubscriptionServiceTest {
 
     @Test
     void 구독_수정_월간결제_결제월_입력_실패() {
-        User user = testUser();
+        User user = UserFixture.create();
         Subscription subscription = testSubscription(user); // MONTHLY
         SubscriptionUpdateRequest request = new SubscriptionUpdateRequest(
                 null, null, null, null, null, 5, null
@@ -135,7 +130,7 @@ class SubscriptionServiceTest {
 
     @Test
     void 구독_목록_조회_성공() {
-        User user = testUser();
+        User user = UserFixture.create();
         given(userRepository.findByEmail("test@example.com")).willReturn(Optional.of(user));
         given(subscriptionRepository.findAllByUserOrderByCreatedAtDesc(user))
                 .willReturn(List.of(testSubscription(user)));
@@ -148,7 +143,7 @@ class SubscriptionServiceTest {
 
     @Test
     void 구독_상세_조회_성공() {
-        User user = testUser();
+        User user = UserFixture.create();
         Subscription subscription = testSubscription(user);
         given(userRepository.findByEmail("test@example.com")).willReturn(Optional.of(user));
         given(subscriptionRepository.findById(1L)).willReturn(Optional.of(subscription));
@@ -160,7 +155,7 @@ class SubscriptionServiceTest {
 
     @Test
     void 구독_상세_조회_없는_구독() {
-        User user = testUser();
+        User user = UserFixture.create();
         given(userRepository.findByEmail("test@example.com")).willReturn(Optional.of(user));
         given(subscriptionRepository.findById(99L)).willReturn(Optional.empty());
 
@@ -172,8 +167,8 @@ class SubscriptionServiceTest {
 
     @Test
     void 구독_상세_조회_다른_사용자_403() {
-        User owner = User.builder().id(1L).name("주인").email("owner@example.com").passwordHash("h").build();
-        User other = User.builder().id(2L).name("타인").email("other@example.com").passwordHash("h").build();
+        User owner = UserFixture.create(1L, "주인", "owner@example.com");
+        User other = UserFixture.create(2L, "타인", "other@example.com");
         Subscription subscription = testSubscription(owner);
         given(userRepository.findByEmail("other@example.com")).willReturn(Optional.of(other));
         given(subscriptionRepository.findById(1L)).willReturn(Optional.of(subscription));
@@ -186,7 +181,7 @@ class SubscriptionServiceTest {
 
     @Test
     void 구독_삭제_성공() {
-        User user = testUser();
+        User user = UserFixture.create();
         Subscription subscription = testSubscription(user);
         given(userRepository.findByEmail("test@example.com")).willReturn(Optional.of(user));
         given(subscriptionRepository.findById(1L)).willReturn(Optional.of(subscription));
@@ -198,7 +193,7 @@ class SubscriptionServiceTest {
 
     @Test
     void 구독_상태_변경_성공() {
-        User user = testUser();
+        User user = UserFixture.create();
         Subscription subscription = testSubscription(user);
         SubscriptionStatusUpdateRequest request = new SubscriptionStatusUpdateRequest(SubscriptionStatus.PAUSED);
         given(userRepository.findByEmail("test@example.com")).willReturn(Optional.of(user));

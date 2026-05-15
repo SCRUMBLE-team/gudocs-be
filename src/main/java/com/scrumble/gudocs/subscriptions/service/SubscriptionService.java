@@ -34,7 +34,6 @@ public class SubscriptionService {
         if (request.billingCycle() == BillingCycle.YEARLY && request.billingMonth() == null) {
             throw new BusinessException(ErrorCode.INVALID_BILLING_MONTH);
         }
-        Integer billingMonth = request.billingCycle() == BillingCycle.MONTHLY ? null : request.billingMonth();
 
         Subscription subscription = Subscription.builder()
                 .user(user)
@@ -43,7 +42,7 @@ public class SubscriptionService {
                 .price(request.price())
                 .billingCycle(request.billingCycle())
                 .billingDay(request.billingDay())
-                .billingMonth(billingMonth)
+                .billingMonth(request.billingMonth())
                 .paymentMethod(request.paymentMethod())
                 .build();
 
