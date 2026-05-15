@@ -2,7 +2,10 @@ package com.scrumble.gudocs.subscriptions.service;
 
 import com.scrumble.gudocs.global.exception.BusinessException;
 import com.scrumble.gudocs.global.exception.ErrorCode;
-import com.scrumble.gudocs.subscriptions.dto.*;
+import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionCreateRequest;
+import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionStatusUpdateRequest;
+import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionUpdateRequest;
+import com.scrumble.gudocs.subscriptions.dto.response.SubscriptionResponse;
 import com.scrumble.gudocs.subscriptions.entity.*;
 import com.scrumble.gudocs.subscriptions.repository.SubscriptionRepository;
 import com.scrumble.gudocs.users.entity.User;

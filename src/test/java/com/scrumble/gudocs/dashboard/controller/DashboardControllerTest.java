@@ -3,7 +3,7 @@ package com.scrumble.gudocs.dashboard.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scrumble.gudocs.auth.dto.LoginRequest;
 import com.scrumble.gudocs.auth.dto.SignupRequest;
-import com.scrumble.gudocs.subscriptions.dto.SubscriptionCreateRequest;
+import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionCreateRequest;
 import com.scrumble.gudocs.subscriptions.entity.BillingCycle;
 import com.scrumble.gudocs.subscriptions.entity.PaymentMethod;
 import com.scrumble.gudocs.subscriptions.entity.SubscriptionCategory;

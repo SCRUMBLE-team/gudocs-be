@@ -5,7 +5,7 @@ import com.scrumble.gudocs.dashboard.dto.DashboardResponse;
 import com.scrumble.gudocs.dashboard.dto.UpcomingNotification;
 import com.scrumble.gudocs.global.exception.BusinessException;
 import com.scrumble.gudocs.global.exception.ErrorCode;
-import com.scrumble.gudocs.subscriptions.dto.SubscriptionResponse;
+import com.scrumble.gudocs.subscriptions.dto.response.SubscriptionResponse;
 import com.scrumble.gudocs.subscriptions.entity.*;
 import com.scrumble.gudocs.subscriptions.repository.SubscriptionRepository;
 import com.scrumble.gudocs.users.entity.User;
@@ -58,7 +58,7 @@ public class DashboardService {
     }
 
     private long monthlyAmount(Subscription s) {
-        return s.getBillingCycle() == BillingCycle.MONTHLY ? s.getPrice() : Math.round((double) s.getPrice() / 12);
+        return s.getBillingCycle() == BillingCycle.MONTHLY ? s.getPrice() : s.getPrice() / 12;
     }
 
     private List<CategorySummary> calculateCategorySummaries(List<Subscription> active, long total) {

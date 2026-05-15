@@ -1,6 +1,6 @@
 package com.scrumble.gudocs.dashboard.dto;
 
-import com.scrumble.gudocs.subscriptions.dto.SubscriptionResponse;
+import com.scrumble.gudocs.subscriptions.dto.response.SubscriptionResponse;
 
 import java.util.List;
 
