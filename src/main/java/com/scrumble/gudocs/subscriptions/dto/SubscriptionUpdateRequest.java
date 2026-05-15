@@ -5,8 +5,10 @@ import com.scrumble.gudocs.subscriptions.entity.PaymentMethod;
 import com.scrumble.gudocs.subscriptions.entity.SubscriptionCategory;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 
 public record SubscriptionUpdateRequest(
+        @NotBlank(message = "서비스명은 공백일 수 없습니다.")
         String serviceName,
         SubscriptionCategory category,
 

@@ -69,7 +69,12 @@ public class Subscription {
         if (serviceName != null) this.serviceName = serviceName;
         if (category != null) this.category = category;
         if (price != null) this.price = price;
-        if (billingCycle != null) this.billingCycle = billingCycle;
+        if (billingCycle != null) {
+            this.billingCycle = billingCycle;
+            if (billingCycle == BillingCycle.MONTHLY) {
+                this.billingMonth = null;
+            }
+        }
         if (billingDay != null) this.billingDay = billingDay;
         if (billingMonth != null) this.billingMonth = billingMonth;
         if (paymentMethod != null) this.paymentMethod = paymentMethod;

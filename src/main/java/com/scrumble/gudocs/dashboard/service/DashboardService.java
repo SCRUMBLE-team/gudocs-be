@@ -46,7 +46,7 @@ public class DashboardService {
                 .toList();
 
         long monthlyTotal = calculateMonthlyTotal(active);
-        List<SubscriptionResponse> recent = active.stream().limit(3).map(SubscriptionResponse::from).toList();
+        List<SubscriptionResponse> recent = all.stream().limit(3).map(SubscriptionResponse::from).toList();
         List<CategorySummary> categories = calculateCategorySummaries(active, monthlyTotal);
         List<UpcomingNotification> upcoming = calculateUpcomingNotifications(active, today);
 
