@@ -150,10 +150,9 @@ public class ExpenseService {
         return subscriptions.stream()
                 .filter(s -> s.getCreatedAt() != null && !s.getCreatedAt().isAfter(endOfMonth))
                 .filter(s -> s.getDeletedAt() == null || !s.getDeletedAt().isBefore(startOfMonth))
-                .filter(s -> {
-                    if (s.getStatus() == SubscriptionStatus.ACTIVE) return true;
-                    return s.getPausedAt() != null && !s.getPausedAt().isBefore(startOfMonth);
-                })
+                .filter(s -> s.getStatus() == SubscriptionStatus.ACTIVE ||
+                        (s.getStatus() == SubscriptionStatus.PAUSED &&
+                         s.getPausedAt() != null && !s.getPausedAt().isBefore(startOfMonth)))
                 .toList();
     }
 

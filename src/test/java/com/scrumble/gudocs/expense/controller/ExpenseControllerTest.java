@@ -66,6 +66,7 @@ class ExpenseControllerTest {
                         .session(session)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated())
                 .andReturn();
         return objectMapper.readTree(result.getResponse().getContentAsString())
                 .path("data").path("id").asLong();
