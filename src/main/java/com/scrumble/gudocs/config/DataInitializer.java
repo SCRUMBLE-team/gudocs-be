@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Component
@@ -74,7 +75,8 @@ public class DataInitializer implements ApplicationRunner {
                         .category(SubscriptionCategory.DESIGN).price(624000L)
                         .billingCycle(BillingCycle.YEARLY).billingDay(1).billingMonth(3)
                         .paymentMethod(PaymentMethod.CARD)
-                        .status(SubscriptionStatus.PAUSED).build(),
+                        .status(SubscriptionStatus.PAUSED)
+                        .pausedAt(LocalDateTime.now()).build(),
 
                 Subscription.builder()
                         .user(user).serviceName("인프런")
