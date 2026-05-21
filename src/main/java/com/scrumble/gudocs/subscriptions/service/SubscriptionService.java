@@ -105,7 +105,7 @@ public class SubscriptionService {
         User user = findUser(email);
         Subscription subscription = findSubscription(subscriptionId);
         checkOwnership(subscription, user);
-        subscriptionRepository.delete(subscription);
+        subscription.softDelete();
     }
 
     @Transactional
@@ -124,8 +124,12 @@ public class SubscriptionService {
     }
 
     private Subscription findSubscription(Long subscriptionId) {
-        return subscriptionRepository.findById(subscriptionId)
+        Subscription subscription = subscriptionRepository.findById(subscriptionId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.SUBSCRIPTION_NOT_FOUND));
+        if (subscription.isDeleted()) {
+            throw new BusinessException(ErrorCode.SUBSCRIPTION_NOT_FOUND);
+        }
+        return subscription;
     }
 
     private void checkOwnership(Subscription subscription, User user) {

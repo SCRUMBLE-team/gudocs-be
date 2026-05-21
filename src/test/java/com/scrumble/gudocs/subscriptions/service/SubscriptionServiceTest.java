@@ -188,7 +188,8 @@ class SubscriptionServiceTest {
 
         subscriptionService.delete("test@example.com", 1L);
 
-        verify(subscriptionRepository).delete(subscription);
+        assertThat(subscription.isDeleted()).isTrue();
+        assertThat(subscription.getDeletedAt()).isNotNull();
     }
 
     @Test

@@ -5,6 +5,7 @@ import com.scrumble.gudocs.users.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
 import java.util.Objects;
 
 @Entity
@@ -52,6 +53,12 @@ public class Subscription extends BaseEntity {
     @Builder.Default
     private SubscriptionStatus status = SubscriptionStatus.ACTIVE;
 
+    @Column(name = "paused_at")
+    private LocalDateTime pausedAt;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     public void update(String serviceName, SubscriptionCategory category, Long price,
                        BillingCycle billingCycle, Integer billingDay, Integer billingMonth,
                        PaymentMethod paymentMethod) {
@@ -65,6 +72,24 @@ public class Subscription extends BaseEntity {
     }
 
     public void updateStatus(SubscriptionStatus status) {
-        this.status = Objects.requireNonNull(status, "status must not be null");
+        Objects.requireNonNull(status, "status must not be null");
+        if (this.status == status) return;
+
+        if (status == SubscriptionStatus.PAUSED) {
+            this.pausedAt = LocalDateTime.now();
+        } else if (status == SubscriptionStatus.ACTIVE) {
+            this.pausedAt = null;
+        }
+        this.status = status;
+    }
+
+    public void softDelete() {
+        if (this.deletedAt == null) {
+            this.deletedAt = LocalDateTime.now();
+        }
+    }
+
+    public boolean isDeleted() {
+        return this.deletedAt != null;
     }
 }
