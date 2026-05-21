@@ -1,4 +1,4 @@
-package com.scrumble.gudocs.subscriptions.expense.dto.response;
+package com.scrumble.gudocs.expense.dto.response;
 
 public record MonthlyExpenseResponse(
         int year,

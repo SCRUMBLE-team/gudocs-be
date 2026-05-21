@@ -1,4 +1,4 @@
-package com.scrumble.gudocs.subscriptions.expense.dto.response;
+package com.scrumble.gudocs.expense.dto.response;
 
 import com.scrumble.gudocs.subscriptions.entity.SubscriptionCategory;
 

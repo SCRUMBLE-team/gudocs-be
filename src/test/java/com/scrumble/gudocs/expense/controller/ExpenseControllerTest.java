@@ -1,4 +1,4 @@
-package com.scrumble.gudocs.subscriptions.expense.controller;
+package com.scrumble.gudocs.expense.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scrumble.gudocs.auth.dto.LoginRequest;

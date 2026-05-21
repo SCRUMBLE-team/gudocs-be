@@ -1,4 +1,4 @@
-package com.scrumble.gudocs.subscriptions.expense.service;
+package com.scrumble.gudocs.expense.service;
 
 import com.scrumble.gudocs.global.exception.BusinessException;
 import com.scrumble.gudocs.global.exception.ErrorCode;
@@ -6,13 +6,13 @@ import com.scrumble.gudocs.subscriptions.entity.BillingCycle;
 import com.scrumble.gudocs.subscriptions.entity.Subscription;
 import com.scrumble.gudocs.subscriptions.entity.SubscriptionCategory;
 import com.scrumble.gudocs.subscriptions.entity.SubscriptionStatus;
-import com.scrumble.gudocs.subscriptions.expense.dto.response.CategoryExpenseItem;
-import com.scrumble.gudocs.subscriptions.expense.dto.response.CategoryExpenseResponse;
-import com.scrumble.gudocs.subscriptions.expense.dto.response.ExpenseTrendResponse;
-import com.scrumble.gudocs.subscriptions.expense.dto.response.MonthlyExpenseDetailResponse;
-import com.scrumble.gudocs.subscriptions.expense.dto.response.MonthlyExpenseResponse;
-import com.scrumble.gudocs.subscriptions.expense.dto.response.MonthlyTrendItem;
-import com.scrumble.gudocs.subscriptions.expense.dto.response.SubscriptionExpenseDetail;
+import com.scrumble.gudocs.expense.dto.response.CategoryExpenseItem;
+import com.scrumble.gudocs.expense.dto.response.CategoryExpenseResponse;
+import com.scrumble.gudocs.expense.dto.response.ExpenseTrendResponse;
+import com.scrumble.gudocs.expense.dto.response.MonthlyExpenseDetailResponse;
+import com.scrumble.gudocs.expense.dto.response.MonthlyExpenseResponse;
+import com.scrumble.gudocs.expense.dto.response.MonthlyTrendItem;
+import com.scrumble.gudocs.expense.dto.response.SubscriptionExpenseDetail;
 import com.scrumble.gudocs.subscriptions.repository.SubscriptionRepository;
 import com.scrumble.gudocs.users.entity.User;
 import com.scrumble.gudocs.users.repository.UserRepository;

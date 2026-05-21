@@ -1,11 +1,11 @@
-package com.scrumble.gudocs.subscriptions.expense.controller;
+package com.scrumble.gudocs.expense.controller;
 
 import com.scrumble.gudocs.global.response.ApiResponse;
-import com.scrumble.gudocs.subscriptions.expense.dto.response.CategoryExpenseResponse;
-import com.scrumble.gudocs.subscriptions.expense.dto.response.ExpenseTrendResponse;
-import com.scrumble.gudocs.subscriptions.expense.dto.response.MonthlyExpenseDetailResponse;
-import com.scrumble.gudocs.subscriptions.expense.dto.response.MonthlyExpenseResponse;
-import com.scrumble.gudocs.subscriptions.expense.service.ExpenseService;
+import com.scrumble.gudocs.expense.dto.response.CategoryExpenseResponse;
+import com.scrumble.gudocs.expense.dto.response.ExpenseTrendResponse;
+import com.scrumble.gudocs.expense.dto.response.MonthlyExpenseDetailResponse;
+import com.scrumble.gudocs.expense.dto.response.MonthlyExpenseResponse;
+import com.scrumble.gudocs.expense.service.ExpenseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
