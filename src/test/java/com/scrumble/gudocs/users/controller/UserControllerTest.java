@@ -8,6 +8,8 @@ import com.scrumble.gudocs.users.dto.UserNameUpdateRequest;
 import com.scrumble.gudocs.users.dto.UserPasswordUpdateRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -43,15 +45,18 @@ class UserControllerTest {
         mockMvc.perform(post("/api/auth/signup")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(
-                        new SignupRequest(NAME, EMAIL, PASSWORD))));
+                        new SignupRequest(NAME, EMAIL, PASSWORD))))
+                .andExpect(status().is2xxSuccessful());
 
         MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 new LoginRequest(EMAIL, PASSWORD))))
+                .andExpect(status().is2xxSuccessful())
                 .andReturn();
 
-        session = (MockHttpSession) loginResult.getRequest().getSession();
+        session = (MockHttpSession) loginResult.getRequest().getSession(false);
+        assertNotNull(session);
     }
 
     // ── GET /api/users/me ──────────────────────────────────────

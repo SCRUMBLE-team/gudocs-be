@@ -49,7 +49,11 @@ public class UserController {
             @AuthenticationPrincipal UserDetails userDetails,
             @Valid @RequestBody UserDeleteRequest request,
             HttpServletRequest httpRequest) {
-        userService.deleteAccount(userDetails.getUsername(), request, httpRequest);
+        userService.deleteAccount(userDetails.getUsername(), request);
+        var session = httpRequest.getSession(false);
+        if (session != null) {
+            session.invalidate();
+        }
         return ResponseEntity.ok(ApiResponse.success("회원 탈퇴가 완료되었습니다."));
     }
 }

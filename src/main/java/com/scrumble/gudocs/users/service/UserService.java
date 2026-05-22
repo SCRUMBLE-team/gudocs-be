@@ -9,7 +9,6 @@ import com.scrumble.gudocs.users.dto.UserNameUpdateRequest;
 import com.scrumble.gudocs.users.dto.UserPasswordUpdateRequest;
 import com.scrumble.gudocs.users.entity.User;
 import com.scrumble.gudocs.users.repository.UserRepository;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -52,20 +51,15 @@ public class UserService {
     }
 
     @Transactional
-    public void deleteAccount(String email, UserDeleteRequest request, HttpServletRequest httpRequest) {
+    public void deleteAccount(String email, UserDeleteRequest request) {
         User user = findByEmail(email);
 
         if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
             throw new BusinessException(ErrorCode.INVALID_PASSWORD);
         }
 
-        subscriptionRepository.deleteAllByUser(user);
+        subscriptionRepository.softDeleteAllByUser(user);
         userRepository.delete(user);
-
-        var session = httpRequest.getSession(false);
-        if (session != null) {
-            session.invalidate();
-        }
     }
 
     private User findByEmail(String email) {
