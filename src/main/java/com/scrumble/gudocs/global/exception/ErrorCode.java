@@ -14,7 +14,9 @@ public enum ErrorCode {
     SUBSCRIPTION_FORBIDDEN(HttpStatus.FORBIDDEN, "해당 구독 서비스에 접근할 권한이 없습니다."),
     INVALID_BILLING_MONTH(HttpStatus.BAD_REQUEST, "연간 결제의 경우 결제 월(1~12)을 입력해야 합니다."),
     BILLING_MONTH_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "월간 결제의 경우 결제 월을 입력할 수 없습니다."),
-    INVALID_YEAR_MONTH(HttpStatus.BAD_REQUEST, "year, month는 유효한 값이어야 하며 month는 1~12 사이여야 합니다.");
+    INVALID_YEAR_MONTH(HttpStatus.BAD_REQUEST, "year, month는 유효한 값이어야 하며 month는 1~12 사이여야 합니다."),
+    INVALID_PASSWORD(HttpStatus.BAD_REQUEST, "현재 비밀번호가 일치하지 않습니다."),
+    SAME_AS_OLD_PASSWORD(HttpStatus.BAD_REQUEST, "새 비밀번호는 현재 비밀번호와 달라야 합니다.");
 
     private final HttpStatus status;
     private final String message;
