@@ -4,7 +4,7 @@ spring:
   datasource:
     url: jdbc:mysql://127.0.0.1:3306/gudocs
     username: root
-    password:
+    password: skygg1006@
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
