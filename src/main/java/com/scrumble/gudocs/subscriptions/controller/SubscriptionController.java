@@ -8,6 +8,7 @@ import com.scrumble.gudocs.subscriptions.dto.response.SubscriptionResponse;
 import com.scrumble.gudocs.subscriptions.service.SubscriptionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @Tag(name = "Subscriptions", description = "구독 서비스 CRUD API")
+@SecurityRequirement(name = "cookieAuth")
 @RestController
 @RequestMapping("/api/subscriptions")
 @RequiredArgsConstructor

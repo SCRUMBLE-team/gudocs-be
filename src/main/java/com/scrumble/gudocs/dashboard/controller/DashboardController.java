@@ -5,6 +5,7 @@ import com.scrumble.gudocs.dashboard.service.DashboardService;
 import com.scrumble.gudocs.global.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "Dashboard", description = "메인 대시보드 API")
+@SecurityRequirement(name = "cookieAuth")
 @RestController
 @RequestMapping("/api/dashboard")
 @RequiredArgsConstructor

@@ -8,6 +8,7 @@ import com.scrumble.gudocs.users.dto.UserPasswordUpdateRequest;
 import com.scrumble.gudocs.users.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -18,6 +19,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "Users", description = "마이페이지 API (내 정보 조회/수정, 회원 탈퇴)")
+@SecurityRequirement(name = "cookieAuth")
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor

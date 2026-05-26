@@ -9,6 +9,7 @@ import com.scrumble.gudocs.expense.service.ExpenseService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "Expenses", description = "지출 분석 API")
+@SecurityRequirement(name = "cookieAuth")
 @RestController
 @RequestMapping("/api/subscriptions/expenses")
 @RequiredArgsConstructor
