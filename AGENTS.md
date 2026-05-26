@@ -1,179 +1,139 @@
 # AGENTS.md — gudocs-be
 
-구독 서비스 통합 관리 대시보드 백엔드.
-OTT, 음악 스트리밍, 클라우드 등 여러 구독 서비스를 한곳에서 관리하고 월별 지출과 결제일을 확인할 수 있다.
+구독 서비스 통합 관리 대시보드 백엔드. Spring Boot 3.5 / Java 21 / MySQL 8.
 
 ---
 
-## 기술 스택
-
-| 항목 | 버전 |
-|------|------|
-| Java | 21 |
-| Spring Boot | 3.5.14 |
-| Spring Data JPA | Boot 관리 |
-| MySQL | 8.x |
-| Lombok | Boot 관리 |
-| JUnit 5 | Boot 관리 |
-
-빌드 도구: Gradle (Wrapper `./gradlew` 사용)
-
----
-
-## 실행 명령어
+## 실행
 
 ```bash
-# 빌드 (테스트 제외)
-./gradlew build -x test
-
-# 로컬 실행 (MySQL)
-./gradlew bootRun
-
-# 로컬 실행 (H2 인메모리 + mock data)
-./gradlew bootRun --args='--spring.profiles.active=local'
-
-# 전체 테스트
-./gradlew test
-
-# 특정 클래스 테스트
-./gradlew test --tests "*ClassName"
+./gradlew build -x test                                      # 빌드
+./gradlew bootRun                                            # 로컬 (MySQL)
+./gradlew bootRun --args='--spring.profiles.active=local'    # H2 + mock data
+./gradlew test                                               # 전체 테스트
+./gradlew test --tests "*ClassName"                          # 단일 클래스
 ```
 
 ---
 
-## 현재 구조
+## 패키지 구조
 
 ```
 src/main/java/com/scrumble/gudocs/
-├── auth/                  # 회원가입, 로그인, 로그아웃, 내 정보
-├── users/                 # User 엔티티, Repository
-├── subscriptions/         # 구독 CRUD
-│   ├── entity/            # Subscription, BillingCycle, SubscriptionCategory,
-│   │                      #   SubscriptionStatus, PaymentMethod
-│   ├── controller/        # SubscriptionController
-│   ├── service/           # SubscriptionService
-│   ├── repository/        # SubscriptionRepository
-│   ├── dto/request/       # SubscriptionCreateRequest, UpdateRequest, StatusUpdateRequest
-│   └── dto/response/      # SubscriptionResponse
-├── expense/               # 지출 분석 독립 도메인
-│   ├── controller/        # ExpenseController
-│   ├── service/           # ExpenseService
-│   └── dto/response/      # MonthlyExpenseResponse, CategoryExpenseResponse,
-│                          #   ExpenseTrendResponse, MonthlyExpenseDetailResponse 외
-├── dashboard/             # 메인 대시보드 데이터 조회
-│   ├── controller/        # DashboardController
-│   ├── service/           # DashboardService
-│   └── dto/               # DashboardResponse, CategorySummary, UpcomingNotification
-├── global/
-│   ├── entity/            # BaseEntity (created_at, updated_at)
-│   ├── exception/         # ErrorCode, BusinessException, GlobalExceptionHandler
-│   └── response/          # ApiResponse
-└── config/
-    ├── SecurityConfig.java       # BCrypt, CORS(5173), 세션 인증
-    ├── LocalSecurityConfig.java  # @Profile("local") — H2 콘솔 허용
-    └── DataInitializer.java      # @Profile("local") — 앱 시작 시 mock data 삽입
+├── auth/           # 회원가입, 로그인, 로그아웃, 내 정보
+├── users/          # User 엔티티, 마이페이지 (이름·비번 수정, 탈퇴)
+├── subscriptions/  # 구독 CRUD (entity/controller/service/repository/dto)
+├── expense/        # 지출 분석 (월별, 카테고리별, 추이)
+├── dashboard/      # 메인 대시보드 집계
+├── global/         # BaseEntity, ErrorCode, BusinessException, ApiResponse
+└── config/         # SecurityConfig, CorsConfig, LocalSecurityConfig, DataInitializer
+
+deploy/             # EC2 배포 리소스 (setup.sh, systemd, Caddyfile, mysql-init.sql)
+.github/workflows/  # ci.yml (PR 테스트), deploy.yml (main → EC2 배포)
 ```
 
-**추가 예정 도메인:**
-- `notification` — 결제 예정 알림 (7일·3일·1일 전)
-- `member` — 회원 정보 수정, 비밀번호 변경, 탈퇴
+추가 예정: `notification` (결제 예정 알림)
 
 ---
 
 ## ERD
 
-### users
+**users** — id, name, email(unique), password_hash, created_at, updated_at
 
-| 컬럼 | 타입 | 제약 |
-|------|------|------|
-| id | bigint | PK, auto increment |
-| name | varchar | NOT NULL |
-| email | varchar | NOT NULL, UNIQUE |
-| password_hash | varchar | NOT NULL |
-| created_at | datetime | NOT NULL |
-| updated_at | datetime | - |
+**subscriptions** — id, user_id(FK), service_name, category, price, billing_cycle, billing_day, billing_month(YEARLY 전용), payment_method, status, paused_at, deleted_at(soft delete), created_at, updated_at
 
-### subscriptions
-
-| 컬럼 | 타입 | 제약 | 비고 |
-|------|------|------|------|
-| id | bigint | PK, auto increment | |
-| user_id | bigint | FK(users.id), NOT NULL | |
-| service_name | varchar | NOT NULL | |
-| category | varchar | NOT NULL | enum: OTT, MUSIC, CLOUD, PRODUCTIVITY, AI, NEWS, EDUCATION, GAME, SHOPPING, DESIGN, ETC |
-| price | bigint | NOT NULL | |
-| billing_cycle | varchar | NOT NULL | enum: MONTHLY, YEARLY |
-| billing_day | int | NOT NULL | |
-| billing_month | int | - | YEARLY 전용 |
-| payment_method | varchar | NOT NULL | enum: CARD, BANK_TRANSFER, SIMPLE_PAY, ETC |
-| status | varchar | NOT NULL | enum: ACTIVE, PAUSED |
-| paused_at | datetime | - | PAUSED 전환 시점 기록, RESUME 시 null |
-| deleted_at | datetime | - | soft delete — null이면 활성, 값이 있으면 삭제됨 |
-| created_at | datetime | NOT NULL | |
-| updated_at | datetime | - | |
+enum:
+- `category`: OTT, MUSIC, CLOUD, PRODUCTIVITY, AI, NEWS, EDUCATION, GAME, SHOPPING, DESIGN, ETC
+- `billing_cycle`: MONTHLY, YEARLY
+- `payment_method`: CARD, BANK_TRANSFER, SIMPLE_PAY, ETC
+- `status`: ACTIVE, PAUSED
 
 ---
 
 ## API 엔드포인트
 
-| 메서드 | 경로 | 인증 | 설명 |
-|--------|------|------|------|
-| POST | `/api/auth/signup` | 불필요 | 회원가입 |
-| POST | `/api/auth/login` | 불필요 | 로그인 |
-| POST | `/api/auth/logout` | 필요 | 로그아웃 |
-| GET | `/api/auth/me` | 필요 | 내 정보 |
-| GET | `/api/subscriptions` | 필요 | 구독 목록 (삭제된 것 제외) |
-| POST | `/api/subscriptions` | 필요 | 구독 등록 |
-| GET | `/api/subscriptions/{id}` | 필요 | 구독 상세 |
-| PUT | `/api/subscriptions/{id}` | 필요 | 구독 수정 |
-| DELETE | `/api/subscriptions/{id}` | 필요 | 구독 삭제 (soft delete) |
-| PUT | `/api/subscriptions/{id}/status` | 필요 | 상태 변경 (ACTIVE/PAUSED) |
-| GET | `/api/subscriptions/expenses/monthly` | 필요 | 월별 지출 분석 |
-| GET | `/api/subscriptions/expenses/categories` | 필요 | 카테고리별 지출 분석 |
-| GET | `/api/subscriptions/expenses/trends` | 필요 | 최근 6개월 지출 추이 |
-| GET | `/api/subscriptions/expenses/monthly/details` | 필요 | 월별 상세 지출 내역 |
-| GET | `/api/dashboard` | 필요 | 메인 대시보드 |
+| Method | Path | 인증 |
+|--------|------|------|
+| POST | `/api/auth/signup`, `/api/auth/login` | × |
+| POST | `/api/auth/logout` | ○ |
+| GET | `/api/auth/me` | ○ |
+| GET / PUT(`/name`,`/password`) / DELETE | `/api/users/me*` | ○ |
+| GET / POST | `/api/subscriptions` | ○ |
+| GET / PUT / DELETE | `/api/subscriptions/{id}` | ○ |
+| PUT | `/api/subscriptions/{id}/status` | ○ |
+| GET | `/api/subscriptions/expenses/{monthly,categories,trends,monthly/details}` | ○ |
+| GET | `/api/dashboard` | ○ |
+
+계층: Controller → Service → Repository
 
 ---
 
-## 지출 분석 계산 규칙
+## 지출 분석 규칙
 
-- `MONTHLY` 구독: `price` 그대로 반영
-- `YEARLY` 구독: `price / 12` (Long 나눗셈, 소수 버림)
-- 해당 월에 결제했다고 간주하는 기준 (세 조건 모두 충족):
-  1. `createdAt ≤ 해당월 말일` — 가입 이전 월은 제외
-  2. `deletedAt IS NULL OR deletedAt ≥ 해당월 1일` — 삭제 이전 월은 포함, 그 다음 달부터 제외
-  3. `status == ACTIVE OR (status == PAUSED AND pausedAt ≥ 해당월 1일)` — 정지 이전 월은 포함, 그 다음 달부터 제외
-- `changeRate = (현재월 - 전월) / 전월 * 100`, 전월이 0원이면 `0.0`
-- 비율 값: `Math.round(x * 100.0) / 100.0` (소수 둘째 자리)
-
-### 알려진 한계
-
-- 가격·카테고리·결제주기 변경 이력은 추적하지 않음 → 과거 월 조회 시 현재 값으로 표시됨
-- PAUSE→RESUME→재PAUSE 시 마지막 정지 시점(`pausedAt`)만 보존됨
+- `MONTHLY`: price 그대로, `YEARLY`: `price / 12` (Long, 소수 버림)
+- 해당 월 결제 간주 조건 (모두 충족):
+  1. `createdAt ≤ 해당월 말일`
+  2. `deletedAt IS NULL OR deletedAt ≥ 해당월 1일`
+  3. `status == ACTIVE OR (PAUSED AND pausedAt ≥ 해당월 1일)`
+- `changeRate = (현재월 - 전월) / 전월 * 100`, 전월 0이면 0.0
+- 비율: `Math.round(x * 100.0) / 100.0`
+- 가격·카테고리·결제주기 변경 이력은 추적하지 않음 (과거 월 조회 시 현재 값 표시)
 
 ---
 
-## soft delete 규칙
+## soft delete
 
-- `DELETE /api/subscriptions/{id}` 는 hard delete가 아니라 `deleted_at` 을 기록하는 soft delete
-- 이후 `GET /api/subscriptions/{id}` 는 404 반환
-- `GET /api/subscriptions` 목록에도 노출되지 않음
-- 지출 분석 API는 `findAllByUserIncludingDeleted` 로 삭제된 구독의 과거 결제 내역을 보존
+- `DELETE /api/subscriptions/{id}` → `deleted_at` 기록만, 이후 상세/목록에서 404·제외
+- 지출 분석은 `findAllByUserIncludingDeleted` 로 과거 결제 내역 보존
 
 ---
 
-## API 계층 구조
+## 배포 (시연용)
 
-Controller → Service → Repository
+5주 팀프로젝트 발표용 1회성 배포. 운영 안 함 → 최소 스펙.
+
+```
+[브라우저] ─HTTPS─► Vercel (gudocs-fe-8xxs.vercel.app)
+                        │ fetch(credentials: include)
+                        ▼
+                EC2 t3.micro (Ubuntu 22.04)
+                Caddy :443 ─► Spring Boot :8080 ─► MySQL :3306
+```
+
+- **도메인 미구매** → 백엔드는 `<dash-IP>.sslip.io` 사용 (예: `13-125-1-2.sslip.io`)
+- **HTTPS**: Caddy + Let's Encrypt 자동
+- **JVM**: `-Xmx400m` + swap 2GB (RAM 1GB 대응)
+
+### 환경변수 (`/etc/gudocs/env`)
+
+`application.yaml` 외부 의존성은 모두 env로 주입. 기본값은 로컬 개발용.
+
+| 변수 | 값 (예시/실제) |
+|------|--------|
+| `DB_URL`, `DB_USER`, `DB_PASSWORD` | MySQL 접속 |
+| `CORS_ALLOWED_ORIGINS` | `https://gudocs-fe-8xxs.vercel.app` (콤마로 다중 가능) |
+| `COOKIE_SAME_SITE` | `none` (크로스 도메인 세션 필수) |
+| `COOKIE_SECURE` | `true` (`none` 사용 시 필수, HTTPS 강제) |
+
+### CI/CD
+
+- **`ci.yml`** — PR(main/develop) + develop push → `gradlew test` + build
+- **`deploy.yml`** — main push 또는 수동 → 빌드 → SCP → `systemctl restart gudocs`
+- **GitHub Secrets**: `EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY`
+
+설정만 바꿀 때: EC2에서 `/etc/gudocs/env` 수정 → `sudo systemctl restart gudocs` (재배포 불필요)
+로그: `sudo journalctl -u gudocs -f`
 
 ---
 
 ## 에이전트 행동 규칙
 
-- secrets(DB 비밀번호, JWT Secret, API Key 등) 코드에 하드코딩 금지 — 환경변수 사용
+- secrets 코드에 하드코딩 금지 — 환경변수 사용
 - 새 도메인은 `com.scrumble.gudocs.<domain>/` 하위에 추가
 - 새 API 추가 시 테스트 작성 필수
-- `application.yaml`, `.env` 내용을 응답에 직접 포함하지 않음
-- 삭제 기능 구현 시 hard delete가 아닌 soft delete 사용 (deleted_at 패턴)
-- 지출 분석 관련 조회는 `findAllByUserIncludingDeleted` 사용 (과거 이력 보존)
+- `application.yaml`, `.env` 내용을 응답에 포함 금지
+- 삭제는 hard delete 금지 — `deleted_at` soft delete 사용
+- 지출 분석 조회는 `findAllByUserIncludingDeleted` 사용
+- 다른 사용자 데이터 접근 가능한 API 금지 — 현재 로그인 사용자 기준만
+- 배포 설정 변경 시 `deploy/env.example`과 `application.yaml` 기본값 동시 점검
+- CORS 도메인 추가는 코드가 아니라 `CORS_ALLOWED_ORIGINS` 환경변수에서 처리

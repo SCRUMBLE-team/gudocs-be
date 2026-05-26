@@ -1,0 +1,20 @@
+[Unit]
+Description=Gudocs Backend (Spring Boot)
+After=network.target mysql.service
+Wants=mysql.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/gudocs
+EnvironmentFile=/etc/gudocs/env
+ExecStart=/usr/bin/java -Xms256m -Xmx400m -jar /opt/gudocs/app.jar
+SuccessExitStatus=143
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=gudocs
+
+[Install]
+WantedBy=multi-user.target
