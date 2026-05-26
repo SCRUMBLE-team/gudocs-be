@@ -27,18 +27,20 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
-public class AuthController {
+public class AuthController implements AuthApi {
 
     private final AuthService authService;
     private final AuthenticationManager authenticationManager;
     private final SecurityContextRepository securityContextRepository;
 
+    @Override
     @PostMapping("/signup")
     public ResponseEntity<ApiResponse<Void>> signup(@Valid @RequestBody SignupRequest request) {
         authService.signup(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("회원가입 성공"));
     }
 
+    @Override
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<Void>> login(
             @Valid @RequestBody LoginRequest request,
@@ -58,6 +60,7 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success("로그인 성공"));
     }
 
+    @Override
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(HttpServletRequest httpRequest) {
         SecurityContextHolder.clearContext();
@@ -68,9 +71,9 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success("로그아웃 성공"));
     }
 
+    @Override
     @GetMapping("/me")
-    public ResponseEntity<ApiResponse<UserResponse>> me(
-            @AuthenticationPrincipal UserDetails userDetails) {
+    public ResponseEntity<ApiResponse<UserResponse>> me(@AuthenticationPrincipal UserDetails userDetails) {
         UserResponse response = authService.getCurrentUser(userDetails.getUsername());
         return ResponseEntity.ok(ApiResponse.success("조회 성공", response));
     }

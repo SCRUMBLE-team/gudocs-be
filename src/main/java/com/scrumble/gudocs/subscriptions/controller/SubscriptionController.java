@@ -19,10 +19,11 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/subscriptions")
 @RequiredArgsConstructor
-public class SubscriptionController {
+public class SubscriptionController implements SubscriptionApi {
 
     private final SubscriptionService subscriptionService;
 
+    @Override
     @PostMapping
     public ResponseEntity<ApiResponse<SubscriptionResponse>> create(
             @AuthenticationPrincipal UserDetails userDetails,
@@ -31,6 +32,7 @@ public class SubscriptionController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("구독 서비스 등록 성공", response));
     }
 
+    @Override
     @GetMapping
     public ResponseEntity<ApiResponse<List<SubscriptionResponse>>> getAll(
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -38,6 +40,7 @@ public class SubscriptionController {
         return ResponseEntity.ok(ApiResponse.success("구독 서비스 목록 조회 성공", response));
     }
 
+    @Override
     @GetMapping("/{subscriptionId}")
     public ResponseEntity<ApiResponse<SubscriptionResponse>> getOne(
             @AuthenticationPrincipal UserDetails userDetails,
@@ -46,6 +49,7 @@ public class SubscriptionController {
         return ResponseEntity.ok(ApiResponse.success("구독 서비스 상세 조회 성공", response));
     }
 
+    @Override
     @PutMapping("/{subscriptionId}")
     public ResponseEntity<ApiResponse<SubscriptionResponse>> update(
             @AuthenticationPrincipal UserDetails userDetails,
@@ -55,6 +59,7 @@ public class SubscriptionController {
         return ResponseEntity.ok(ApiResponse.success("구독 서비스 수정 성공", response));
     }
 
+    @Override
     @DeleteMapping("/{subscriptionId}")
     public ResponseEntity<ApiResponse<Void>> delete(
             @AuthenticationPrincipal UserDetails userDetails,
@@ -63,6 +68,7 @@ public class SubscriptionController {
         return ResponseEntity.ok(ApiResponse.success("구독 서비스 삭제 성공"));
     }
 
+    @Override
     @PutMapping("/{subscriptionId}/status")
     public ResponseEntity<ApiResponse<SubscriptionResponse>> updateStatus(
             @AuthenticationPrincipal UserDetails userDetails,

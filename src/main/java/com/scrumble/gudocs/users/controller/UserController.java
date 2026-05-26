@@ -17,10 +17,11 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
-public class UserController {
+public class UserController implements UserApi {
 
     private final UserService userService;
 
+    @Override
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<UserInfoResponse>> getMyInfo(
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -28,6 +29,7 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success("내 정보 조회에 성공했습니다.", response));
     }
 
+    @Override
     @PutMapping("/me/name")
     public ResponseEntity<ApiResponse<UserInfoResponse>> updateName(
             @AuthenticationPrincipal UserDetails userDetails,
@@ -36,6 +38,7 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success("이름이 수정되었습니다.", response));
     }
 
+    @Override
     @PutMapping("/me/password")
     public ResponseEntity<ApiResponse<Void>> updatePassword(
             @AuthenticationPrincipal UserDetails userDetails,
@@ -44,6 +47,7 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success("비밀번호가 수정되었습니다."));
     }
 
+    @Override
     @DeleteMapping("/me")
     public ResponseEntity<ApiResponse<Void>> deleteAccount(
             @AuthenticationPrincipal UserDetails userDetails,

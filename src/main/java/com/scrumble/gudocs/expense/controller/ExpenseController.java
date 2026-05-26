@@ -1,10 +1,10 @@
 package com.scrumble.gudocs.expense.controller;
 
-import com.scrumble.gudocs.global.response.ApiResponse;
 import com.scrumble.gudocs.expense.dto.response.CategoryExpenseResponse;
 import com.scrumble.gudocs.expense.dto.response.ExpenseTrendResponse;
 import com.scrumble.gudocs.expense.dto.response.MonthlyExpenseDetailResponse;
 import com.scrumble.gudocs.expense.dto.response.MonthlyExpenseResponse;
+import com.scrumble.gudocs.global.response.ApiResponse;
 import com.scrumble.gudocs.expense.service.ExpenseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -18,10 +18,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/subscriptions/expenses")
 @RequiredArgsConstructor
-public class ExpenseController {
+public class ExpenseController implements ExpenseApi {
 
     private final ExpenseService expenseService;
 
+    @Override
     @GetMapping("/monthly")
     public ResponseEntity<ApiResponse<MonthlyExpenseResponse>> getMonthlyExpense(
             @AuthenticationPrincipal UserDetails userDetails,
@@ -31,6 +32,7 @@ public class ExpenseController {
         return ResponseEntity.ok(ApiResponse.success("월별 구독 지출 분석 조회에 성공했습니다.", response));
     }
 
+    @Override
     @GetMapping("/categories")
     public ResponseEntity<ApiResponse<CategoryExpenseResponse>> getCategoryExpense(
             @AuthenticationPrincipal UserDetails userDetails,
@@ -40,6 +42,7 @@ public class ExpenseController {
         return ResponseEntity.ok(ApiResponse.success("카테고리별 지출 분석 조회에 성공했습니다.", response));
     }
 
+    @Override
     @GetMapping("/trends")
     public ResponseEntity<ApiResponse<ExpenseTrendResponse>> getExpenseTrend(
             @AuthenticationPrincipal UserDetails userDetails,
@@ -49,6 +52,7 @@ public class ExpenseController {
         return ResponseEntity.ok(ApiResponse.success("최근 6개월 구독 지출 추이 조회에 성공했습니다.", response));
     }
 
+    @Override
     @GetMapping("/monthly/details")
     public ResponseEntity<ApiResponse<MonthlyExpenseDetailResponse>> getMonthlyExpenseDetail(
             @AuthenticationPrincipal UserDetails userDetails,
