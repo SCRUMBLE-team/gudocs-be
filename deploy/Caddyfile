@@ -1,7 +1,4 @@
-# 도메인 미구매 정책: EC2 퍼블릭 IP를 dash 구분으로 sslip.io 에 결합해서 사용
-# 예: EC2 IP가 13.125.1.2 라면 → 13-125-1-2.sslip.io
-# 인스턴스 생성 후 실제 IP로 아래 호스트를 교체할 것
-13-125-1-2.sslip.io {
+43-203-195-12.sslip.io {
     encode gzip
 
     reverse_proxy localhost:8080 {
