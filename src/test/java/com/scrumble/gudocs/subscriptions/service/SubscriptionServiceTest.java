@@ -117,7 +117,8 @@ class SubscriptionServiceTest {
         User user = UserFixture.create();
         Subscription subscription = testSubscription(user); // MONTHLY
         SubscriptionUpdateRequest request = new SubscriptionUpdateRequest(
-                null, null, null, null, null, 5, null
+                "Netflix", SubscriptionCategory.OTT, 17000L,
+                BillingCycle.MONTHLY, 15, 5, PaymentMethod.CARD
         );
         given(userRepository.findByEmail("test@example.com")).willReturn(Optional.of(user));
         given(subscriptionRepository.findById(1L)).willReturn(Optional.of(subscription));
@@ -193,7 +194,7 @@ class SubscriptionServiceTest {
     }
 
     @Test
-    void 구독_상태_변경_성공() {
+    void 구독_상태_변경_ACTIVE에서_PAUSED로() {
         User user = UserFixture.create();
         Subscription subscription = testSubscription(user);
         SubscriptionStatusUpdateRequest request = new SubscriptionStatusUpdateRequest(SubscriptionStatus.PAUSED);
@@ -203,5 +204,35 @@ class SubscriptionServiceTest {
         SubscriptionResponse response = subscriptionService.updateStatus("test@example.com", 1L, request);
 
         assertThat(response.status()).isEqualTo(SubscriptionStatus.PAUSED);
+        assertThat(subscription.getPausedAt()).isNotNull();
+    }
+
+    @Test
+    void 구독_상태_변경_PAUSED에서_ACTIVE로() {
+        User user = UserFixture.create();
+        Subscription subscription = testSubscription(user);
+        subscription.updateStatus(SubscriptionStatus.PAUSED); // pausedAt 설정
+        SubscriptionStatusUpdateRequest request = new SubscriptionStatusUpdateRequest(SubscriptionStatus.ACTIVE);
+        given(userRepository.findByEmail("test@example.com")).willReturn(Optional.of(user));
+        given(subscriptionRepository.findById(1L)).willReturn(Optional.of(subscription));
+
+        SubscriptionResponse response = subscriptionService.updateStatus("test@example.com", 1L, request);
+
+        assertThat(response.status()).isEqualTo(SubscriptionStatus.ACTIVE);
+        assertThat(subscription.getPausedAt()).isNull();
+    }
+
+    @Test
+    void 구독_상태_변경_동일_상태_변경없음() {
+        User user = UserFixture.create();
+        Subscription subscription = testSubscription(user);
+        SubscriptionStatusUpdateRequest request = new SubscriptionStatusUpdateRequest(SubscriptionStatus.ACTIVE);
+        given(userRepository.findByEmail("test@example.com")).willReturn(Optional.of(user));
+        given(subscriptionRepository.findById(1L)).willReturn(Optional.of(subscription));
+
+        SubscriptionResponse response = subscriptionService.updateStatus("test@example.com", 1L, request);
+
+        assertThat(response.status()).isEqualTo(SubscriptionStatus.ACTIVE);
+        assertThat(subscription.getPausedAt()).isNull();
     }
 }

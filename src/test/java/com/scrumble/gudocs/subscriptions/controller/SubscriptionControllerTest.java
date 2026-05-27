@@ -191,8 +191,8 @@ class SubscriptionControllerTest {
         long id = 구독_ID_추출(createResult);
 
         SubscriptionUpdateRequest updateRequest = new SubscriptionUpdateRequest(
-                "Netflix Premium", null, 19000L,
-                null, null, null, null
+                "Netflix Premium", SubscriptionCategory.OTT, 19000L,
+                BillingCycle.MONTHLY, 15, null, PaymentMethod.CARD
         );
 
         mockMvc.perform(put("/api/subscriptions/" + id)

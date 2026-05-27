@@ -72,20 +72,14 @@ public class SubscriptionService {
         Subscription subscription = findSubscription(subscriptionId);
         checkOwnership(subscription, user);
 
-        BillingCycle effectiveCycle = request.billingCycle() != null
-                ? request.billingCycle()
-                : subscription.getBillingCycle();
-
         Integer effectiveBillingMonth;
-        if (effectiveCycle == BillingCycle.MONTHLY) {
+        if (request.billingCycle() == BillingCycle.MONTHLY) {
             if (request.billingMonth() != null) {
                 throw new BusinessException(ErrorCode.BILLING_MONTH_NOT_ALLOWED);
             }
             effectiveBillingMonth = null;
         } else {
-            effectiveBillingMonth = request.billingMonth() != null
-                    ? request.billingMonth()
-                    : subscription.getBillingMonth();
+            effectiveBillingMonth = request.billingMonth();
             if (effectiveBillingMonth == null) {
                 throw new BusinessException(ErrorCode.INVALID_BILLING_MONTH);
             }
