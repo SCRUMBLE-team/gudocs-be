@@ -62,13 +62,13 @@ public class Subscription extends BaseEntity {
     public void update(String serviceName, SubscriptionCategory category, Long price,
                        BillingCycle billingCycle, Integer billingDay, Integer billingMonth,
                        PaymentMethod paymentMethod) {
-        if (serviceName != null) this.serviceName = serviceName;
-        if (category != null) this.category = category;
-        if (price != null) this.price = price;
-        if (billingCycle != null) this.billingCycle = billingCycle;
-        if (billingDay != null) this.billingDay = billingDay;
-        if (billingMonth != null) this.billingMonth = billingMonth;
-        if (paymentMethod != null) this.paymentMethod = paymentMethod;
+        this.serviceName = serviceName;
+        this.category = category;
+        this.price = price;
+        this.billingCycle = billingCycle;
+        this.billingDay = billingDay;
+        this.billingMonth = billingMonth;
+        this.paymentMethod = paymentMethod;
     }
 
     public void updateStatus(SubscriptionStatus status) {

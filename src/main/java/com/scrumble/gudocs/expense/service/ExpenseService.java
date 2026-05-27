@@ -124,7 +124,8 @@ public class ExpenseService {
                         s.getBillingDay(),
                         s.getBillingMonth(),
                         s.getPaymentMethod(),
-                        s.getStatus()
+                        s.getStatus(),
+                        s.getDeletedAt() != null
                 ))
                 .toList();
 

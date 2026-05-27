@@ -16,6 +16,7 @@ public record SubscriptionExpenseDetail(
         Integer billingDay,
         Integer billingMonth,
         PaymentMethod paymentMethod,
-        SubscriptionStatus status
+        SubscriptionStatus status,
+        boolean deleted
 ) {
 }
