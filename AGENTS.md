@@ -66,6 +66,8 @@ enum:
 
 계층: Controller → Service → Repository
 
+- `PUT /api/subscriptions/{id}` — **full update** 방식: 모든 필드 필수 전송 (partial update 불가)
+
 ---
 
 ## 지출 분석 규칙
@@ -85,6 +87,7 @@ enum:
 
 - `DELETE /api/subscriptions/{id}` → `deleted_at` 기록만, 이후 상세/목록에서 404·제외
 - 지출 분석은 `findAllByUserIncludingDeleted` 로 과거 결제 내역 보존
+- `GET /api/subscriptions/expenses/monthly/details` 응답의 각 구독 항목에 `deleted` 필드 포함 — `deletedAt != null`이면 `true`
 
 ---
 
