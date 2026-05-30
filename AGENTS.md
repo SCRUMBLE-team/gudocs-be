@@ -22,17 +22,16 @@
 src/main/java/com/scrumble/gudocs/
 ├── auth/           # 회원가입, 로그인, 로그아웃, 내 정보
 ├── users/          # User 엔티티, 마이페이지 (이름·비번 수정, 탈퇴)
-├── subscriptions/  # 구독 CRUD (entity/controller/service/repository/dto)
+├── subscriptions/  # 구독 CRUD (entity/controller/service/repository/dto/util)
 ├── expense/        # 지출 분석 (월별, 카테고리별, 추이)
 ├── dashboard/      # 메인 대시보드 집계
+├── notification/   # 결제 예정 알림 (헤더용 단독 엔드포인트)
 ├── global/         # BaseEntity, ErrorCode, BusinessException, ApiResponse
 └── config/         # SecurityConfig, CorsConfig, LocalSecurityConfig, DataInitializer
 
 deploy/             # EC2 배포 리소스 (setup.sh, systemd, Caddyfile, mysql-init.sql)
 .github/workflows/  # ci.yml (PR 테스트), deploy.yml (main → EC2 배포)
 ```
-
-추가 예정: `notification` (결제 예정 알림)
 
 ---
 
@@ -63,10 +62,13 @@ enum:
 | PUT | `/api/subscriptions/{id}/status` | ○ |
 | GET | `/api/subscriptions/expenses/{monthly,categories,trends,monthly/details}` | ○ |
 | GET | `/api/dashboard` | ○ |
+| GET | `/api/notifications/upcoming` | ○ |
 
 계층: Controller → Service → Repository
 
 - `PUT /api/subscriptions/{id}` — **full update** 방식: 모든 필드 필수 전송 (partial update 불가)
+- `SubscriptionResponse`에 `nextBillingDate` 필드 포함 — BE에서 계산해 내려보냄 (FE 자체 계산 금지)
+- 결제일 계산은 `subscriptions/util/NextBillingDateCalculator` 단일 소스. 알림(`NotificationService`)·대시보드·구독 응답이 모두 이 헬퍼를 공유
 
 ---
 
