@@ -2,12 +2,17 @@ package com.scrumble.gudocs.dashboard.service;
 
 import com.scrumble.gudocs.dashboard.dto.CategorySummary;
 import com.scrumble.gudocs.dashboard.dto.DashboardResponse;
-import com.scrumble.gudocs.dashboard.dto.UpcomingNotification;
 import com.scrumble.gudocs.global.exception.BusinessException;
 import com.scrumble.gudocs.global.exception.ErrorCode;
+import com.scrumble.gudocs.notification.dto.response.UpcomingNotification;
+import com.scrumble.gudocs.notification.service.NotificationService;
 import com.scrumble.gudocs.subscriptions.dto.response.SubscriptionResponse;
-import com.scrumble.gudocs.subscriptions.entity.*;
+import com.scrumble.gudocs.subscriptions.entity.BillingCycle;
+import com.scrumble.gudocs.subscriptions.entity.Subscription;
+import com.scrumble.gudocs.subscriptions.entity.SubscriptionCategory;
+import com.scrumble.gudocs.subscriptions.entity.SubscriptionStatus;
 import com.scrumble.gudocs.subscriptions.repository.SubscriptionRepository;
+import com.scrumble.gudocs.subscriptions.util.NextBillingDateCalculator;
 import com.scrumble.gudocs.users.entity.User;
 import com.scrumble.gudocs.users.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -15,13 +20,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.YearMonth;
-import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +31,7 @@ public class DashboardService {
 
     private final SubscriptionRepository subscriptionRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     @Transactional(readOnly = true)
     public DashboardResponse getDashboard(String email) {
@@ -46,9 +49,12 @@ public class DashboardService {
                 .toList();
 
         long monthlyTotal = calculateMonthlyTotal(active);
-        List<SubscriptionResponse> recent = all.stream().limit(3).map(SubscriptionResponse::from).toList();
+        List<SubscriptionResponse> recent = all.stream()
+                .limit(3)
+                .map(s -> SubscriptionResponse.from(s, NextBillingDateCalculator.calculate(s, today)))
+                .toList();
         List<CategorySummary> categories = calculateCategorySummaries(active, monthlyTotal);
-        List<UpcomingNotification> upcoming = calculateUpcomingNotifications(active, today);
+        List<UpcomingNotification> upcoming = notificationService.calculate(active, today);
 
         return new DashboardResponse(upcoming, monthlyTotal, active.size(), recent, categories);
     }
@@ -76,53 +82,5 @@ public class DashboardService {
                 })
                 .sorted(Comparator.comparingLong(CategorySummary::monthlyAmount).reversed())
                 .toList();
-    }
-
-    private List<UpcomingNotification> calculateUpcomingNotifications(List<Subscription> active, LocalDate today) {
-        LocalDate threshold = today.plusDays(7);
-
-        return active.stream()
-                .flatMap(s -> {
-                    LocalDate nextBillingDate = calculateNextBillingDate(s, today);
-                    if (!nextBillingDate.isBefore(today) && !nextBillingDate.isAfter(threshold)) {
-                        int daysUntil = (int) ChronoUnit.DAYS.between(today, nextBillingDate);
-                        return Stream.of(new UpcomingNotification(
-                                s.getId(), s.getServiceName(), s.getPrice(), nextBillingDate, daysUntil));
-                    }
-                    return Stream.empty();
-                })
-                .sorted(Comparator.comparing(UpcomingNotification::nextBillingDate))
-                .toList();
-    }
-
-    private LocalDate calculateNextBillingDate(Subscription subscription, LocalDate today) {
-        if (subscription.getBillingCycle() == BillingCycle.MONTHLY) {
-            return calculateMonthlyNextBillingDate(subscription.getBillingDay(), today);
-        }
-        return calculateYearlyNextBillingDate(subscription.getBillingDay(), subscription.getBillingMonth(), today);
-    }
-
-    private LocalDate calculateMonthlyNextBillingDate(int billingDay, LocalDate today) {
-        YearMonth currentMonth = YearMonth.from(today);
-        LocalDate billingDate = currentMonth.atDay(Math.min(billingDay, currentMonth.lengthOfMonth()));
-
-        if (!billingDate.isBefore(today)) {
-            return billingDate;
-        }
-
-        YearMonth nextMonth = currentMonth.plusMonths(1);
-        return nextMonth.atDay(Math.min(billingDay, nextMonth.lengthOfMonth()));
-    }
-
-    private LocalDate calculateYearlyNextBillingDate(int billingDay, int billingMonth, LocalDate today) {
-        YearMonth thisYearMonth = YearMonth.of(today.getYear(), billingMonth);
-        LocalDate billingDate = thisYearMonth.atDay(Math.min(billingDay, thisYearMonth.lengthOfMonth()));
-
-        if (!billingDate.isBefore(today)) {
-            return billingDate;
-        }
-
-        YearMonth nextYearMonth = YearMonth.of(today.getYear() + 1, billingMonth);
-        return nextYearMonth.atDay(Math.min(billingDay, nextYearMonth.lengthOfMonth()));
     }
 }

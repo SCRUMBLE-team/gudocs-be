@@ -2,6 +2,7 @@ package com.scrumble.gudocs.subscriptions.dto.response;
 
 import com.scrumble.gudocs.subscriptions.entity.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public record SubscriptionResponse(
@@ -14,10 +15,11 @@ public record SubscriptionResponse(
         Integer billingMonth,
         PaymentMethod paymentMethod,
         SubscriptionStatus status,
+        LocalDate nextBillingDate,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
-    public static SubscriptionResponse from(Subscription subscription) {
+    public static SubscriptionResponse from(Subscription subscription, LocalDate nextBillingDate) {
         return new SubscriptionResponse(
                 subscription.getId(),
                 subscription.getServiceName(),
@@ -28,6 +30,7 @@ public record SubscriptionResponse(
                 subscription.getBillingMonth(),
                 subscription.getPaymentMethod(),
                 subscription.getStatus(),
+                nextBillingDate,
                 subscription.getCreatedAt(),
                 subscription.getUpdatedAt()
         );
