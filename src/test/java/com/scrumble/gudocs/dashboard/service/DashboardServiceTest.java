@@ -1,6 +1,7 @@
 package com.scrumble.gudocs.dashboard.service;
 
 import com.scrumble.gudocs.dashboard.dto.DashboardResponse;
+import com.scrumble.gudocs.notification.service.NotificationService;
 import com.scrumble.gudocs.subscriptions.entity.*;
 import com.scrumble.gudocs.subscriptions.repository.SubscriptionRepository;
 import com.scrumble.gudocs.users.entity.User;
@@ -29,6 +30,9 @@ class DashboardServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private NotificationService notificationService;
 
     @InjectMocks
     private DashboardService dashboardService;
@@ -174,6 +178,18 @@ class DashboardServiceTest {
     }
 
     @Test
+    void 최근_구독_nextBillingDate_채워짐() {
+        User u = user();
+        // today = 2026-05-11, billingDay=15 → 2026-05-15
+        setupUser(u, List.of(monthly("Netflix", SubscriptionCategory.OTT, 17000L, 15)));
+
+        DashboardResponse response = dashboardService.getDashboard("test@example.com", TODAY);
+
+        assertThat(response.recentSubscriptions().get(0).nextBillingDate())
+                .isEqualTo(LocalDate.of(2026, 5, 15));
+    }
+
+    @Test
     void 구독_없으면_최근_구독_빈_목록() {
         User u = user();
         setupUser(u, List.of());
@@ -181,138 +197,5 @@ class DashboardServiceTest {
         DashboardResponse response = dashboardService.getDashboard("test@example.com", TODAY);
 
         assertThat(response.recentSubscriptions()).isEmpty();
-    }
-
-    // ─── upcomingNotifications ──────────────────────────────────────────────────
-
-    @Test
-    void 결제일_7일_이내_알림_포함() {
-        // today = 2026-05-11, billingDay = 15 → nextBillingDate = 2026-05-15 (4일 후)
-        User u = user();
-        setupUser(u, List.of(monthly("Netflix", SubscriptionCategory.OTT, 17000L, 15)));
-
-        DashboardResponse response = dashboardService.getDashboard("test@example.com", TODAY);
-
-        assertThat(response.upcomingNotifications()).hasSize(1);
-        assertThat(response.upcomingNotifications().get(0).daysUntilBilling()).isEqualTo(4);
-        assertThat(response.upcomingNotifications().get(0).nextBillingDate())
-                .isEqualTo(LocalDate.of(2026, 5, 15));
-    }
-
-    @Test
-    void 결제일_당일_알림_포함() {
-        // today = 2026-05-11, billingDay = 11 → 0일 후
-        User u = user();
-        setupUser(u, List.of(monthly("Netflix", SubscriptionCategory.OTT, 17000L, 11)));
-
-        DashboardResponse response = dashboardService.getDashboard("test@example.com", TODAY);
-
-        assertThat(response.upcomingNotifications()).hasSize(1);
-        assertThat(response.upcomingNotifications().get(0).daysUntilBilling()).isZero();
-    }
-
-    @Test
-    void 결제일_7일_후_알림_포함() {
-        // today = 2026-05-11, billingDay = 18 → 2026-05-18 (7일 후, 경계값)
-        User u = user();
-        setupUser(u, List.of(monthly("Netflix", SubscriptionCategory.OTT, 17000L, 18)));
-
-        DashboardResponse response = dashboardService.getDashboard("test@example.com", TODAY);
-
-        assertThat(response.upcomingNotifications()).hasSize(1);
-        assertThat(response.upcomingNotifications().get(0).daysUntilBilling()).isEqualTo(7);
-    }
-
-    @Test
-    void 결제일_8일_후_알림_미포함() {
-        // today = 2026-05-11, billingDay = 19 → 2026-05-19 (8일 후)
-        User u = user();
-        setupUser(u, List.of(monthly("Netflix", SubscriptionCategory.OTT, 17000L, 19)));
-
-        DashboardResponse response = dashboardService.getDashboard("test@example.com", TODAY);
-
-        assertThat(response.upcomingNotifications()).isEmpty();
-    }
-
-    @Test
-    void 결제일_이미_지난_경우_다음달_계산() {
-        // today = 2026-05-11, billingDay = 5 → 이번달 5일은 지남 → next: 2026-06-05 (25일 후)
-        User u = user();
-        setupUser(u, List.of(monthly("Netflix", SubscriptionCategory.OTT, 17000L, 5)));
-
-        DashboardResponse response = dashboardService.getDashboard("test@example.com", TODAY);
-
-        assertThat(response.upcomingNotifications()).isEmpty();
-    }
-
-    @Test
-    void 결제일_31일_없는_달_마지막_날_계산() {
-        // today = 2026-04-25, billingDay = 31, 4월은 30일까지 → 2026-04-30 (5일 후)
-        User u = user();
-        given(userRepository.findByEmail("test@example.com")).willReturn(Optional.of(u));
-        given(subscriptionRepository.findAllByUserOrderByCreatedAtDesc(u))
-                .willReturn(List.of(monthly("Netflix", SubscriptionCategory.OTT, 17000L, 31)));
-
-        LocalDate aprilDate = LocalDate.of(2026, 4, 25);
-        DashboardResponse response = dashboardService.getDashboard("test@example.com", aprilDate);
-
-        assertThat(response.upcomingNotifications()).hasSize(1);
-        assertThat(response.upcomingNotifications().get(0).nextBillingDate())
-                .isEqualTo(LocalDate.of(2026, 4, 30));
-    }
-
-    @Test
-    void PAUSED_구독은_알림_미포함() {
-        User u = user();
-        Subscription paused = Subscription.builder()
-                .user(u).serviceName("Netflix").category(SubscriptionCategory.OTT)
-                .price(17000L).billingCycle(BillingCycle.MONTHLY).billingDay(15)
-                .paymentMethod(PaymentMethod.CARD).status(SubscriptionStatus.PAUSED).build();
-        setupUser(u, List.of(paused));
-
-        DashboardResponse response = dashboardService.getDashboard("test@example.com", TODAY);
-
-        assertThat(response.upcomingNotifications()).isEmpty();
-    }
-
-    @Test
-    void 연간_구독_결제_예정일_계산() {
-        // today = 2026-05-11, billingMonth = 5, billingDay = 14 → 2026-05-14 (3일 후)
-        User u = user();
-        setupUser(u, List.of(yearly("Adobe", SubscriptionCategory.DESIGN, 120000L, 14, 5)));
-
-        DashboardResponse response = dashboardService.getDashboard("test@example.com", TODAY);
-
-        assertThat(response.upcomingNotifications()).hasSize(1);
-        assertThat(response.upcomingNotifications().get(0).nextBillingDate())
-                .isEqualTo(LocalDate.of(2026, 5, 14));
-    }
-
-    @Test
-    void 연간_구독_결제일_지나면_내년으로_계산() {
-        // today = 2026-05-11, billingMonth = 3, billingDay = 1 → 2026-03-01 지남 → 2027-03-01
-        User u = user();
-        setupUser(u, List.of(yearly("Adobe", SubscriptionCategory.DESIGN, 120000L, 1, 3)));
-
-        DashboardResponse response = dashboardService.getDashboard("test@example.com", TODAY);
-
-        assertThat(response.upcomingNotifications()).isEmpty();
-    }
-
-    @Test
-    void 알림_결제일_오름차순_정렬() {
-        // today = 2026-05-11
-        // billingDay=15 → 05-15 (4일), billingDay=13 → 05-13 (2일)
-        User u = user();
-        setupUser(u, List.of(
-                monthly("Netflix", SubscriptionCategory.OTT, 17000L, 15),
-                monthly("Spotify", SubscriptionCategory.MUSIC, 10000L, 13)
-        ));
-
-        DashboardResponse response = dashboardService.getDashboard("test@example.com", TODAY);
-
-        assertThat(response.upcomingNotifications()).hasSize(2);
-        assertThat(response.upcomingNotifications().get(0).serviceName()).isEqualTo("Spotify");
-        assertThat(response.upcomingNotifications().get(1).serviceName()).isEqualTo("Netflix");
     }
 }
