@@ -1,7 +1,6 @@
 package com.scrumble.gudocs.dashboard.service;
 
 import com.scrumble.gudocs.dashboard.dto.DashboardResponse;
-import com.scrumble.gudocs.notification.service.NotificationService;
 import com.scrumble.gudocs.subscriptions.entity.*;
 import com.scrumble.gudocs.subscriptions.repository.SubscriptionRepository;
 import com.scrumble.gudocs.users.entity.User;
@@ -30,9 +29,6 @@ class DashboardServiceTest {
 
     @Mock
     private UserRepository userRepository;
-
-    @Mock
-    private NotificationService notificationService;
 
     @InjectMocks
     private DashboardService dashboardService;

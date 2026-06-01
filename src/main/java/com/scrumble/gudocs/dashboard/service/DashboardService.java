@@ -4,8 +4,6 @@ import com.scrumble.gudocs.dashboard.dto.CategorySummary;
 import com.scrumble.gudocs.dashboard.dto.DashboardResponse;
 import com.scrumble.gudocs.global.exception.BusinessException;
 import com.scrumble.gudocs.global.exception.ErrorCode;
-import com.scrumble.gudocs.notification.dto.response.UpcomingNotification;
-import com.scrumble.gudocs.notification.service.NotificationService;
 import com.scrumble.gudocs.subscriptions.dto.response.SubscriptionResponse;
 import com.scrumble.gudocs.subscriptions.entity.BillingCycle;
 import com.scrumble.gudocs.subscriptions.entity.Subscription;
@@ -31,7 +29,6 @@ public class DashboardService {
 
     private final SubscriptionRepository subscriptionRepository;
     private final UserRepository userRepository;
-    private final NotificationService notificationService;
 
     @Transactional(readOnly = true)
     public DashboardResponse getDashboard(String email) {
@@ -54,9 +51,8 @@ public class DashboardService {
                 .map(s -> SubscriptionResponse.from(s, NextBillingDateCalculator.calculate(s, today)))
                 .toList();
         List<CategorySummary> categories = calculateCategorySummaries(active, monthlyTotal);
-        List<UpcomingNotification> upcoming = notificationService.calculate(active, today);
 
-        return new DashboardResponse(upcoming, monthlyTotal, active.size(), recent, categories);
+        return new DashboardResponse(monthlyTotal, active.size(), recent, categories);
     }
 
     private long calculateMonthlyTotal(List<Subscription> subscriptions) {

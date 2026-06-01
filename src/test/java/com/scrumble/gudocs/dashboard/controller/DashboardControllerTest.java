@@ -70,7 +70,6 @@ class DashboardControllerTest {
                 .andExpect(jsonPath("$.data.monthlyTotalExpense").value(0))
                 .andExpect(jsonPath("$.data.activeSubscriptionCount").value(0))
                 .andExpect(jsonPath("$.data.recentSubscriptions").isArray())
-                .andExpect(jsonPath("$.data.upcomingNotifications").isArray())
                 .andExpect(jsonPath("$.data.categorySummaries").isArray());
     }
 
