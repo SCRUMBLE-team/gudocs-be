@@ -8,12 +8,14 @@ import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionUpdateRequest;
 import com.scrumble.gudocs.subscriptions.dto.response.SubscriptionResponse;
 import com.scrumble.gudocs.subscriptions.entity.*;
 import com.scrumble.gudocs.subscriptions.repository.SubscriptionRepository;
+import com.scrumble.gudocs.subscriptions.util.NextBillingDateCalculator;
 import com.scrumble.gudocs.users.entity.User;
 import com.scrumble.gudocs.users.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 
@@ -46,15 +48,16 @@ public class SubscriptionService {
                 .paymentMethod(request.paymentMethod())
                 .build();
 
-        return SubscriptionResponse.from(subscriptionRepository.save(subscription));
+        return toResponse(subscriptionRepository.save(subscription));
     }
 
     @Transactional(readOnly = true)
     public List<SubscriptionResponse> getAll(String email) {
         User user = findUser(email);
+        LocalDate today = LocalDate.now();
         return subscriptionRepository.findAllByUserOrderByCreatedAtDesc(user)
                 .stream()
-                .map(SubscriptionResponse::from)
+                .map(s -> SubscriptionResponse.from(s, NextBillingDateCalculator.calculate(s, today)))
                 .toList();
     }
 
@@ -63,7 +66,7 @@ public class SubscriptionService {
         User user = findUser(email);
         Subscription subscription = findSubscription(subscriptionId);
         checkOwnership(subscription, user);
-        return SubscriptionResponse.from(subscription);
+        return toResponse(subscription);
     }
 
     @Transactional
@@ -91,7 +94,7 @@ public class SubscriptionService {
                 request.paymentMethod()
         );
 
-        return SubscriptionResponse.from(subscription);
+        return toResponse(subscription);
     }
 
     @Transactional
@@ -109,7 +112,14 @@ public class SubscriptionService {
         Subscription subscription = findSubscription(subscriptionId);
         checkOwnership(subscription, user);
         subscription.updateStatus(request.status());
-        return SubscriptionResponse.from(subscription);
+        return toResponse(subscription);
+    }
+
+    private SubscriptionResponse toResponse(Subscription subscription) {
+        return SubscriptionResponse.from(
+                subscription,
+                NextBillingDateCalculator.calculate(subscription, LocalDate.now())
+        );
     }
 
     private User findUser(String email) {

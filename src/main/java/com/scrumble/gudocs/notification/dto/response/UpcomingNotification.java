@@ -1,4 +1,4 @@
-package com.scrumble.gudocs.dashboard.dto;
+package com.scrumble.gudocs.notification.dto.response;
 
 import java.time.LocalDate;
 

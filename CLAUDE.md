@@ -66,6 +66,13 @@ subscriptions/
   controller/SubscriptionController.java
   service/SubscriptionService.java
   repository/SubscriptionRepository.java  # findAllByUserOrderByCreatedAtDesc
+  util/NextBillingDateCalculator.java     # 다음 결제일 계산 단일 소스
+  dto/response/SubscriptionResponse.java  # nextBillingDate 포함
+
+notification/
+  controller/NotificationController.java  # GET /api/notifications/upcoming
+  service/NotificationService.java        # 7일 이내 ACTIVE 구독 알림
+  dto/response/UpcomingNotification.java
 
 global/
   entity/BaseEntity.java         # created_at, updated_at (JPA Auditing)
@@ -94,6 +101,7 @@ global/
 | PUT    | `/api/subscriptions/{id}`        | 필요  | 구독 수정                 |
 | DELETE | `/api/subscriptions/{id}`        | 필요  | 구독 삭제                 |
 | PUT    | `/api/subscriptions/{id}/status` | 필요  | 상태 변경 (ACTIVE/PAUSED) |
+| GET    | `/api/notifications/upcoming`    | 필요  | 다가오는 결제 알림 (7일 이내)   |
 
 ---
 
