@@ -69,6 +69,15 @@ public class SubscriptionController implements SubscriptionApi {
     }
 
     @Override
+    @GetMapping("/check-name")
+    public ResponseEntity<ApiResponse<Boolean>> checkDuplicateName(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam String name) {
+        boolean isDuplicate = subscriptionService.isDuplicateName(userDetails.getUsername(), name);
+        return ResponseEntity.ok(ApiResponse.success("서비스명 중복 확인", isDuplicate));
+    }
+
+    @Override
     @PutMapping("/{subscriptionId}/status")
     public ResponseEntity<ApiResponse<SubscriptionResponse>> updateStatus(
             @AuthenticationPrincipal UserDetails userDetails,

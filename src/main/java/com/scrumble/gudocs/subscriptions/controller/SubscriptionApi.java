@@ -65,6 +65,14 @@ public interface SubscriptionApi {
     ResponseEntity<ApiResponse<Void>> delete(@Parameter(hidden = true) UserDetails userDetails,
             Long subscriptionId);
 
+    @Operation(summary = "서비스명 중복 확인", description = "동일한 서비스명의 활성 구독이 있는지 확인합니다. (대소문자 무시, 경고 용도)")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "확인 완료"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "로그인 필요")
+    })
+    ResponseEntity<ApiResponse<Boolean>> checkDuplicateName(@Parameter(hidden = true) UserDetails userDetails,
+            String name);
+
     @Operation(summary = "구독 상태 변경", description = "구독 상태를 ACTIVE 또는 PAUSED로 변경합니다.")
     @ApiResponses({
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "상태 변경 성공"),

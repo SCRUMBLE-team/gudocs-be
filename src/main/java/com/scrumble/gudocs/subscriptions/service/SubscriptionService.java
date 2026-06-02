@@ -105,6 +105,12 @@ public class SubscriptionService {
         subscription.softDelete();
     }
 
+    @Transactional(readOnly = true)
+    public boolean isDuplicateName(String email, String serviceName) {
+        User user = findUser(email);
+        return subscriptionRepository.existsByUserAndServiceNameIgnoreCaseAndDeletedAtIsNull(user, serviceName);
+    }
+
     @Transactional
     public SubscriptionResponse updateStatus(String email, Long subscriptionId,
                                              SubscriptionStatusUpdateRequest request) {
