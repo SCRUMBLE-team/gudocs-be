@@ -39,7 +39,7 @@ public class SubscriptionService {
 
         Subscription subscription = Subscription.builder()
                 .user(user)
-                .serviceName(request.serviceName())
+                .serviceName(request.serviceName().strip())
                 .category(request.category())
                 .price(request.price())
                 .billingCycle(request.billingCycle())
@@ -89,7 +89,7 @@ public class SubscriptionService {
         }
 
         subscription.update(
-                request.serviceName(), request.category(), request.price(),
+                request.serviceName().strip(), request.category(), request.price(),
                 request.billingCycle(), request.billingDay(), effectiveBillingMonth,
                 request.paymentMethod()
         );
@@ -108,7 +108,7 @@ public class SubscriptionService {
     @Transactional(readOnly = true)
     public boolean isDuplicateName(String email, String serviceName) {
         User user = findUser(email);
-        return subscriptionRepository.existsByUserAndServiceNameIgnoreCaseAndDeletedAtIsNull(user, serviceName);
+        return subscriptionRepository.existsByUserAndServiceNameIgnoreCaseAndDeletedAtIsNull(user, serviceName.strip());
     }
 
     @Transactional

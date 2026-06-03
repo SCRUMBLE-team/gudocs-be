@@ -312,4 +312,26 @@ class SubscriptionControllerTest {
         mockMvc.perform(get("/api/subscriptions"))
                 .andExpect(status().isUnauthorized());
     }
+
+    @Test
+    void 서비스명_중복_확인_빈문자열_400() throws Exception {
+        mockMvc.perform(get("/api/subscriptions/check-name")
+                        .param("name", "   ")
+                        .session(session))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void 서비스명_중복_확인_앞뒤공백_트리밍() throws Exception {
+        구독_등록(session, new SubscriptionCreateRequest(
+                "Netflix", SubscriptionCategory.OTT, 17000L,
+                BillingCycle.MONTHLY, 15, null, PaymentMethod.CARD));
+
+        mockMvc.perform(get("/api/subscriptions/check-name")
+                        .param("name", "  Netflix  ")
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(true));
+    }
 }

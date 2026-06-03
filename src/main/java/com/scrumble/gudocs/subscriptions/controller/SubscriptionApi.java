@@ -10,6 +10,9 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.userdetails.UserDetails;
 
@@ -26,7 +29,7 @@ public interface SubscriptionApi {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "로그인 필요")
     })
     ResponseEntity<ApiResponse<SubscriptionResponse>> create(@Parameter(hidden = true) UserDetails userDetails,
-            SubscriptionCreateRequest request);
+            @Valid SubscriptionCreateRequest request);
 
     @Operation(summary = "구독 목록 조회", description = "현재 사용자의 구독 목록을 조회합니다. (삭제된 항목 제외)")
     @ApiResponses({
@@ -54,7 +57,7 @@ public interface SubscriptionApi {
     })
     ResponseEntity<ApiResponse<SubscriptionResponse>> update(@Parameter(hidden = true) UserDetails userDetails,
             Long subscriptionId,
-            SubscriptionUpdateRequest request);
+            @Valid SubscriptionUpdateRequest request);
 
     @Operation(summary = "구독 삭제", description = "구독 서비스를 삭제합니다. (soft delete)")
     @ApiResponses({
@@ -71,7 +74,8 @@ public interface SubscriptionApi {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "로그인 필요")
     })
     ResponseEntity<ApiResponse<Boolean>> checkDuplicateName(@Parameter(hidden = true) UserDetails userDetails,
-            String name);
+            @Parameter(description = "확인할 서비스명", example = "Netflix", required = true)
+            @NotBlank @Size(max = 100) String name);
 
     @Operation(summary = "구독 상태 변경", description = "구독 상태를 ACTIVE 또는 PAUSED로 변경합니다.")
     @ApiResponses({
@@ -81,5 +85,5 @@ public interface SubscriptionApi {
     })
     ResponseEntity<ApiResponse<SubscriptionResponse>> updateStatus(@Parameter(hidden = true) UserDetails userDetails,
             Long subscriptionId,
-            SubscriptionStatusUpdateRequest request);
+            @Valid SubscriptionStatusUpdateRequest request);
 }
