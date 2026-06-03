@@ -19,6 +19,8 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
     @Query("SELECT s FROM Subscription s WHERE s.user = :user ORDER BY s.createdAt DESC")
     List<Subscription> findAllByUserIncludingDeleted(@Param("user") User user);
 
+    boolean existsByUserAndServiceNameIgnoreCaseAndDeletedAtIsNull(User user, String serviceName);
+
     @Modifying
     @Transactional
     @Query("UPDATE Subscription s SET s.deletedAt = CURRENT_TIMESTAMP WHERE s.user = :user AND s.deletedAt IS NULL")

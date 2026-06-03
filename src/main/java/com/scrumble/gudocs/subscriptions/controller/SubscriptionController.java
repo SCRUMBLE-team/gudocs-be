@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,6 +20,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/subscriptions")
 @RequiredArgsConstructor
+@Validated
 public class SubscriptionController implements SubscriptionApi {
 
     private final SubscriptionService subscriptionService;
@@ -66,6 +68,15 @@ public class SubscriptionController implements SubscriptionApi {
             @PathVariable Long subscriptionId) {
         subscriptionService.delete(userDetails.getUsername(), subscriptionId);
         return ResponseEntity.ok(ApiResponse.success("구독 서비스 삭제 성공"));
+    }
+
+    @Override
+    @GetMapping("/check-name")
+    public ResponseEntity<ApiResponse<Boolean>> checkDuplicateName(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam String name) {
+        boolean isDuplicate = subscriptionService.isDuplicateName(userDetails.getUsername(), name);
+        return ResponseEntity.ok(ApiResponse.success("서비스명 중복 확인", isDuplicate));
     }
 
     @Override

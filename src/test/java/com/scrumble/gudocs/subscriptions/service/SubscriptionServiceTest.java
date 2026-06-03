@@ -223,6 +223,30 @@ class SubscriptionServiceTest {
     }
 
     @Test
+    void 서비스명_중복_확인_중복있음() {
+        User user = UserFixture.create();
+        given(userRepository.findByEmail("test@example.com")).willReturn(Optional.of(user));
+        given(subscriptionRepository.existsByUserAndServiceNameIgnoreCaseAndDeletedAtIsNull(user, "Netflix"))
+                .willReturn(true);
+
+        boolean result = subscriptionService.isDuplicateName("test@example.com", "Netflix");
+
+        assertThat(result).isTrue();
+    }
+
+    @Test
+    void 서비스명_중복_확인_중복없음() {
+        User user = UserFixture.create();
+        given(userRepository.findByEmail("test@example.com")).willReturn(Optional.of(user));
+        given(subscriptionRepository.existsByUserAndServiceNameIgnoreCaseAndDeletedAtIsNull(user, "Spotify"))
+                .willReturn(false);
+
+        boolean result = subscriptionService.isDuplicateName("test@example.com", "Spotify");
+
+        assertThat(result).isFalse();
+    }
+
+    @Test
     void 구독_상태_변경_동일_상태_변경없음() {
         User user = UserFixture.create();
         Subscription subscription = testSubscription(user);

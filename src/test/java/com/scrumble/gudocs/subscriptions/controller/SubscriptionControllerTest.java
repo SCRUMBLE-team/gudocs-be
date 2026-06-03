@@ -268,8 +268,70 @@ class SubscriptionControllerTest {
     }
 
     @Test
+    void 서비스명_중복_확인_중복있음() throws Exception {
+        구독_등록(session, new SubscriptionCreateRequest(
+                "Netflix", SubscriptionCategory.OTT, 17000L,
+                BillingCycle.MONTHLY, 15, null, PaymentMethod.CARD));
+
+        mockMvc.perform(get("/api/subscriptions/check-name")
+                        .param("name", "netflix")
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").value(true));
+    }
+
+    @Test
+    void 서비스명_중복_확인_중복없음() throws Exception {
+        mockMvc.perform(get("/api/subscriptions/check-name")
+                        .param("name", "Spotify")
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").value(false));
+    }
+
+    @Test
+    void 서비스명_중복_확인_삭제된_구독은_중복아님() throws Exception {
+        MvcResult createResult = 구독_등록(session, new SubscriptionCreateRequest(
+                "Netflix", SubscriptionCategory.OTT, 17000L,
+                BillingCycle.MONTHLY, 15, null, PaymentMethod.CARD));
+        long id = 구독_ID_추출(createResult);
+
+        mockMvc.perform(delete("/api/subscriptions/" + id).session(session));
+
+        mockMvc.perform(get("/api/subscriptions/check-name")
+                        .param("name", "Netflix")
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(false));
+    }
+
+    @Test
     void 미인증_구독_목록_조회_401() throws Exception {
         mockMvc.perform(get("/api/subscriptions"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void 서비스명_중복_확인_빈문자열_400() throws Exception {
+        mockMvc.perform(get("/api/subscriptions/check-name")
+                        .param("name", "   ")
+                        .session(session))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void 서비스명_중복_확인_앞뒤공백_트리밍() throws Exception {
+        구독_등록(session, new SubscriptionCreateRequest(
+                "Netflix", SubscriptionCategory.OTT, 17000L,
+                BillingCycle.MONTHLY, 15, null, PaymentMethod.CARD));
+
+        mockMvc.perform(get("/api/subscriptions/check-name")
+                        .param("name", "  Netflix  ")
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(true));
     }
 }
