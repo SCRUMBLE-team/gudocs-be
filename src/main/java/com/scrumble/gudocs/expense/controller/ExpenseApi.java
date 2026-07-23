@@ -11,7 +11,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.userdetails.UserDetails;
+import com.scrumble.gudocs.global.security.CurrentUserId;
 
 @Tag(name = "Expenses", description = "지출 분석 API")
 @SecurityRequirement(name = "cookieAuth")
@@ -23,7 +23,7 @@ public interface ExpenseApi {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "로그인 필요")
     })
     ResponseEntity<ApiResponse<MonthlyExpenseResponse>> getMonthlyExpense(
-            @Parameter(hidden = true) UserDetails userDetails,
+            @CurrentUserId Long userId,
             @Parameter(description = "연도 (예: 2025)") int year,
             @Parameter(description = "월 (1~12)") int month);
 
@@ -33,7 +33,7 @@ public interface ExpenseApi {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "로그인 필요")
     })
     ResponseEntity<ApiResponse<CategoryExpenseResponse>> getCategoryExpense(
-            @Parameter(hidden = true) UserDetails userDetails,
+            @CurrentUserId Long userId,
             @Parameter(description = "연도 (예: 2025)") int year,
             @Parameter(description = "월 (1~12)") int month);
 
@@ -43,7 +43,7 @@ public interface ExpenseApi {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "로그인 필요")
     })
     ResponseEntity<ApiResponse<ExpenseTrendResponse>> getExpenseTrend(
-            @Parameter(hidden = true) UserDetails userDetails,
+            @CurrentUserId Long userId,
             @Parameter(description = "기준 연도 (예: 2025)") int baseYear,
             @Parameter(description = "기준 월 (1~12)") int baseMonth);
 
@@ -53,7 +53,7 @@ public interface ExpenseApi {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "로그인 필요")
     })
     ResponseEntity<ApiResponse<MonthlyExpenseDetailResponse>> getMonthlyExpenseDetail(
-            @Parameter(hidden = true) UserDetails userDetails,
+            @CurrentUserId Long userId,
             @Parameter(description = "연도 (예: 2025)") int year,
             @Parameter(description = "월 (1~12)") int month);
 }

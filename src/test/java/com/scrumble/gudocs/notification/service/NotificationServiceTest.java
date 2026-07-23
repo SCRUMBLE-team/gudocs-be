@@ -37,7 +37,7 @@ class NotificationServiceTest {
     private NotificationService notificationService;
 
     private User user() {
-        return User.builder().id(1L).name("테스터").email("test@example.com").passwordHash("hashed").build();
+        return User.builder().id(1L).name("테스터").email("test@example.com").build();
     }
 
     private Subscription monthly(String name, long price, int billingDay) {
@@ -66,7 +66,7 @@ class NotificationServiceTest {
     }
 
     private void setupUser(User u, List<Subscription> subs) {
-        given(userRepository.findByEmail("test@example.com")).willReturn(Optional.of(u));
+        given(userRepository.findById(1L)).willReturn(Optional.of(u));
         given(subscriptionRepository.findAllByUserOrderByCreatedAtDesc(u)).willReturn(subs);
     }
 
@@ -76,7 +76,7 @@ class NotificationServiceTest {
         User u = user();
         setupUser(u, List.of(monthly("Netflix", 17000L, 15)));
 
-        List<UpcomingNotification> result = notificationService.findUpcoming("test@example.com", TODAY);
+        List<UpcomingNotification> result = notificationService.findUpcoming(1L, TODAY);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).daysUntilBilling()).isEqualTo(4);
@@ -89,7 +89,7 @@ class NotificationServiceTest {
         User u = user();
         setupUser(u, List.of(monthly("Netflix", 17000L, 11)));
 
-        List<UpcomingNotification> result = notificationService.findUpcoming("test@example.com", TODAY);
+        List<UpcomingNotification> result = notificationService.findUpcoming(1L, TODAY);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).daysUntilBilling()).isZero();
@@ -101,7 +101,7 @@ class NotificationServiceTest {
         User u = user();
         setupUser(u, List.of(monthly("Netflix", 17000L, 18)));
 
-        List<UpcomingNotification> result = notificationService.findUpcoming("test@example.com", TODAY);
+        List<UpcomingNotification> result = notificationService.findUpcoming(1L, TODAY);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).daysUntilBilling()).isEqualTo(7);
@@ -113,7 +113,7 @@ class NotificationServiceTest {
         User u = user();
         setupUser(u, List.of(monthly("Netflix", 17000L, 19)));
 
-        List<UpcomingNotification> result = notificationService.findUpcoming("test@example.com", TODAY);
+        List<UpcomingNotification> result = notificationService.findUpcoming(1L, TODAY);
 
         assertThat(result).isEmpty();
     }
@@ -124,7 +124,7 @@ class NotificationServiceTest {
         User u = user();
         setupUser(u, List.of(monthly("Netflix", 17000L, 5)));
 
-        List<UpcomingNotification> result = notificationService.findUpcoming("test@example.com", TODAY);
+        List<UpcomingNotification> result = notificationService.findUpcoming(1L, TODAY);
 
         assertThat(result).isEmpty();
     }
@@ -133,12 +133,12 @@ class NotificationServiceTest {
     void 결제일_31일_없는_달_마지막_날_계산() {
         // today = 2026-04-25, billingDay = 31, 4월은 30일까지 → 2026-04-30 (5일 후)
         User u = user();
-        given(userRepository.findByEmail("test@example.com")).willReturn(Optional.of(u));
+        given(userRepository.findById(1L)).willReturn(Optional.of(u));
         given(subscriptionRepository.findAllByUserOrderByCreatedAtDesc(u))
                 .willReturn(List.of(monthly("Netflix", 17000L, 31)));
 
         LocalDate aprilDate = LocalDate.of(2026, 4, 25);
-        List<UpcomingNotification> result = notificationService.findUpcoming("test@example.com", aprilDate);
+        List<UpcomingNotification> result = notificationService.findUpcoming(1L, aprilDate);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).nextBillingDate()).isEqualTo(LocalDate.of(2026, 4, 30));
@@ -153,7 +153,7 @@ class NotificationServiceTest {
                 .paymentMethod(PaymentMethod.CARD).status(SubscriptionStatus.PAUSED).build();
         setupUser(u, List.of(paused));
 
-        List<UpcomingNotification> result = notificationService.findUpcoming("test@example.com", TODAY);
+        List<UpcomingNotification> result = notificationService.findUpcoming(1L, TODAY);
 
         assertThat(result).isEmpty();
     }
@@ -164,7 +164,7 @@ class NotificationServiceTest {
         User u = user();
         setupUser(u, List.of(yearly("Adobe", 120000L, 14, 5)));
 
-        List<UpcomingNotification> result = notificationService.findUpcoming("test@example.com", TODAY);
+        List<UpcomingNotification> result = notificationService.findUpcoming(1L, TODAY);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).nextBillingDate()).isEqualTo(LocalDate.of(2026, 5, 14));
@@ -176,7 +176,7 @@ class NotificationServiceTest {
         User u = user();
         setupUser(u, List.of(yearly("Adobe", 120000L, 1, 3)));
 
-        List<UpcomingNotification> result = notificationService.findUpcoming("test@example.com", TODAY);
+        List<UpcomingNotification> result = notificationService.findUpcoming(1L, TODAY);
 
         assertThat(result).isEmpty();
     }
@@ -191,7 +191,7 @@ class NotificationServiceTest {
                 monthly("Spotify", 10000L, 13)
         ));
 
-        List<UpcomingNotification> result = notificationService.findUpcoming("test@example.com", TODAY);
+        List<UpcomingNotification> result = notificationService.findUpcoming(1L, TODAY);
 
         assertThat(result).hasSize(2);
         assertThat(result.get(0).serviceName()).isEqualTo("Spotify");
@@ -203,16 +203,16 @@ class NotificationServiceTest {
         User u = user();
         setupUser(u, List.of());
 
-        List<UpcomingNotification> result = notificationService.findUpcoming("test@example.com", TODAY);
+        List<UpcomingNotification> result = notificationService.findUpcoming(1L, TODAY);
 
         assertThat(result).isEmpty();
     }
 
     @Test
     void 사용자_없으면_USER_NOT_FOUND() {
-        given(userRepository.findByEmail("missing@example.com")).willReturn(Optional.empty());
+        given(userRepository.findById(2L)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> notificationService.findUpcoming("missing@example.com", TODAY))
+        assertThatThrownBy(() -> notificationService.findUpcoming(2L, TODAY))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
                         .isEqualTo(ErrorCode.USER_NOT_FOUND));

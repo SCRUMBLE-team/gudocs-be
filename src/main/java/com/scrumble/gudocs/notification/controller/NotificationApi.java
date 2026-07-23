@@ -8,7 +8,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.userdetails.UserDetails;
+import com.scrumble.gudocs.global.security.CurrentUserId;
 
 import java.util.List;
 
@@ -24,5 +24,5 @@ public interface NotificationApi {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "사용자 없음")
     })
     ResponseEntity<ApiResponse<List<UpcomingNotification>>> getUpcoming(
-            @Parameter(hidden = true) UserDetails userDetails);
+            @CurrentUserId Long userId);
 }

@@ -27,8 +27,8 @@ public class SubscriptionService {
     private final UserRepository userRepository;
 
     @Transactional
-    public SubscriptionResponse create(String email, SubscriptionCreateRequest request) {
-        User user = findUser(email);
+    public SubscriptionResponse create(Long userId, SubscriptionCreateRequest request) {
+        User user = findUser(userId);
 
         if (request.billingCycle() == BillingCycle.MONTHLY && request.billingMonth() != null) {
             throw new BusinessException(ErrorCode.BILLING_MONTH_NOT_ALLOWED);
@@ -52,8 +52,8 @@ public class SubscriptionService {
     }
 
     @Transactional(readOnly = true)
-    public List<SubscriptionResponse> getAll(String email) {
-        User user = findUser(email);
+    public List<SubscriptionResponse> getAll(Long userId) {
+        User user = findUser(userId);
         LocalDate today = LocalDate.now();
         return subscriptionRepository.findAllByUserOrderByCreatedAtDesc(user)
                 .stream()
@@ -62,16 +62,16 @@ public class SubscriptionService {
     }
 
     @Transactional(readOnly = true)
-    public SubscriptionResponse getOne(String email, Long subscriptionId) {
-        User user = findUser(email);
+    public SubscriptionResponse getOne(Long userId, Long subscriptionId) {
+        User user = findUser(userId);
         Subscription subscription = findSubscription(subscriptionId);
         checkOwnership(subscription, user);
         return toResponse(subscription);
     }
 
     @Transactional
-    public SubscriptionResponse update(String email, Long subscriptionId, SubscriptionUpdateRequest request) {
-        User user = findUser(email);
+    public SubscriptionResponse update(Long userId, Long subscriptionId, SubscriptionUpdateRequest request) {
+        User user = findUser(userId);
         Subscription subscription = findSubscription(subscriptionId);
         checkOwnership(subscription, user);
 
@@ -98,23 +98,23 @@ public class SubscriptionService {
     }
 
     @Transactional
-    public void delete(String email, Long subscriptionId) {
-        User user = findUser(email);
+    public void delete(Long userId, Long subscriptionId) {
+        User user = findUser(userId);
         Subscription subscription = findSubscription(subscriptionId);
         checkOwnership(subscription, user);
         subscription.softDelete();
     }
 
     @Transactional(readOnly = true)
-    public boolean isDuplicateName(String email, String serviceName) {
-        User user = findUser(email);
+    public boolean isDuplicateName(Long userId, String serviceName) {
+        User user = findUser(userId);
         return subscriptionRepository.existsByUserAndServiceNameIgnoreCaseAndDeletedAtIsNull(user, serviceName.strip());
     }
 
     @Transactional
-    public SubscriptionResponse updateStatus(String email, Long subscriptionId,
+    public SubscriptionResponse updateStatus(Long userId, Long subscriptionId,
                                              SubscriptionStatusUpdateRequest request) {
-        User user = findUser(email);
+        User user = findUser(userId);
         Subscription subscription = findSubscription(subscriptionId);
         checkOwnership(subscription, user);
         subscription.updateStatus(request.status());
@@ -128,8 +128,8 @@ public class SubscriptionService {
         );
     }
 
-    private User findUser(String email) {
-        return userRepository.findByEmail(email)
+    private User findUser(Long userId) {
+        return userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
     }
 

@@ -31,13 +31,13 @@ public class DashboardService {
     private final UserRepository userRepository;
 
     @Transactional(readOnly = true)
-    public DashboardResponse getDashboard(String email) {
-        return getDashboard(email, LocalDate.now());
+    public DashboardResponse getDashboard(Long userId) {
+        return getDashboard(userId, LocalDate.now());
     }
 
     @Transactional(readOnly = true)
-    DashboardResponse getDashboard(String email, LocalDate today) {
-        User user = userRepository.findByEmail(email)
+    DashboardResponse getDashboard(Long userId, LocalDate today) {
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         List<Subscription> all = subscriptionRepository.findAllByUserOrderByCreatedAtDesc(user);

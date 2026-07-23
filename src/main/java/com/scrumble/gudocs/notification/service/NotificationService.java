@@ -29,13 +29,13 @@ public class NotificationService {
     private final UserRepository userRepository;
 
     @Transactional(readOnly = true)
-    public List<UpcomingNotification> findUpcoming(String email) {
-        return findUpcoming(email, LocalDate.now());
+    public List<UpcomingNotification> findUpcoming(Long userId) {
+        return findUpcoming(userId, LocalDate.now());
     }
 
     @Transactional(readOnly = true)
-    List<UpcomingNotification> findUpcoming(String email, LocalDate today) {
-        User user = userRepository.findByEmail(email)
+    List<UpcomingNotification> findUpcoming(Long userId, LocalDate today) {
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         List<Subscription> active = subscriptionRepository.findAllByUserOrderByCreatedAtDesc(user).stream()
