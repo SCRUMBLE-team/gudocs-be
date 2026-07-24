@@ -8,7 +8,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.userdetails.UserDetails;
+import com.scrumble.gudocs.global.security.CurrentUserId;
 
 @Tag(name = "Dashboard", description = "메인 대시보드 API")
 @SecurityRequirement(name = "cookieAuth")
@@ -19,5 +19,5 @@ public interface DashboardApi {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "로그인 필요")
     })
-    ResponseEntity<ApiResponse<DashboardResponse>> getDashboard(@Parameter(hidden = true) UserDetails userDetails);
+    ResponseEntity<ApiResponse<DashboardResponse>> getDashboard(@CurrentUserId Long userId);
 }

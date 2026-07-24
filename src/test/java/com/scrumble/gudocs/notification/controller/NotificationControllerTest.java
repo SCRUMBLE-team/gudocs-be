@@ -1,8 +1,6 @@
 package com.scrumble.gudocs.notification.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.scrumble.gudocs.auth.dto.LoginRequest;
-import com.scrumble.gudocs.auth.dto.SignupRequest;
 import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionCreateRequest;
 import com.scrumble.gudocs.subscriptions.entity.BillingCycle;
 import com.scrumble.gudocs.subscriptions.entity.PaymentMethod;
@@ -14,6 +12,9 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
+import com.scrumble.gudocs.common.TestSessions;
+import com.scrumble.gudocs.users.repository.SocialAccountRepository;
+import com.scrumble.gudocs.users.repository.UserRepository;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,22 +37,17 @@ class NotificationControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private SocialAccountRepository socialAccountRepository;
+
     private MockHttpSession session;
 
     @BeforeEach
     void setUp() throws Exception {
-        mockMvc.perform(post("/api/auth/signup")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(
-                        new SignupRequest("테스터", "noti@example.com", "Password1!"))));
-
-        MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                new LoginRequest("noti@example.com", "Password1!"))))
-                .andReturn();
-
-        session = (MockHttpSession) loginResult.getRequest().getSession();
+        session = TestSessions.loginNew(userRepository, socialAccountRepository, "테스터", "noti@example.com");
     }
 
     private void 구독_등록(String name, int billingDay) throws Exception {

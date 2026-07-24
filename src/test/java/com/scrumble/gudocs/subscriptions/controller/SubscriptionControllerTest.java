@@ -1,8 +1,6 @@
 package com.scrumble.gudocs.subscriptions.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.scrumble.gudocs.auth.dto.LoginRequest;
-import com.scrumble.gudocs.auth.dto.SignupRequest;
 import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionCreateRequest;
 import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionStatusUpdateRequest;
 import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionUpdateRequest;
@@ -14,6 +12,9 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
+import com.scrumble.gudocs.common.TestSessions;
+import com.scrumble.gudocs.users.repository.SocialAccountRepository;
+import com.scrumble.gudocs.users.repository.UserRepository;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,22 +34,17 @@ class SubscriptionControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private SocialAccountRepository socialAccountRepository;
+
     private MockHttpSession session;
 
     @BeforeEach
     void setUp() throws Exception {
-        mockMvc.perform(post("/api/auth/signup")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(
-                        new SignupRequest("테스터", "sub@example.com", "Password1!"))));
-
-        MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                new LoginRequest("sub@example.com", "Password1!"))))
-                .andReturn();
-
-        session = (MockHttpSession) loginResult.getRequest().getSession();
+        session = TestSessions.loginNew(userRepository, socialAccountRepository, "테스터", "sub@example.com");
     }
 
     private MvcResult 구독_등록(MockHttpSession s, SubscriptionCreateRequest request) throws Exception {
@@ -251,16 +247,7 @@ class SubscriptionControllerTest {
         MvcResult createResult = 구독_등록(session, request);
         long id = 구독_ID_추출(createResult);
 
-        mockMvc.perform(post("/api/auth/signup")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(
-                        new SignupRequest("타인", "other@example.com", "Password1!"))));
-        MvcResult otherLogin = mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                new LoginRequest("other@example.com", "Password1!"))))
-                .andReturn();
-        MockHttpSession otherSession = (MockHttpSession) otherLogin.getRequest().getSession();
+        MockHttpSession otherSession = TestSessions.loginNew(userRepository, socialAccountRepository, "타인", "other@example.com");
 
         mockMvc.perform(get("/api/subscriptions/" + id).session(otherSession))
                 .andExpect(status().isForbidden())

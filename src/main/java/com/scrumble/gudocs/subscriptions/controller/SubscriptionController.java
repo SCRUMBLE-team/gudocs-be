@@ -10,8 +10,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
+import com.scrumble.gudocs.global.security.CurrentUserId;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,65 +27,65 @@ public class SubscriptionController implements SubscriptionApi {
     @Override
     @PostMapping
     public ResponseEntity<ApiResponse<SubscriptionResponse>> create(
-            @AuthenticationPrincipal UserDetails userDetails,
+            @CurrentUserId Long userId,
             @Valid @RequestBody SubscriptionCreateRequest request) {
-        SubscriptionResponse response = subscriptionService.create(userDetails.getUsername(), request);
+        SubscriptionResponse response = subscriptionService.create(userId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("구독 서비스 등록 성공", response));
     }
 
     @Override
     @GetMapping
     public ResponseEntity<ApiResponse<List<SubscriptionResponse>>> getAll(
-            @AuthenticationPrincipal UserDetails userDetails) {
-        List<SubscriptionResponse> response = subscriptionService.getAll(userDetails.getUsername());
+            @CurrentUserId Long userId) {
+        List<SubscriptionResponse> response = subscriptionService.getAll(userId);
         return ResponseEntity.ok(ApiResponse.success("구독 서비스 목록 조회 성공", response));
     }
 
     @Override
     @GetMapping("/{subscriptionId}")
     public ResponseEntity<ApiResponse<SubscriptionResponse>> getOne(
-            @AuthenticationPrincipal UserDetails userDetails,
+            @CurrentUserId Long userId,
             @PathVariable Long subscriptionId) {
-        SubscriptionResponse response = subscriptionService.getOne(userDetails.getUsername(), subscriptionId);
+        SubscriptionResponse response = subscriptionService.getOne(userId, subscriptionId);
         return ResponseEntity.ok(ApiResponse.success("구독 서비스 상세 조회 성공", response));
     }
 
     @Override
     @PutMapping("/{subscriptionId}")
     public ResponseEntity<ApiResponse<SubscriptionResponse>> update(
-            @AuthenticationPrincipal UserDetails userDetails,
+            @CurrentUserId Long userId,
             @PathVariable Long subscriptionId,
             @Valid @RequestBody SubscriptionUpdateRequest request) {
-        SubscriptionResponse response = subscriptionService.update(userDetails.getUsername(), subscriptionId, request);
+        SubscriptionResponse response = subscriptionService.update(userId, subscriptionId, request);
         return ResponseEntity.ok(ApiResponse.success("구독 서비스 수정 성공", response));
     }
 
     @Override
     @DeleteMapping("/{subscriptionId}")
     public ResponseEntity<ApiResponse<Void>> delete(
-            @AuthenticationPrincipal UserDetails userDetails,
+            @CurrentUserId Long userId,
             @PathVariable Long subscriptionId) {
-        subscriptionService.delete(userDetails.getUsername(), subscriptionId);
+        subscriptionService.delete(userId, subscriptionId);
         return ResponseEntity.ok(ApiResponse.success("구독 서비스 삭제 성공"));
     }
 
     @Override
     @GetMapping("/check-name")
     public ResponseEntity<ApiResponse<Boolean>> checkDuplicateName(
-            @AuthenticationPrincipal UserDetails userDetails,
+            @CurrentUserId Long userId,
             @RequestParam String name) {
-        boolean isDuplicate = subscriptionService.isDuplicateName(userDetails.getUsername(), name);
+        boolean isDuplicate = subscriptionService.isDuplicateName(userId, name);
         return ResponseEntity.ok(ApiResponse.success("서비스명 중복 확인", isDuplicate));
     }
 
     @Override
     @PutMapping("/{subscriptionId}/status")
     public ResponseEntity<ApiResponse<SubscriptionResponse>> updateStatus(
-            @AuthenticationPrincipal UserDetails userDetails,
+            @CurrentUserId Long userId,
             @PathVariable Long subscriptionId,
             @Valid @RequestBody SubscriptionStatusUpdateRequest request) {
         SubscriptionResponse response = subscriptionService.updateStatus(
-                userDetails.getUsername(), subscriptionId, request);
+                userId, subscriptionId, request);
         return ResponseEntity.ok(ApiResponse.success("구독 상태 변경 성공", response));
     }
 }

@@ -24,7 +24,6 @@ class SubscriptionRepositoryTest {
         User user = User.builder()
                 .name("테스터")
                 .email(email)
-                .passwordHash("hashed")
                 .build();
         return em.persistAndFlush(user);
     }

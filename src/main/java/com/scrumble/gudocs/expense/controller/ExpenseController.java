@@ -8,8 +8,7 @@ import com.scrumble.gudocs.global.response.ApiResponse;
 import com.scrumble.gudocs.expense.service.ExpenseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
+import com.scrumble.gudocs.global.security.CurrentUserId;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -25,40 +24,40 @@ public class ExpenseController implements ExpenseApi {
     @Override
     @GetMapping("/monthly")
     public ResponseEntity<ApiResponse<MonthlyExpenseResponse>> getMonthlyExpense(
-            @AuthenticationPrincipal UserDetails userDetails,
+            @CurrentUserId Long userId,
             @RequestParam int year,
             @RequestParam int month) {
-        MonthlyExpenseResponse response = expenseService.getMonthlyExpense(userDetails.getUsername(), year, month);
+        MonthlyExpenseResponse response = expenseService.getMonthlyExpense(userId, year, month);
         return ResponseEntity.ok(ApiResponse.success("월별 구독 지출 분석 조회에 성공했습니다.", response));
     }
 
     @Override
     @GetMapping("/categories")
     public ResponseEntity<ApiResponse<CategoryExpenseResponse>> getCategoryExpense(
-            @AuthenticationPrincipal UserDetails userDetails,
+            @CurrentUserId Long userId,
             @RequestParam int year,
             @RequestParam int month) {
-        CategoryExpenseResponse response = expenseService.getCategoryExpense(userDetails.getUsername(), year, month);
+        CategoryExpenseResponse response = expenseService.getCategoryExpense(userId, year, month);
         return ResponseEntity.ok(ApiResponse.success("카테고리별 지출 분석 조회에 성공했습니다.", response));
     }
 
     @Override
     @GetMapping("/trends")
     public ResponseEntity<ApiResponse<ExpenseTrendResponse>> getExpenseTrend(
-            @AuthenticationPrincipal UserDetails userDetails,
+            @CurrentUserId Long userId,
             @RequestParam int baseYear,
             @RequestParam int baseMonth) {
-        ExpenseTrendResponse response = expenseService.getExpenseTrend(userDetails.getUsername(), baseYear, baseMonth);
+        ExpenseTrendResponse response = expenseService.getExpenseTrend(userId, baseYear, baseMonth);
         return ResponseEntity.ok(ApiResponse.success("최근 6개월 구독 지출 추이 조회에 성공했습니다.", response));
     }
 
     @Override
     @GetMapping("/monthly/details")
     public ResponseEntity<ApiResponse<MonthlyExpenseDetailResponse>> getMonthlyExpenseDetail(
-            @AuthenticationPrincipal UserDetails userDetails,
+            @CurrentUserId Long userId,
             @RequestParam int year,
             @RequestParam int month) {
-        MonthlyExpenseDetailResponse response = expenseService.getMonthlyExpenseDetail(userDetails.getUsername(), year, month);
+        MonthlyExpenseDetailResponse response = expenseService.getMonthlyExpenseDetail(userId, year, month);
         return ResponseEntity.ok(ApiResponse.success("월별 구독 서비스 상세 지출 내역 조회에 성공했습니다.", response));
     }
 }

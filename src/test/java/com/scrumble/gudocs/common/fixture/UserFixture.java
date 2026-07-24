@@ -8,7 +8,6 @@ public class UserFixture {
         return User.builder()
                 .name("테스터")
                 .email("test@example.com")
-                .passwordHash("hashed")
                 .build();
     }
 
@@ -17,7 +16,6 @@ public class UserFixture {
                 .id(id)
                 .name(name)
                 .email(email)
-                .passwordHash("hashed")
                 .build();
     }
 }

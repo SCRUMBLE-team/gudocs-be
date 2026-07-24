@@ -2,13 +2,15 @@ package com.scrumble.gudocs.config;
 
 import com.scrumble.gudocs.subscriptions.entity.*;
 import com.scrumble.gudocs.subscriptions.repository.SubscriptionRepository;
+import com.scrumble.gudocs.users.entity.SocialAccount;
+import com.scrumble.gudocs.users.entity.SocialProvider;
 import com.scrumble.gudocs.users.entity.User;
+import com.scrumble.gudocs.users.repository.SocialAccountRepository;
 import com.scrumble.gudocs.users.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -21,7 +23,7 @@ public class DataInitializer implements ApplicationRunner {
 
     private final UserRepository userRepository;
     private final SubscriptionRepository subscriptionRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final SocialAccountRepository socialAccountRepository;
 
     @Override
     public void run(ApplicationArguments args) {
@@ -30,7 +32,14 @@ public class DataInitializer implements ApplicationRunner {
         User user = userRepository.save(User.builder()
                 .name("테스트 유저")
                 .email("test@test.com")
-                .passwordHash(passwordEncoder.encode("Test1234!"))
+                .build());
+
+        socialAccountRepository.save(SocialAccount.builder()
+                .user(user)
+                .provider(SocialProvider.GOOGLE)
+                .providerId("mock-google-1")
+                .email("test@test.com")
+                .emailVerified(true)
                 .build());
 
         subscriptionRepository.saveAll(List.of(

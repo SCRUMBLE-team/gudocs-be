@@ -15,3 +15,7 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.H2Dialect
     show-sql: true
+
+app:
+  oauth:
+    success-redirect: http://localhost:5173
