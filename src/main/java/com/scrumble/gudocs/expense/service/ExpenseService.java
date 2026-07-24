@@ -121,8 +121,7 @@ public class ExpenseService {
                         s.getBillingCycle(),
                         s.getPrice(),
                         monthlyAmount(s),
-                        s.getBillingDay(),
-                        s.getBillingMonth(),
+                        s.getFirstBillingDate(),
                         s.getPaymentMethod(),
                         s.getStatus(),
                         s.getDeletedAt() != null

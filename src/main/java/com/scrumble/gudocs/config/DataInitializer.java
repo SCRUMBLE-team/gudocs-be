@@ -13,6 +13,7 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -46,43 +47,43 @@ public class DataInitializer implements ApplicationRunner {
                 Subscription.builder()
                         .user(user).serviceName("Netflix")
                         .category(SubscriptionCategory.OTT).price(17000L)
-                        .billingCycle(BillingCycle.MONTHLY).billingDay(5)
+                        .billingCycle(BillingCycle.MONTHLY).firstBillingDate(LocalDate.of(2025, 1, 5))
                         .paymentMethod(PaymentMethod.CARD).build(),
 
                 Subscription.builder()
                         .user(user).serviceName("YouTube Premium")
                         .category(SubscriptionCategory.OTT).price(14900L)
-                        .billingCycle(BillingCycle.MONTHLY).billingDay(10)
+                        .billingCycle(BillingCycle.MONTHLY).firstBillingDate(LocalDate.of(2025, 1, 10))
                         .paymentMethod(PaymentMethod.CARD).build(),
 
                 Subscription.builder()
                         .user(user).serviceName("Spotify")
                         .category(SubscriptionCategory.MUSIC).price(10900L)
-                        .billingCycle(BillingCycle.MONTHLY).billingDay(15)
+                        .billingCycle(BillingCycle.MONTHLY).firstBillingDate(LocalDate.of(2025, 1, 15))
                         .paymentMethod(PaymentMethod.SIMPLE_PAY).build(),
 
                 Subscription.builder()
                         .user(user).serviceName("iCloud+")
                         .category(SubscriptionCategory.CLOUD).price(3900L)
-                        .billingCycle(BillingCycle.MONTHLY).billingDay(1)
+                        .billingCycle(BillingCycle.MONTHLY).firstBillingDate(LocalDate.of(2025, 1, 1))
                         .paymentMethod(PaymentMethod.CARD).build(),
 
                 Subscription.builder()
                         .user(user).serviceName("Google One")
                         .category(SubscriptionCategory.CLOUD).price(2900L)
-                        .billingCycle(BillingCycle.MONTHLY).billingDay(8)
+                        .billingCycle(BillingCycle.MONTHLY).firstBillingDate(LocalDate.of(2025, 1, 8))
                         .paymentMethod(PaymentMethod.CARD).build(),
 
                 Subscription.builder()
                         .user(user).serviceName("ChatGPT Plus")
                         .category(SubscriptionCategory.AI).price(24000L)
-                        .billingCycle(BillingCycle.MONTHLY).billingDay(20)
+                        .billingCycle(BillingCycle.MONTHLY).firstBillingDate(LocalDate.of(2025, 1, 20))
                         .paymentMethod(PaymentMethod.CARD).build(),
 
                 Subscription.builder()
                         .user(user).serviceName("Adobe Creative Cloud")
                         .category(SubscriptionCategory.DESIGN).price(624000L)
-                        .billingCycle(BillingCycle.YEARLY).billingDay(1).billingMonth(3)
+                        .billingCycle(BillingCycle.YEARLY).firstBillingDate(LocalDate.of(2025, 3, 1))
                         .paymentMethod(PaymentMethod.CARD)
                         .status(SubscriptionStatus.PAUSED)
                         .pausedAt(LocalDateTime.now()).build(),
@@ -90,7 +91,7 @@ public class DataInitializer implements ApplicationRunner {
                 Subscription.builder()
                         .user(user).serviceName("인프런")
                         .category(SubscriptionCategory.EDUCATION).price(29000L)
-                        .billingCycle(BillingCycle.MONTHLY).billingDay(25)
+                        .billingCycle(BillingCycle.MONTHLY).firstBillingDate(LocalDate.of(2025, 1, 25))
                         .paymentMethod(PaymentMethod.CARD).build()
         ));
     }

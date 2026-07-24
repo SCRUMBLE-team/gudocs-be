@@ -5,6 +5,7 @@ import com.scrumble.gudocs.users.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
@@ -38,11 +39,8 @@ public class Subscription extends BaseEntity {
     @Column(name = "billing_cycle", nullable = false)
     private BillingCycle billingCycle;
 
-    @Column(name = "billing_day", nullable = false)
-    private Integer billingDay;
-
-    @Column(name = "billing_month")
-    private Integer billingMonth;
+    @Column(name = "first_billing_date", nullable = false)
+    private LocalDate firstBillingDate;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_method", nullable = false)
@@ -60,14 +58,13 @@ public class Subscription extends BaseEntity {
     private LocalDateTime deletedAt;
 
     public void update(String serviceName, SubscriptionCategory category, Long price,
-                       BillingCycle billingCycle, Integer billingDay, Integer billingMonth,
+                       BillingCycle billingCycle, LocalDate firstBillingDate,
                        PaymentMethod paymentMethod) {
         this.serviceName = serviceName;
         this.category = category;
         this.price = price;
         this.billingCycle = billingCycle;
-        this.billingDay = billingDay;
-        this.billingMonth = billingMonth;
+        this.firstBillingDate = firstBillingDate;
         this.paymentMethod = paymentMethod;
     }
 

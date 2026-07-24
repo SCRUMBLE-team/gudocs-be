@@ -30,21 +30,13 @@ public class SubscriptionService {
     public SubscriptionResponse create(Long userId, SubscriptionCreateRequest request) {
         User user = findUser(userId);
 
-        if (request.billingCycle() == BillingCycle.MONTHLY && request.billingMonth() != null) {
-            throw new BusinessException(ErrorCode.BILLING_MONTH_NOT_ALLOWED);
-        }
-        if (request.billingCycle() == BillingCycle.YEARLY && request.billingMonth() == null) {
-            throw new BusinessException(ErrorCode.INVALID_BILLING_MONTH);
-        }
-
         Subscription subscription = Subscription.builder()
                 .user(user)
                 .serviceName(request.serviceName().strip())
                 .category(request.category())
                 .price(request.price())
                 .billingCycle(request.billingCycle())
-                .billingDay(request.billingDay())
-                .billingMonth(request.billingMonth())
+                .firstBillingDate(request.firstBillingDate())
                 .paymentMethod(request.paymentMethod())
                 .build();
 
@@ -75,22 +67,9 @@ public class SubscriptionService {
         Subscription subscription = findSubscription(subscriptionId);
         checkOwnership(subscription, user);
 
-        Integer effectiveBillingMonth;
-        if (request.billingCycle() == BillingCycle.MONTHLY) {
-            if (request.billingMonth() != null) {
-                throw new BusinessException(ErrorCode.BILLING_MONTH_NOT_ALLOWED);
-            }
-            effectiveBillingMonth = null;
-        } else {
-            effectiveBillingMonth = request.billingMonth();
-            if (effectiveBillingMonth == null) {
-                throw new BusinessException(ErrorCode.INVALID_BILLING_MONTH);
-            }
-        }
-
         subscription.update(
                 request.serviceName().strip(), request.category(), request.price(),
-                request.billingCycle(), request.billingDay(), effectiveBillingMonth,
+                request.billingCycle(), request.firstBillingDate(),
                 request.paymentMethod()
         );
 

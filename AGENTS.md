@@ -47,7 +47,8 @@ deploy/             # EC2 배포 리소스 (setup.sh, systemd, Caddyfile, mysql-
 - `UNIQUE(provider, provider_id)` — 로그인 조회키
 - `UNIQUE(user_id, provider)` — 같은 provider 중복 연결 금지
 
-**subscriptions** — id, user_id(FK), service_name, category, price, billing_cycle, billing_day, billing_month(YEARLY 전용), payment_method, status, paused_at, deleted_at(soft delete), created_at, updated_at
+**subscriptions** — id, user_id(FK), service_name, category, price, billing_cycle, first_billing_date(최초 결제일 앵커), payment_method, status, paused_at, deleted_at(soft delete), created_at, updated_at
+- `first_billing_date`: 다음 결제일 계산의 단일 기준 앵커. 기존 `billing_day`+`billing_month`를 통합. 다음 결제일은 저장하지 않고 `NextBillingDateCalculator`가 앵커+주기로 재계산(월말 드리프트 없음)
 
 enum:
 - `provider`: GOOGLE, KAKAO, NAVER

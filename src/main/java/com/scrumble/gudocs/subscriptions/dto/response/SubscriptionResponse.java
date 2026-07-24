@@ -22,11 +22,8 @@ public record SubscriptionResponse(
         @Schema(description = "결제 주기", example = "MONTHLY")
         BillingCycle billingCycle,
 
-        @Schema(description = "결제일(1~31)", example = "15")
-        Integer billingDay,
-
-        @Schema(description = "결제 월(1~12, YEARLY 전용)", example = "1", nullable = true)
-        Integer billingMonth,
+        @Schema(description = "최초 결제일(다음 결제일 계산의 기준 앵커)", example = "2026-07-15")
+        LocalDate firstBillingDate,
 
         @Schema(description = "결제 수단", example = "CARD")
         PaymentMethod paymentMethod,
@@ -50,8 +47,7 @@ public record SubscriptionResponse(
                 subscription.getCategory(),
                 subscription.getPrice(),
                 subscription.getBillingCycle(),
-                subscription.getBillingDay(),
-                subscription.getBillingMonth(),
+                subscription.getFirstBillingDate(),
                 subscription.getPaymentMethod(),
                 subscription.getStatus(),
                 nextBillingDate,
