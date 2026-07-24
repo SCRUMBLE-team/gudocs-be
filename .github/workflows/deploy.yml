@@ -47,12 +47,39 @@ jobs:
 
       - name: Deploy on EC2
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          KAKAO_CLIENT_ID: ${{ secrets.KAKAO_CLIENT_ID }}
+          KAKAO_CLIENT_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
+          NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
+          NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          envs: DB_PASSWORD,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,KAKAO_CLIENT_ID,KAKAO_CLIENT_SECRET,NAVER_CLIENT_ID,NAVER_CLIENT_SECRET
           script: |
             set -e
+            # /etc/gudocs/env 를 배포마다 시크릿에서 렌더링 (GitHub Secrets가 소스)
+            sudo install -d -m 755 /etc/gudocs
+            sudo tee /etc/gudocs/env > /dev/null <<EOF
+            DB_URL=jdbc:mysql://127.0.0.1:3306/gudocs
+            DB_USER=gudocs
+            DB_PASSWORD=${DB_PASSWORD}
+            CORS_ALLOWED_ORIGINS=https://gudocs-fe-v2.vercel.app
+            COOKIE_SAME_SITE=none
+            COOKIE_SECURE=true
+            GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+            GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+            KAKAO_CLIENT_ID=${KAKAO_CLIENT_ID}
+            KAKAO_CLIENT_SECRET=${KAKAO_CLIENT_SECRET}
+            NAVER_CLIENT_ID=${NAVER_CLIENT_ID}
+            NAVER_CLIENT_SECRET=${NAVER_CLIENT_SECRET}
+            OAUTH_SUCCESS_REDIRECT=https://gudocs-fe-v2.vercel.app
+            EOF
+            sudo chmod 600 /etc/gudocs/env
             sudo mv /tmp/app.jar /opt/gudocs/app.jar
             sudo chown ubuntu:ubuntu /opt/gudocs/app.jar
             sudo systemctl restart gudocs
