@@ -2,6 +2,8 @@ package com.scrumble.gudocs.config;
 
 import com.scrumble.gudocs.auth.oauth.CustomOAuth2UserService;
 import jakarta.servlet.http.HttpServletResponse;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -42,8 +44,12 @@ public class SecurityConfig {
                         .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
                         .successHandler((request, response, authentication) ->
                                 response.sendRedirect(oauthSuccessRedirect))
-                        .failureHandler((request, response, exception) ->
-                                response.sendRedirect(oauthSuccessRedirect + "?login=fail"))
+                        .failureHandler((request, response, exception) -> {
+                            String reason = URLEncoder.encode(
+                                    exception.getMessage() == null ? "" : exception.getMessage(),
+                                    StandardCharsets.UTF_8);
+                            response.sendRedirect(oauthSuccessRedirect + "?login=fail&reason=" + reason);
+                        })
                 )
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
