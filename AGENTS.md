@@ -20,14 +20,14 @@
 
 ```
 src/main/java/com/scrumble/gudocs/
-├── auth/           # 회원가입, 로그인, 로그아웃, 내 정보
-├── users/          # User 엔티티, 마이페이지 (이름·비번 수정, 탈퇴)
+├── auth/           # 소셜 로그인(oauth/), 로그아웃, 내 정보
+├── users/          # User·SocialAccount 엔티티, 마이페이지 (이름 수정, 탈퇴)
 ├── subscriptions/  # 구독 CRUD (entity/controller/service/repository/dto/util)
 ├── expense/        # 지출 분석 (월별, 카테고리별, 추이)
 ├── dashboard/      # 메인 대시보드 집계
 ├── notification/   # 결제 예정 알림 (헤더용 단독 엔드포인트)
-├── global/         # BaseEntity, ErrorCode, BusinessException, ApiResponse
-└── config/         # SecurityConfig, CorsConfig, LocalSecurityConfig, DataInitializer
+├── global/         # BaseEntity, ErrorCode, BusinessException, ApiResponse, security/(CurrentUserId)
+└── config/         # SecurityConfig, WebConfig, CorsConfig, LocalSecurityConfig, DataInitializer
 
 deploy/             # EC2 배포 리소스 (setup.sh, systemd, Caddyfile, mysql-init.sql)
 .github/workflows/  # ci.yml (PR 테스트), deploy.yml (main → EC2 배포)
@@ -37,11 +37,18 @@ deploy/             # EC2 배포 리소스 (setup.sh, systemd, Caddyfile, mysql-
 
 ## ERD
 
-**users** — id, name, email(unique), password_hash, created_at, updated_at
+**users** — id, name, email(unique), created_at, updated_at
+- 소셜 로그인 전용 전환으로 `password_hash` **제거**
+
+**social_accounts** — id, user_id(FK), provider, provider_id, email, email_verified, last_login_at, created_at, updated_at
+- users 1:N social_accounts
+- `UNIQUE(provider, provider_id)` — 로그인 조회키
+- `UNIQUE(user_id, provider)` — 같은 provider 중복 연결 금지
 
 **subscriptions** — id, user_id(FK), service_name, category, price, billing_cycle, billing_day, billing_month(YEARLY 전용), payment_method, status, paused_at, deleted_at(soft delete), created_at, updated_at
 
 enum:
+- `provider`: GOOGLE, KAKAO, NAVER
 - `category`: OTT, MUSIC, CLOUD, PRODUCTIVITY, AI, NEWS, EDUCATION, GAME, SHOPPING, DESIGN, ETC
 - `billing_cycle`: MONTHLY, YEARLY
 - `payment_method`: CARD, BANK_TRANSFER, SIMPLE_PAY, ETC
@@ -53,10 +60,11 @@ enum:
 
 | Method | Path | 인증 |
 |--------|------|------|
-| POST | `/api/auth/signup`, `/api/auth/login` | × |
+| GET | `/oauth2/authorization/{google,kakao,naver}` | × |
+| GET | `/login/oauth2/code/{provider}` (콜백, provider가 호출) | × |
 | POST | `/api/auth/logout` | ○ |
 | GET | `/api/auth/me` | ○ |
-| GET / PUT(`/name`,`/password`) / DELETE | `/api/users/me*` | ○ |
+| GET / PUT(`/name`) / DELETE | `/api/users/me*` | ○ |
 | GET / POST | `/api/subscriptions` | ○ |
 | GET / PUT / DELETE | `/api/subscriptions/{id}` | ○ |
 | PUT | `/api/subscriptions/{id}/status` | ○ |
@@ -65,6 +73,16 @@ enum:
 | GET | `/api/notifications/upcoming` | ○ |
 
 계층: Controller → Service → Repository
+
+### 인증 (소셜 로그인 전용)
+
+- **이메일/비밀번호 로그인 폐지** — `signup`/`login` 엔드포인트, `UserDetailsService`, BCrypt 모두 제거
+- Spring Security `oauth2Login` 사용. `/oauth2/authorization/{provider}` 2개(authorization/callback)는 프레임워크 자동 노출, 커스텀 REST 컨트롤러 없음
+- `CustomOAuth2UserService`: provider userinfo → `OAuth2UserInfo`로 정규화(3사 switch 분기) → `(provider, provider_id)`로 조회, 없으면 신규 User+SocialAccount 생성
+- **동일 이메일 자동 병합 안 함**: 다른 provider로 이미 가입된 이메일이면 가입 차단(`?login=fail&reason=<기존 provider>로 이미 가입...`). 계정 연결(마이페이지)은 2차 미구현
+- 세션 principal = `CustomOAuth2User`(user.id 보유). 컨트롤러는 `@CurrentUserId Long userId`로 주입받음 (`CurrentUserIdArgumentResolver`, `WebConfig` 등록)
+- 로그인 성공 시 `app.oauth.success-redirect`(env `OAUTH_SUCCESS_REDIRECT`)로 리다이렉트
+- 회원 탈퇴는 세션 인증만으로 처리(비번 확인 없음), 탈퇴 시 subscriptions·social_accounts 함께 삭제
 
 - `PUT /api/subscriptions/{id}` — **full update** 방식: 모든 필드 필수 전송 (partial update 불가)
 - `SubscriptionResponse`에 `nextBillingDate` 필드 포함 — BE에서 계산해 내려보냄 (FE 자체 계산 금지)
@@ -119,6 +137,10 @@ enum:
 | `CORS_ALLOWED_ORIGINS` | `https://gudocs-fe-8xxs.vercel.app` (콤마로 다중 가능) |
 | `COOKIE_SAME_SITE` | `none` (크로스 도메인 세션 필수) |
 | `COOKIE_SECURE` | `true` (`none` 사용 시 필수, HTTPS 강제) |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google OAuth 크레덴셜 (Google Cloud Console 발급) |
+| `OAUTH_SUCCESS_REDIRECT` | 소셜 로그인 성공 후 리다이렉트할 프론트 주소 |
+
+- Google 콘솔 Authorized redirect URI: `<BE주소>/login/oauth2/code/google` (로컬·배포 각각 등록)
 
 ### CI/CD
 
@@ -139,6 +161,6 @@ enum:
 - `application.yaml`, `.env` 내용을 응답에 포함 금지
 - 삭제는 hard delete 금지 — `deleted_at` soft delete 사용
 - 지출 분석 조회는 `findAllByUserIncludingDeleted` 사용
-- 다른 사용자 데이터 접근 가능한 API 금지 — 현재 로그인 사용자 기준만
+- 다른 사용자 데이터 접근 가능한 API 금지 — 현재 로그인 사용자 기준만 (`@CurrentUserId Long userId`)
 - 배포 설정 변경 시 `deploy/env.example`과 `application.yaml` 기본값 동시 점검
 - CORS 도메인 추가는 코드가 아니라 `CORS_ALLOWED_ORIGINS` 환경변수에서 처리
