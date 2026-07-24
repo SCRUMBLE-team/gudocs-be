@@ -58,8 +58,8 @@ public class SocialLoginProcessor {
                     existingProvider + "로 이미 가입된 이메일입니다. 기존 로그인 방식을 사용해주세요.");
         });
 
+        // 이름은 온보딩 화면에서 입력받으므로 최초에는 비워둔다
         User user = userRepository.save(User.builder()
-                .name(resolveName(info))
                 .email(info.email())
                 .build());
 
@@ -70,16 +70,5 @@ public class SocialLoginProcessor {
                 .email(info.email())
                 .emailVerified(info.emailVerified())
                 .build());
-    }
-
-    /**
-     * provider가 이름/닉네임을 주지 않는 경우가 있어(예: 카카오 닉네임 미동의),
-     * 이름이 비어 있으면 이메일 로컬파트로 대체한다. (User.name은 NOT NULL)
-     */
-    private String resolveName(OAuth2UserInfo info) {
-        if (info.name() != null && !info.name().isBlank()) {
-            return info.name();
-        }
-        return info.email().split("@")[0];
     }
 }

@@ -16,7 +16,8 @@ public class User extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    // 소셜 로그인 후 온보딩에서 입력받는다 (신규 유저는 최초 null)
+    @Column
     private String name;
 
     @Column(nullable = false, unique = true)

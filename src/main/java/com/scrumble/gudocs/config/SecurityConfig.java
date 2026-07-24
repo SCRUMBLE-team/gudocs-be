@@ -2,6 +2,8 @@ package com.scrumble.gudocs.config;
 
 import com.scrumble.gudocs.auth.oauth.CustomOAuth2UserService;
 import com.scrumble.gudocs.auth.oauth.CustomOidcUserService;
+import com.scrumble.gudocs.auth.oauth.UserPrincipal;
+import com.scrumble.gudocs.users.repository.UserRepository;
 import jakarta.servlet.http.HttpServletResponse;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -33,7 +35,8 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
             SecurityContextRepository securityContextRepository,
             CustomOAuth2UserService customOAuth2UserService,
-            CustomOidcUserService customOidcUserService) throws Exception {
+            CustomOidcUserService customOidcUserService,
+            UserRepository userRepository) throws Exception {
         http
                 .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
@@ -46,8 +49,16 @@ public class SecurityConfig {
                         .userInfoEndpoint(userInfo -> userInfo
                                 .userService(customOAuth2UserService)
                                 .oidcUserService(customOidcUserService))
-                        .successHandler((request, response, authentication) ->
-                                response.sendRedirect(oauthSuccessRedirect))
+                        .successHandler((request, response, authentication) -> {
+                            // 이름 미설정(신규 가입) → 온보딩(이름 입력) 화면으로, 아니면 정상 진입
+                            Long userId = ((UserPrincipal) authentication.getPrincipal()).getUserId();
+                            boolean needsOnboarding = userRepository.findById(userId)
+                                    .map(u -> u.getName() == null || u.getName().isBlank())
+                                    .orElse(false);
+                            response.sendRedirect(needsOnboarding
+                                    ? oauthSuccessRedirect + "?onboarding=1"
+                                    : oauthSuccessRedirect);
+                        })
                         .failureHandler((request, response, exception) -> {
                             String reason = URLEncoder.encode(
                                     exception.getMessage() == null ? "" : exception.getMessage(),

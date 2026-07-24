@@ -37,8 +37,9 @@ deploy/             # EC2 배포 리소스 (setup.sh, systemd, Caddyfile, mysql-
 
 ## ERD
 
-**users** — id, name, email(unique), created_at, updated_at
+**users** — id, name(nullable), email(unique), created_at, updated_at
 - 소셜 로그인 전용 전환으로 `password_hash` **제거**
+- `name`은 최초 로그인 시 null → 온보딩(이름 입력) 화면에서 `PUT /api/users/me/name`로 채움
 
 **social_accounts** — id, user_id(FK), provider, provider_id, email, email_verified, last_login_at, created_at, updated_at
 - users 1:N social_accounts
@@ -82,6 +83,8 @@ enum:
 - **동일 이메일 자동 병합 안 함**: 다른 provider로 이미 가입된 이메일이면 가입 차단(`?login=fail&reason=<기존 provider>로 이미 가입...`). 계정 연결(마이페이지)은 2차 미구현
 - 세션 principal = `CustomOAuth2User`(user.id 보유). 컨트롤러는 `@CurrentUserId Long userId`로 주입받음 (`CurrentUserIdArgumentResolver`, `WebConfig` 등록)
 - 로그인 성공 시 `app.oauth.success-redirect`(env `OAUTH_SUCCESS_REDIRECT`)로 리다이렉트
+  - **신규 유저(name null)** → `?onboarding=1` 붙여 리다이렉트 → FE는 이름 입력 화면 표시 후 `PUT /api/users/me/name` 호출
+  - 기존 유저 → 파라미터 없이 리다이렉트
 - 회원 탈퇴는 세션 인증만으로 처리(비번 확인 없음), 탈퇴 시 subscriptions·social_accounts 함께 삭제
 
 - `PUT /api/subscriptions/{id}` — **full update** 방식: 모든 필드 필수 전송 (partial update 불가)
