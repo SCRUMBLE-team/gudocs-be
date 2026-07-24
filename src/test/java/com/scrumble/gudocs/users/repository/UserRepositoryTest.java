@@ -23,7 +23,6 @@ class UserRepositoryTest {
         User user = User.builder()
                 .name("테스터")
                 .email("test@example.com")
-                .passwordHash("hashed")
                 .build();
         return em.persistAndFlush(user);
     }

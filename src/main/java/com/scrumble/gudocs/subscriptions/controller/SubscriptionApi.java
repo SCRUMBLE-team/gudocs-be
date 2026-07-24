@@ -14,7 +14,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.userdetails.UserDetails;
+import com.scrumble.gudocs.global.security.CurrentUserId;
 
 import java.util.List;
 
@@ -28,7 +28,7 @@ public interface SubscriptionApi {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "유효하지 않은 요청"),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "로그인 필요")
     })
-    ResponseEntity<ApiResponse<SubscriptionResponse>> create(@Parameter(hidden = true) UserDetails userDetails,
+    ResponseEntity<ApiResponse<SubscriptionResponse>> create(@CurrentUserId Long userId,
             @Valid SubscriptionCreateRequest request);
 
     @Operation(summary = "구독 목록 조회", description = "현재 사용자의 구독 목록을 조회합니다. (삭제된 항목 제외)")
@@ -36,7 +36,7 @@ public interface SubscriptionApi {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "로그인 필요")
     })
-    ResponseEntity<ApiResponse<List<SubscriptionResponse>>> getAll(@Parameter(hidden = true) UserDetails userDetails);
+    ResponseEntity<ApiResponse<List<SubscriptionResponse>>> getAll(@CurrentUserId Long userId);
 
     @Operation(summary = "구독 상세 조회", description = "특정 구독 서비스의 상세 정보를 조회합니다.")
     @ApiResponses({
@@ -45,7 +45,7 @@ public interface SubscriptionApi {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "접근 권한 없음"),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "구독 없음")
     })
-    ResponseEntity<ApiResponse<SubscriptionResponse>> getOne(@Parameter(hidden = true) UserDetails userDetails,
+    ResponseEntity<ApiResponse<SubscriptionResponse>> getOne(@CurrentUserId Long userId,
             Long subscriptionId);
 
     @Operation(summary = "구독 수정", description = "구독 서비스 정보를 수정합니다.")
@@ -55,7 +55,7 @@ public interface SubscriptionApi {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "로그인 필요"),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "구독 없음")
     })
-    ResponseEntity<ApiResponse<SubscriptionResponse>> update(@Parameter(hidden = true) UserDetails userDetails,
+    ResponseEntity<ApiResponse<SubscriptionResponse>> update(@CurrentUserId Long userId,
             Long subscriptionId,
             @Valid SubscriptionUpdateRequest request);
 
@@ -65,7 +65,7 @@ public interface SubscriptionApi {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "로그인 필요"),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "구독 없음")
     })
-    ResponseEntity<ApiResponse<Void>> delete(@Parameter(hidden = true) UserDetails userDetails,
+    ResponseEntity<ApiResponse<Void>> delete(@CurrentUserId Long userId,
             Long subscriptionId);
 
     @Operation(summary = "서비스명 중복 확인", description = "동일한 서비스명의 활성 구독이 있는지 확인합니다. (대소문자 무시, 경고 용도)")
@@ -73,7 +73,7 @@ public interface SubscriptionApi {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "확인 완료"),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "로그인 필요")
     })
-    ResponseEntity<ApiResponse<Boolean>> checkDuplicateName(@Parameter(hidden = true) UserDetails userDetails,
+    ResponseEntity<ApiResponse<Boolean>> checkDuplicateName(@CurrentUserId Long userId,
             @Parameter(description = "확인할 서비스명", example = "Netflix", required = true)
             @NotBlank @Size(max = 100) String name);
 
@@ -83,7 +83,7 @@ public interface SubscriptionApi {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "로그인 필요"),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "구독 없음")
     })
-    ResponseEntity<ApiResponse<SubscriptionResponse>> updateStatus(@Parameter(hidden = true) UserDetails userDetails,
+    ResponseEntity<ApiResponse<SubscriptionResponse>> updateStatus(@CurrentUserId Long userId,
             Long subscriptionId,
             @Valid SubscriptionStatusUpdateRequest request);
 }

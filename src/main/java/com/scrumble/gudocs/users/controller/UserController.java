@@ -1,17 +1,14 @@
 package com.scrumble.gudocs.users.controller;
 
 import com.scrumble.gudocs.global.response.ApiResponse;
-import com.scrumble.gudocs.users.dto.UserDeleteRequest;
+import com.scrumble.gudocs.global.security.CurrentUserId;
 import com.scrumble.gudocs.users.dto.UserInfoResponse;
 import com.scrumble.gudocs.users.dto.UserNameUpdateRequest;
-import com.scrumble.gudocs.users.dto.UserPasswordUpdateRequest;
 import com.scrumble.gudocs.users.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -24,36 +21,26 @@ public class UserController implements UserApi {
     @Override
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<UserInfoResponse>> getMyInfo(
-            @AuthenticationPrincipal UserDetails userDetails) {
-        UserInfoResponse response = userService.getMyInfo(userDetails.getUsername());
+            @CurrentUserId Long userId) {
+        UserInfoResponse response = userService.getMyInfo(userId);
         return ResponseEntity.ok(ApiResponse.success("내 정보 조회에 성공했습니다.", response));
     }
 
     @Override
     @PutMapping("/me/name")
     public ResponseEntity<ApiResponse<UserInfoResponse>> updateName(
-            @AuthenticationPrincipal UserDetails userDetails,
+            @CurrentUserId Long userId,
             @Valid @RequestBody UserNameUpdateRequest request) {
-        UserInfoResponse response = userService.updateName(userDetails.getUsername(), request);
+        UserInfoResponse response = userService.updateName(userId, request);
         return ResponseEntity.ok(ApiResponse.success("이름이 수정되었습니다.", response));
-    }
-
-    @Override
-    @PutMapping("/me/password")
-    public ResponseEntity<ApiResponse<Void>> updatePassword(
-            @AuthenticationPrincipal UserDetails userDetails,
-            @Valid @RequestBody UserPasswordUpdateRequest request) {
-        userService.updatePassword(userDetails.getUsername(), request);
-        return ResponseEntity.ok(ApiResponse.success("비밀번호가 수정되었습니다."));
     }
 
     @Override
     @DeleteMapping("/me")
     public ResponseEntity<ApiResponse<Void>> deleteAccount(
-            @AuthenticationPrincipal UserDetails userDetails,
-            @Valid @RequestBody UserDeleteRequest request,
+            @CurrentUserId Long userId,
             HttpServletRequest httpRequest) {
-        userService.deleteAccount(userDetails.getUsername(), request);
+        userService.deleteAccount(userId);
         var session = httpRequest.getSession(false);
         if (session != null) {
             session.invalidate();

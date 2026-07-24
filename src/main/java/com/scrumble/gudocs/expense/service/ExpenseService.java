@@ -38,9 +38,9 @@ public class ExpenseService {
     private final UserRepository userRepository;
 
     @Transactional(readOnly = true)
-    public MonthlyExpenseResponse getMonthlyExpense(String email, int year, int month) {
+    public MonthlyExpenseResponse getMonthlyExpense(Long userId, int year, int month) {
         YearMonth target = parseYearMonth(year, month);
-        List<Subscription> all = loadAllSubscriptions(email);
+        List<Subscription> all = loadAllSubscriptions(userId);
 
         List<Subscription> currentMonth = filterByMonth(all, target);
         List<Subscription> previousMonth = filterByMonth(all, target.minusMonths(1));
@@ -61,9 +61,9 @@ public class ExpenseService {
     }
 
     @Transactional(readOnly = true)
-    public CategoryExpenseResponse getCategoryExpense(String email, int year, int month) {
+    public CategoryExpenseResponse getCategoryExpense(Long userId, int year, int month) {
         YearMonth target = parseYearMonth(year, month);
-        List<Subscription> currentMonth = filterByMonth(loadAllSubscriptions(email), target);
+        List<Subscription> currentMonth = filterByMonth(loadAllSubscriptions(userId), target);
         long totalAmount = sumMonthlyAmount(currentMonth);
 
         Map<SubscriptionCategory, List<Subscription>> grouped = currentMonth.stream()
@@ -88,9 +88,9 @@ public class ExpenseService {
     }
 
     @Transactional(readOnly = true)
-    public ExpenseTrendResponse getExpenseTrend(String email, int baseYear, int baseMonth) {
+    public ExpenseTrendResponse getExpenseTrend(Long userId, int baseYear, int baseMonth) {
         YearMonth base = parseYearMonth(baseYear, baseMonth);
-        List<Subscription> all = loadAllSubscriptions(email);
+        List<Subscription> all = loadAllSubscriptions(userId);
 
         List<MonthlyTrendItem> trends = IntStream
                 .range(0, TREND_MONTHS)
@@ -106,9 +106,9 @@ public class ExpenseService {
     }
 
     @Transactional(readOnly = true)
-    public MonthlyExpenseDetailResponse getMonthlyExpenseDetail(String email, int year, int month) {
+    public MonthlyExpenseDetailResponse getMonthlyExpenseDetail(Long userId, int year, int month) {
         YearMonth target = parseYearMonth(year, month);
-        List<Subscription> currentMonth = filterByMonth(loadAllSubscriptions(email), target);
+        List<Subscription> currentMonth = filterByMonth(loadAllSubscriptions(userId), target);
         long totalAmount = sumMonthlyAmount(currentMonth);
 
         List<SubscriptionExpenseDetail> details = currentMonth.stream()
@@ -132,8 +132,8 @@ public class ExpenseService {
         return new MonthlyExpenseDetailResponse(target.getYear(), target.getMonthValue(), totalAmount, details);
     }
 
-    private List<Subscription> loadAllSubscriptions(String email) {
-        User user = userRepository.findByEmail(email)
+    private List<Subscription> loadAllSubscriptions(Long userId) {
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         return subscriptionRepository.findAllByUserIncludingDeleted(user);
     }

@@ -34,7 +34,7 @@ class DashboardServiceTest {
     private DashboardService dashboardService;
 
     private User user() {
-        return User.builder().id(1L).name("테스터").email("test@example.com").passwordHash("hashed").build();
+        return User.builder().id(1L).name("테스터").email("test@example.com").build();
     }
 
     private Subscription monthly(String name, SubscriptionCategory category, long price, int billingDay) {
@@ -63,7 +63,7 @@ class DashboardServiceTest {
     }
 
     private void setupUser(User u, List<Subscription> subs) {
-        given(userRepository.findByEmail("test@example.com")).willReturn(Optional.of(u));
+        given(userRepository.findById(1L)).willReturn(Optional.of(u));
         given(subscriptionRepository.findAllByUserOrderByCreatedAtDesc(u)).willReturn(subs);
     }
 
@@ -79,7 +79,7 @@ class DashboardServiceTest {
                 .paymentMethod(PaymentMethod.CARD).status(SubscriptionStatus.PAUSED).build();
         setupUser(u, List.of(active, paused));
 
-        DashboardResponse response = dashboardService.getDashboard("test@example.com", TODAY);
+        DashboardResponse response = dashboardService.getDashboard(1L, TODAY);
 
         assertThat(response.activeSubscriptionCount()).isEqualTo(1);
     }
@@ -91,7 +91,7 @@ class DashboardServiceTest {
         User u = user();
         setupUser(u, List.of(monthly("Netflix", SubscriptionCategory.OTT, 17000L, 15)));
 
-        DashboardResponse response = dashboardService.getDashboard("test@example.com", TODAY);
+        DashboardResponse response = dashboardService.getDashboard(1L, TODAY);
 
         assertThat(response.monthlyTotalExpense()).isEqualTo(17000L);
     }
@@ -101,7 +101,7 @@ class DashboardServiceTest {
         User u = user();
         setupUser(u, List.of(yearly("Adobe", SubscriptionCategory.DESIGN, 120000L, 1, 3)));
 
-        DashboardResponse response = dashboardService.getDashboard("test@example.com", TODAY);
+        DashboardResponse response = dashboardService.getDashboard(1L, TODAY);
 
         assertThat(response.monthlyTotalExpense()).isEqualTo(10000L);
     }
@@ -116,7 +116,7 @@ class DashboardServiceTest {
                 .paymentMethod(PaymentMethod.CARD).status(SubscriptionStatus.PAUSED).build();
         setupUser(u, List.of(active, paused));
 
-        DashboardResponse response = dashboardService.getDashboard("test@example.com", TODAY);
+        DashboardResponse response = dashboardService.getDashboard(1L, TODAY);
 
         assertThat(response.monthlyTotalExpense()).isEqualTo(17000L);
     }
@@ -131,7 +131,7 @@ class DashboardServiceTest {
                 monthly("Spotify", SubscriptionCategory.MUSIC, 10000L, 5)
         ));
 
-        DashboardResponse response = dashboardService.getDashboard("test@example.com", TODAY);
+        DashboardResponse response = dashboardService.getDashboard(1L, TODAY);
 
         assertThat(response.categorySummaries()).hasSize(2);
         assertThat(response.categorySummaries().get(0).monthlyAmount()).isEqualTo(17000L);
@@ -148,7 +148,7 @@ class DashboardServiceTest {
                 monthly("Spotify", SubscriptionCategory.MUSIC, 10000L, 5)
         ));
 
-        DashboardResponse response = dashboardService.getDashboard("test@example.com", TODAY);
+        DashboardResponse response = dashboardService.getDashboard(1L, TODAY);
 
         double ottRatio = response.categorySummaries().stream()
                 .filter(c -> c.category() == SubscriptionCategory.OTT)
@@ -168,7 +168,7 @@ class DashboardServiceTest {
                 monthly("iCloud", SubscriptionCategory.CLOUD, 1100L, 25)
         ));
 
-        DashboardResponse response = dashboardService.getDashboard("test@example.com", TODAY);
+        DashboardResponse response = dashboardService.getDashboard(1L, TODAY);
 
         assertThat(response.recentSubscriptions()).hasSize(3);
     }
@@ -179,7 +179,7 @@ class DashboardServiceTest {
         // today = 2026-05-11, billingDay=15 → 2026-05-15
         setupUser(u, List.of(monthly("Netflix", SubscriptionCategory.OTT, 17000L, 15)));
 
-        DashboardResponse response = dashboardService.getDashboard("test@example.com", TODAY);
+        DashboardResponse response = dashboardService.getDashboard(1L, TODAY);
 
         assertThat(response.recentSubscriptions().get(0).nextBillingDate())
                 .isEqualTo(LocalDate.of(2026, 5, 15));
@@ -190,7 +190,7 @@ class DashboardServiceTest {
         User u = user();
         setupUser(u, List.of());
 
-        DashboardResponse response = dashboardService.getDashboard("test@example.com", TODAY);
+        DashboardResponse response = dashboardService.getDashboard(1L, TODAY);
 
         assertThat(response.recentSubscriptions()).isEmpty();
     }
