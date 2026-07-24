@@ -36,7 +36,7 @@ public class UserService {
     @Transactional
     public void deleteAccount(Long userId) {
         User user = findUser(userId);
-        subscriptionRepository.softDeleteAllByUser(user);
+        subscriptionRepository.hardDeleteAllByUser(user);
         socialAccountRepository.deleteAllByUser(user);
         userRepository.delete(user);
     }

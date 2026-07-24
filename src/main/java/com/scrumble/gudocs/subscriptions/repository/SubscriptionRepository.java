@@ -23,6 +23,6 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
 
     @Modifying
     @Transactional
-    @Query("UPDATE Subscription s SET s.deletedAt = CURRENT_TIMESTAMP WHERE s.user = :user AND s.deletedAt IS NULL")
-    int softDeleteAllByUser(@Param("user") User user);
+    @Query("DELETE FROM Subscription s WHERE s.user = :user")
+    int hardDeleteAllByUser(@Param("user") User user);
 }

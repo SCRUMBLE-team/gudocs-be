@@ -23,7 +23,7 @@ import org.springframework.security.web.context.SecurityContextRepository;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    @Value("${app.oauth.success-redirect:http://localhost:5173}")
+    @Value("${app.oauth.success-redirect}")
     private String oauthSuccessRedirect;
 
     @Bean
