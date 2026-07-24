@@ -1,6 +1,7 @@
 package com.scrumble.gudocs.config;
 
 import com.scrumble.gudocs.auth.oauth.CustomOAuth2UserService;
+import com.scrumble.gudocs.auth.oauth.CustomOidcUserService;
 import jakarta.servlet.http.HttpServletResponse;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -31,7 +32,8 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
             SecurityContextRepository securityContextRepository,
-            CustomOAuth2UserService customOAuth2UserService) throws Exception {
+            CustomOAuth2UserService customOAuth2UserService,
+            CustomOidcUserService customOidcUserService) throws Exception {
         http
                 .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
@@ -41,7 +43,9 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth -> oauth
-                        .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
+                        .userInfoEndpoint(userInfo -> userInfo
+                                .userService(customOAuth2UserService)
+                                .oidcUserService(customOidcUserService))
                         .successHandler((request, response, authentication) ->
                                 response.sendRedirect(oauthSuccessRedirect))
                         .failureHandler((request, response, exception) -> {

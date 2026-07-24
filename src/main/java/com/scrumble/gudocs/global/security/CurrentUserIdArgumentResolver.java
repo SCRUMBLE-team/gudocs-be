@@ -1,6 +1,6 @@
 package com.scrumble.gudocs.global.security;
 
-import com.scrumble.gudocs.auth.oauth.CustomOAuth2User;
+import com.scrumble.gudocs.auth.oauth.UserPrincipal;
 import com.scrumble.gudocs.global.exception.BusinessException;
 import com.scrumble.gudocs.global.exception.ErrorCode;
 import org.springframework.core.MethodParameter;
@@ -23,7 +23,7 @@ public class CurrentUserIdArgumentResolver implements HandlerMethodArgumentResol
     public Object resolveArgument(MethodParameter parameter, ModelAndViewContainer mavContainer,
             NativeWebRequest webRequest, WebDataBinderFactory binderFactory) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.getPrincipal() instanceof CustomOAuth2User principal) {
+        if (authentication != null && authentication.getPrincipal() instanceof UserPrincipal principal) {
             return principal.getUserId();
         }
         throw new BusinessException(ErrorCode.UNAUTHORIZED);

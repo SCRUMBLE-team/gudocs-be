@@ -11,7 +11,7 @@ import java.util.Map;
 /**
  * 세션 principal. 로그인 수단(provider)과 무관하게 user.id를 기준 식별자로 보유한다.
  */
-public class CustomOAuth2User implements OAuth2User {
+public class CustomOAuth2User implements OAuth2User, UserPrincipal {
 
     private final Long userId;
     private final Map<String, Object> attributes;
@@ -21,6 +21,7 @@ public class CustomOAuth2User implements OAuth2User {
         this.attributes = attributes;
     }
 
+    @Override
     public Long getUserId() {
         return userId;
     }
