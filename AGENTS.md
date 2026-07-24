@@ -116,7 +116,7 @@ enum:
 5주 팀프로젝트 발표용 1회성 배포. 운영 안 함 → 최소 스펙.
 
 ```
-[브라우저] ─HTTPS─► Vercel (gudocs-fe-8xxs.vercel.app)
+[브라우저] ─HTTPS─► Vercel (gudocs-fe-v2.vercel.app)
                         │ fetch(credentials: include)
                         ▼
                 EC2 t3.micro (Ubuntu 22.04)
@@ -134,7 +134,7 @@ enum:
 | 변수 | 값 (예시/실제) |
 |------|--------|
 | `DB_URL`, `DB_USER`, `DB_PASSWORD` | MySQL 접속 |
-| `CORS_ALLOWED_ORIGINS` | `https://gudocs-fe-8xxs.vercel.app` (콤마로 다중 가능) |
+| `CORS_ALLOWED_ORIGINS` | `https://gudocs-fe-v2.vercel.app` (콤마로 다중 가능) |
 | `COOKIE_SAME_SITE` | `none` (크로스 도메인 세션 필수) |
 | `COOKIE_SECURE` | `true` (`none` 사용 시 필수, HTTPS 강제) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google OAuth 크레덴셜 (Google Cloud Console 발급) |
