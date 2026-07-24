@@ -20,7 +20,9 @@ public class User extends BaseEntity {
     @Column
     private String name;
 
-    @Column(nullable = false, unique = true)
+    // provider+providerId로 식별하므로 이메일은 unique 아님
+    // (다른 소셜 제공자가 같은 이메일이면 별도 회원)
+    @Column(nullable = false)
     private String email;
 
     public void updateName(String name) {

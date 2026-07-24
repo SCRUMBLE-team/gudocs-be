@@ -3,19 +3,9 @@ package com.scrumble.gudocs.users.entity;
 import java.util.Arrays;
 
 public enum SocialProvider {
-    GOOGLE("구글"),
-    KAKAO("카카오"),
-    NAVER("네이버");
-
-    private final String displayName;
-
-    SocialProvider(String displayName) {
-        this.displayName = displayName;
-    }
-
-    public String getDisplayName() {
-        return displayName;
-    }
+    GOOGLE,
+    KAKAO,
+    NAVER;
 
     public static SocialProvider from(String registrationId) {
         return Arrays.stream(values())

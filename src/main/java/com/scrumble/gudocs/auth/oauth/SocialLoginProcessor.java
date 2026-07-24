@@ -45,19 +45,9 @@ public class SocialLoginProcessor {
 
     /**
      * 처음 보는 소셜 계정이면 새 user를 만든다.
-     * 동일 이메일이 이미 다른 provider로 가입돼 있으면 자동 병합하지 않고 막는다.
-     * (계정 연결은 이후 단계에서 마이페이지로 처리)
+     * provider+providerId로 식별하므로, 다른 제공자가 같은 이메일이어도 별도 회원으로 가입한다.
      */
     private SocialAccount register(SocialProvider provider, OAuth2UserInfo info) {
-        userRepository.findByEmail(info.email()).ifPresent(existing -> {
-            String existingProvider = socialAccountRepository.findFirstByUser(existing)
-                    .map(sa -> sa.getProvider().getDisplayName())
-                    .orElse("다른 방식");
-            throw new OAuth2AuthenticationException(
-                    new OAuth2Error("email_already_registered"),
-                    existingProvider + "로 이미 가입된 이메일입니다. 기존 로그인 방식을 사용해주세요.");
-        });
-
         // 이름은 온보딩 화면에서 입력받으므로 최초에는 비워둔다
         User user = userRepository.save(User.builder()
                 .email(info.email())
