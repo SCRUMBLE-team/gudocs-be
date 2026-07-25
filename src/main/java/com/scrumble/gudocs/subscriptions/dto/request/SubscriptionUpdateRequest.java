@@ -9,6 +9,8 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
+import java.time.LocalDate;
+
 public record SubscriptionUpdateRequest(
         @Schema(description = "서비스명", example = "Netflix")
         @NotBlank(message = "서비스명은 필수입니다.")
@@ -28,16 +30,9 @@ public record SubscriptionUpdateRequest(
         @NotNull(message = "결제 주기는 필수입니다.")
         BillingCycle billingCycle,
 
-        @Schema(description = "결제일(1~31)", example = "15")
-        @NotNull(message = "결제일은 필수입니다.")
-        @Min(value = 1, message = "결제일은 1~31 사이여야 합니다.")
-        @Max(value = 31, message = "결제일은 1~31 사이여야 합니다.")
-        Integer billingDay,
-
-        @Schema(description = "결제 월(1~12, YEARLY 전용)", example = "1", nullable = true)
-        @Min(value = 1, message = "결제 월은 1~12 사이여야 합니다.")
-        @Max(value = 12, message = "결제 월은 1~12 사이여야 합니다.")
-        Integer billingMonth,
+        @Schema(description = "최초 결제일(다음 결제일 계산의 기준 앵커)", example = "2026-07-15")
+        @NotNull(message = "최초 결제일은 필수입니다.")
+        LocalDate firstBillingDate,
 
         @Schema(description = "결제 수단", example = "CARD")
         @NotNull(message = "결제 수단은 필수입니다.")

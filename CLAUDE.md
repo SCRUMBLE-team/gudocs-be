@@ -56,7 +56,7 @@ users/
 subscriptions/
   entity/
     Subscription.java            # id, user_id, service_name, category, price,
-                                 # billing_cycle, billing_day, billing_month,
+                                 # billing_cycle, first_billing_date(앵커),
                                  # payment_method, status
     BillingCycle.java            # MONTHLY, YEARLY
     SubscriptionCategory.java    # OTT, MUSIC, CLOUD, PRODUCTIVITY, AI, NEWS,

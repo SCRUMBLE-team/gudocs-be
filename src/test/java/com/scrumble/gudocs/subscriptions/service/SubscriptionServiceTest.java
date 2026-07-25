@@ -17,6 +17,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -45,7 +46,7 @@ class SubscriptionServiceTest {
                 .category(SubscriptionCategory.OTT)
                 .price(17000L)
                 .billingCycle(BillingCycle.MONTHLY)
-                .billingDay(15)
+                .firstBillingDate(LocalDate.of(2025, 1, 15))
                 .paymentMethod(PaymentMethod.CARD)
                 .build();
     }
@@ -55,7 +56,7 @@ class SubscriptionServiceTest {
         User user = UserFixture.create();
         SubscriptionCreateRequest request = new SubscriptionCreateRequest(
                 "Netflix", SubscriptionCategory.OTT, 17000L,
-                BillingCycle.MONTHLY, 15, null, PaymentMethod.CARD
+                BillingCycle.MONTHLY, LocalDate.of(2025, 1, 15), PaymentMethod.CARD
         );
         given(userRepository.findById(1L)).willReturn(Optional.of(user));
         given(subscriptionRepository.save(any(Subscription.class))).willAnswer(inv -> inv.getArgument(0));
@@ -63,70 +64,41 @@ class SubscriptionServiceTest {
         SubscriptionResponse response = subscriptionService.create(1L, request);
 
         assertThat(response.serviceName()).isEqualTo("Netflix");
-        assertThat(response.billingMonth()).isNull();
+        assertThat(response.firstBillingDate()).isEqualTo(LocalDate.of(2025, 1, 15));
         verify(subscriptionRepository).save(any(Subscription.class));
     }
 
     @Test
-    void 구독_등록_연간결제_월_없음_실패() {
-        User user = UserFixture.create();
-        SubscriptionCreateRequest request = new SubscriptionCreateRequest(
-                "Netflix", SubscriptionCategory.OTT, 17000L,
-                BillingCycle.YEARLY, 15, null, PaymentMethod.CARD
-        );
-        given(userRepository.findById(1L)).willReturn(Optional.of(user));
-
-        assertThatThrownBy(() -> subscriptionService.create(1L, request))
-                .isInstanceOf(BusinessException.class)
-                .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
-                        .isEqualTo(ErrorCode.INVALID_BILLING_MONTH));
-    }
-
-    @Test
-    void 구독_등록_연간결제_월_성공() {
+    void 구독_등록_연간결제_성공() {
         User user = UserFixture.create();
         SubscriptionCreateRequest request = new SubscriptionCreateRequest(
                 "Adobe", SubscriptionCategory.DESIGN, 60000L,
-                BillingCycle.YEARLY, 1, 3, PaymentMethod.CARD
+                BillingCycle.YEARLY, LocalDate.of(2025, 3, 1), PaymentMethod.CARD
         );
         given(userRepository.findById(1L)).willReturn(Optional.of(user));
         given(subscriptionRepository.save(any(Subscription.class))).willAnswer(inv -> inv.getArgument(0));
 
         SubscriptionResponse response = subscriptionService.create(1L, request);
 
-        assertThat(response.billingMonth()).isEqualTo(3);
+        assertThat(response.firstBillingDate()).isEqualTo(LocalDate.of(2025, 3, 1));
     }
 
     @Test
-    void 구독_등록_월간결제_결제월_입력_실패() {
+    void 구독_수정_성공() {
         User user = UserFixture.create();
-        SubscriptionCreateRequest request = new SubscriptionCreateRequest(
-                "Netflix", SubscriptionCategory.OTT, 17000L,
-                BillingCycle.MONTHLY, 15, 5, PaymentMethod.CARD
-        );
-        given(userRepository.findById(1L)).willReturn(Optional.of(user));
-
-        assertThatThrownBy(() -> subscriptionService.create(1L, request))
-                .isInstanceOf(BusinessException.class)
-                .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
-                        .isEqualTo(ErrorCode.BILLING_MONTH_NOT_ALLOWED));
-    }
-
-    @Test
-    void 구독_수정_월간결제_결제월_입력_실패() {
-        User user = UserFixture.create();
-        Subscription subscription = testSubscription(user); // MONTHLY
+        Subscription subscription = testSubscription(user);
         SubscriptionUpdateRequest request = new SubscriptionUpdateRequest(
-                "Netflix", SubscriptionCategory.OTT, 17000L,
-                BillingCycle.MONTHLY, 15, 5, PaymentMethod.CARD
+                "Netflix Premium", SubscriptionCategory.OTT, 20000L,
+                BillingCycle.MONTHLY, LocalDate.of(2025, 2, 20), PaymentMethod.SIMPLE_PAY
         );
         given(userRepository.findById(1L)).willReturn(Optional.of(user));
         given(subscriptionRepository.findById(1L)).willReturn(Optional.of(subscription));
 
-        assertThatThrownBy(() -> subscriptionService.update(1L, 1L, request))
-                .isInstanceOf(BusinessException.class)
-                .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
-                        .isEqualTo(ErrorCode.BILLING_MONTH_NOT_ALLOWED));
+        SubscriptionResponse response = subscriptionService.update(1L, 1L, request);
+
+        assertThat(response.serviceName()).isEqualTo("Netflix Premium");
+        assertThat(response.firstBillingDate()).isEqualTo(LocalDate.of(2025, 2, 20));
+        assertThat(response.paymentMethod()).isEqualTo(PaymentMethod.SIMPLE_PAY);
     }
 
     @Test

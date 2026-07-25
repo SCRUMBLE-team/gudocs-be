@@ -19,6 +19,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -50,8 +52,9 @@ class DashboardControllerTest {
 
     private void 구독_등록(String name, SubscriptionCategory category, long price,
                          BillingCycle cycle, int day, Integer month) throws Exception {
+        LocalDate firstBillingDate = LocalDate.of(2025, month != null ? month : 1, day);
         SubscriptionCreateRequest req = new SubscriptionCreateRequest(
-                name, category, price, cycle, day, month, PaymentMethod.CARD);
+                name, category, price, cycle, firstBillingDate, PaymentMethod.CARD);
         mockMvc.perform(post("/api/subscriptions")
                 .session(session)
                 .contentType(MediaType.APPLICATION_JSON)

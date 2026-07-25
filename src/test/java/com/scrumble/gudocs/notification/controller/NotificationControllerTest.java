@@ -50,10 +50,10 @@ class NotificationControllerTest {
         session = TestSessions.loginNew(userRepository, socialAccountRepository, "테스터", "noti@example.com");
     }
 
-    private void 구독_등록(String name, int billingDay) throws Exception {
+    private void 구독_등록(String name, LocalDate firstBillingDate) throws Exception {
         SubscriptionCreateRequest req = new SubscriptionCreateRequest(
                 name, SubscriptionCategory.OTT, 17000L,
-                BillingCycle.MONTHLY, billingDay, null, PaymentMethod.CARD);
+                BillingCycle.MONTHLY, firstBillingDate, PaymentMethod.CARD);
         mockMvc.perform(post("/api/subscriptions")
                 .session(session)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -71,9 +71,8 @@ class NotificationControllerTest {
 
     @Test
     void 알림_조회_7일_이내_구독_포함() throws Exception {
-        // billingDay가 오늘이면 daysUntil=0 → 알림 포함
-        int todayDay = LocalDate.now().getDayOfMonth();
-        구독_등록("Netflix", todayDay);
+        // 최초 결제일이 오늘이면 daysUntil=0 → 알림 포함
+        구독_등록("Netflix", LocalDate.now());
 
         mockMvc.perform(get("/api/notifications/upcoming").session(session))
                 .andExpect(status().isOk())

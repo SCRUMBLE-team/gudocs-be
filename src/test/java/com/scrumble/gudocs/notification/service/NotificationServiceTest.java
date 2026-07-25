@@ -47,7 +47,7 @@ class NotificationServiceTest {
                 .category(SubscriptionCategory.OTT)
                 .price(price)
                 .billingCycle(BillingCycle.MONTHLY)
-                .billingDay(billingDay)
+                .firstBillingDate(LocalDate.of(2025, 1, billingDay))
                 .paymentMethod(PaymentMethod.CARD)
                 .build();
     }
@@ -59,8 +59,7 @@ class NotificationServiceTest {
                 .category(SubscriptionCategory.DESIGN)
                 .price(price)
                 .billingCycle(BillingCycle.YEARLY)
-                .billingDay(billingDay)
-                .billingMonth(billingMonth)
+                .firstBillingDate(LocalDate.of(2025, billingMonth, billingDay))
                 .paymentMethod(PaymentMethod.CARD)
                 .build();
     }
@@ -149,7 +148,7 @@ class NotificationServiceTest {
         User u = user();
         Subscription paused = Subscription.builder()
                 .user(u).serviceName("Netflix").category(SubscriptionCategory.OTT)
-                .price(17000L).billingCycle(BillingCycle.MONTHLY).billingDay(15)
+                .price(17000L).billingCycle(BillingCycle.MONTHLY).firstBillingDate(LocalDate.of(2025, 1, 15))
                 .paymentMethod(PaymentMethod.CARD).status(SubscriptionStatus.PAUSED).build();
         setupUser(u, List.of(paused));
 
