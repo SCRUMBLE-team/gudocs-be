@@ -6,8 +6,6 @@ import com.scrumble.gudocs.users.entity.User;
 import com.scrumble.gudocs.users.repository.SocialAccountRepository;
 import com.scrumble.gudocs.users.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
-import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,13 +25,9 @@ public class SocialLoginProcessor {
 
     @Transactional
     public Long login(SocialProvider provider, Map<String, Object> attributes) {
+        // provider+providerId로 식별하므로 이메일은 필수가 아니다.
+        // 카카오 등 이메일 선택 동의 provider는 미동의 시 email이 null일 수 있다.
         OAuth2UserInfo info = OAuth2UserInfo.of(provider, attributes);
-
-        if (info.email() == null || info.email().isBlank()) {
-            throw new OAuth2AuthenticationException(
-                    new OAuth2Error("email_not_provided"),
-                    "이메일 제공에 동의해야 로그인할 수 있습니다.");
-        }
 
         SocialAccount account = socialAccountRepository
                 .findByProviderAndProviderId(provider, info.providerId())

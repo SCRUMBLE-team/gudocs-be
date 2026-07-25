@@ -22,7 +22,8 @@ public class User extends BaseEntity {
 
     // provider+providerId로 식별하므로 이메일은 unique 아님
     // (다른 소셜 제공자가 같은 이메일이면 별도 회원)
-    @Column(nullable = false)
+    // 카카오 등 이메일 선택 동의 provider는 미동의 시 null일 수 있다
+    @Column
     private String email;
 
     public void updateName(String name) {
