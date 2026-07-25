@@ -44,7 +44,7 @@ class DashboardServiceTest {
                 .category(category)
                 .price(price)
                 .billingCycle(BillingCycle.MONTHLY)
-                .billingDay(billingDay)
+                .firstBillingDate(LocalDate.of(2025, 1, billingDay))
                 .paymentMethod(PaymentMethod.CARD)
                 .build();
     }
@@ -56,8 +56,7 @@ class DashboardServiceTest {
                 .category(category)
                 .price(price)
                 .billingCycle(BillingCycle.YEARLY)
-                .billingDay(billingDay)
-                .billingMonth(billingMonth)
+                .firstBillingDate(LocalDate.of(2025, billingMonth, billingDay))
                 .paymentMethod(PaymentMethod.CARD)
                 .build();
     }
@@ -75,7 +74,7 @@ class DashboardServiceTest {
         Subscription active = monthly("Netflix", SubscriptionCategory.OTT, 17000L, 15);
         Subscription paused = Subscription.builder()
                 .user(u).serviceName("Spotify").category(SubscriptionCategory.MUSIC)
-                .price(10000L).billingCycle(BillingCycle.MONTHLY).billingDay(10)
+                .price(10000L).billingCycle(BillingCycle.MONTHLY).firstBillingDate(LocalDate.of(2025, 1, 10))
                 .paymentMethod(PaymentMethod.CARD).status(SubscriptionStatus.PAUSED).build();
         setupUser(u, List.of(active, paused));
 
@@ -112,7 +111,7 @@ class DashboardServiceTest {
         Subscription active = monthly("Netflix", SubscriptionCategory.OTT, 17000L, 15);
         Subscription paused = Subscription.builder()
                 .user(u).serviceName("Spotify").category(SubscriptionCategory.MUSIC)
-                .price(10000L).billingCycle(BillingCycle.MONTHLY).billingDay(10)
+                .price(10000L).billingCycle(BillingCycle.MONTHLY).firstBillingDate(LocalDate.of(2025, 1, 10))
                 .paymentMethod(PaymentMethod.CARD).status(SubscriptionStatus.PAUSED).build();
         setupUser(u, List.of(active, paused));
 

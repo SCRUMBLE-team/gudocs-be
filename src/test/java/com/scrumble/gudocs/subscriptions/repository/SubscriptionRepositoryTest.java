@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -35,7 +36,7 @@ class SubscriptionRepositoryTest {
                 .category(SubscriptionCategory.OTT)
                 .price(17000L)
                 .billingCycle(BillingCycle.MONTHLY)
-                .billingDay(15)
+                .firstBillingDate(LocalDate.of(2025, 1, 15))
                 .paymentMethod(PaymentMethod.CARD)
                 .build();
         return em.persistAndFlush(subscription);

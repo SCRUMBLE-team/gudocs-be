@@ -12,33 +12,40 @@ public final class NextBillingDateCalculator {
     }
 
     public static LocalDate calculate(Subscription subscription, LocalDate today) {
-        if (subscription.getBillingCycle() == BillingCycle.MONTHLY) {
-            return monthly(subscription.getBillingDay(), today);
+        LocalDate anchor = subscription.getFirstBillingDate();
+
+        // 최초 결제일이 아직 도래하지 않았으면 그 날이 다음 결제일
+        if (!anchor.isBefore(today)) {
+            return anchor;
         }
-        return yearly(subscription.getBillingDay(), subscription.getBillingMonth(), today);
+
+        return subscription.getBillingCycle() == BillingCycle.MONTHLY
+                ? nextMonthly(anchor, today)
+                : nextYearly(anchor, today);
     }
 
-    private static LocalDate monthly(int billingDay, LocalDate today) {
-        YearMonth currentMonth = YearMonth.from(today);
-        LocalDate billingDate = currentMonth.atDay(Math.min(billingDay, currentMonth.lengthOfMonth()));
+    private static LocalDate nextMonthly(LocalDate anchor, LocalDate today) {
+        int day = anchor.getDayOfMonth();
+        YearMonth month = YearMonth.from(today);
+        LocalDate billingDate = month.atDay(Math.min(day, month.lengthOfMonth()));
 
-        if (!billingDate.isBefore(today)) {
-            return billingDate;
+        if (billingDate.isBefore(today)) {
+            month = month.plusMonths(1);
+            billingDate = month.atDay(Math.min(day, month.lengthOfMonth()));
         }
-
-        YearMonth nextMonth = currentMonth.plusMonths(1);
-        return nextMonth.atDay(Math.min(billingDay, nextMonth.lengthOfMonth()));
+        return billingDate;
     }
 
-    private static LocalDate yearly(int billingDay, int billingMonth, LocalDate today) {
-        YearMonth thisYearMonth = YearMonth.of(today.getYear(), billingMonth);
-        LocalDate billingDate = thisYearMonth.atDay(Math.min(billingDay, thisYearMonth.lengthOfMonth()));
+    private static LocalDate nextYearly(LocalDate anchor, LocalDate today) {
+        int day = anchor.getDayOfMonth();
+        int monthValue = anchor.getMonthValue();
+        YearMonth yearMonth = YearMonth.of(today.getYear(), monthValue);
+        LocalDate billingDate = yearMonth.atDay(Math.min(day, yearMonth.lengthOfMonth()));
 
-        if (!billingDate.isBefore(today)) {
-            return billingDate;
+        if (billingDate.isBefore(today)) {
+            yearMonth = YearMonth.of(today.getYear() + 1, monthValue);
+            billingDate = yearMonth.atDay(Math.min(day, yearMonth.lengthOfMonth()));
         }
-
-        YearMonth nextYearMonth = YearMonth.of(today.getYear() + 1, billingMonth);
-        return nextYearMonth.atDay(Math.min(billingDay, nextYearMonth.lengthOfMonth()));
+        return billingDate;
     }
 }
