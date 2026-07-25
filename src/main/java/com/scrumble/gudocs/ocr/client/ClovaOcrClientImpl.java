@@ -5,10 +5,10 @@ import com.scrumble.gudocs.global.exception.ErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
 
 import java.util.Base64;
 import java.util.List;
@@ -19,13 +19,22 @@ public class ClovaOcrClientImpl implements ClovaOcrClient {
 
     private static final Logger log = LoggerFactory.getLogger(ClovaOcrClientImpl.class);
 
-    private final RestClient restClient = RestClient.create();
+    private final RestClient restClient;
+    private final String invokeUrl;
+    private final String secretKey;
 
-    @Value("${app.ocr.clova.invoke-url}")
-    private String invokeUrl;
-
-    @Value("${app.ocr.clova.secret-key}")
-    private String secretKey;
+    public ClovaOcrClientImpl(
+            RestClient.Builder restClientBuilder,
+            @Value("${app.ocr.clova.invoke-url}") String invokeUrl,
+            @Value("${app.ocr.clova.secret-key}") String secretKey
+    ) {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(5000);
+        requestFactory.setReadTimeout(15000);
+        this.restClient = restClientBuilder.requestFactory(requestFactory).build();
+        this.invokeUrl = invokeUrl;
+        this.secretKey = secretKey;
+    }
 
     @Override
     public String extractText(byte[] imageBytes, String imageFormat) {
@@ -46,7 +55,7 @@ public class ClovaOcrClientImpl implements ClovaOcrClient {
                     .body(ClovaOcrResponse.class);
 
             return toPlainText(response);
-        } catch (RestClientException e) {
+        } catch (RuntimeException e) {
             log.error("CLOVA OCR API 호출 실패", e);
             throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
         }

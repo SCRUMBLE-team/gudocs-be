@@ -18,6 +18,9 @@ import java.util.Set;
 public class OcrService {
 
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of("image/jpeg", "image/png");
+    // 방어적 이중 체크: 실제 HTTP 요청에서는 서블릿 컨테이너가 spring.servlet.multipart.max-file-size
+    // (application.yaml, test/resources/application.yaml)를 먼저 적용해 초과 요청을 거부하므로 이 분기는
+    // 보통 도달하지 않는다. 값을 바꿀 때는 두 application.yaml의 max-file-size와 반드시 동기화할 것.
     private static final long MAX_FILE_SIZE = 10L * 1024 * 1024;
 
     private final ClovaOcrClient clovaOcrClient;

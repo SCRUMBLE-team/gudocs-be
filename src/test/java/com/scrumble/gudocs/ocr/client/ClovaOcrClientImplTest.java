@@ -1,12 +1,26 @@
 package com.scrumble.gudocs.ocr.client;
 
+import com.scrumble.gudocs.global.exception.BusinessException;
+import com.scrumble.gudocs.global.exception.ErrorCode;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.client.RestClient;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ClovaOcrClientImplTest {
+
+    @Test
+    void invokeUrl이_비어있으면_BusinessException으로_변환된다() {
+        ClovaOcrClientImpl client = new ClovaOcrClientImpl(RestClient.builder(), "", "");
+
+        assertThatThrownBy(() -> client.extractText(new byte[]{1}, "jpg"))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
+                        .isEqualTo(ErrorCode.EXTERNAL_API_ERROR));
+    }
 
     @Test
     void 필드를_lineBreak_기준으로_이어붙여_평문_텍스트로_만든다() {
