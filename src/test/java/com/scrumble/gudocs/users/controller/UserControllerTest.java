@@ -46,23 +46,13 @@ class UserControllerTest {
         session = TestSessions.loginNew(userRepository, socialAccountRepository, NAME, EMAIL);
     }
 
-    // ── GET /api/users/me ──────────────────────────────────────
+    // ── GET /api/users/me 는 제거됨 (내 정보 조회는 GET /api/auth/me로 일원화) ──
 
     @Test
-    void 내_정보_조회_성공() throws Exception {
+    void 내_정보_조회_GET_API_제거_405() throws Exception {
+        // /api/users/me 경로에는 DELETE(회원 탈퇴)만 남아 GET은 405를 반환한다.
         mockMvc.perform(get("/api/users/me").session(session))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("내 정보 조회에 성공했습니다."))
-                .andExpect(jsonPath("$.data.email").value(EMAIL))
-                .andExpect(jsonPath("$.data.name").value(NAME))
-                .andExpect(jsonPath("$.data.userId").isNumber());
-    }
-
-    @Test
-    void 내_정보_조회_미인증_401() throws Exception {
-        mockMvc.perform(get("/api/users/me"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isMethodNotAllowed());
     }
 
     // ── PUT /api/users/me/name ─────────────────────────────────
@@ -130,7 +120,7 @@ class UserControllerTest {
     void 회원_탈퇴_후_세션_무효화() throws Exception {
         mockMvc.perform(delete("/api/users/me").session(session));
 
-        mockMvc.perform(get("/api/users/me").session(session))
+        mockMvc.perform(get("/api/auth/me").session(session))
                 .andExpect(status().isUnauthorized());
     }
 

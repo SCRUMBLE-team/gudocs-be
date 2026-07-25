@@ -37,7 +37,8 @@ public class SocialAccount extends BaseEntity {
     @Column(name = "provider_id", nullable = false)
     private String providerId;
 
-    @Column(nullable = false)
+    // 이메일 선택 동의 provider(카카오 등) 미동의 시 null 가능
+    @Column
     private String email;
 
     @Column(name = "email_verified", nullable = false)
