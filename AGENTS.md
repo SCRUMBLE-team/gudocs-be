@@ -66,8 +66,8 @@ enum:
 | GET | `/oauth2/authorization/{google,kakao,naver}` | × |
 | GET | `/login/oauth2/code/{provider}` (콜백, provider가 호출) | × |
 | POST | `/api/auth/logout` | ○ |
-| GET | `/api/auth/me` | ○ |
-| GET / PUT(`/name`) / DELETE | `/api/users/me*` | ○ |
+| GET | `/api/auth/me` | ○ | (로그인 상태·기본 정보 확인 — 내 정보 조회 단일 창구)
+| PUT(`/name`) / DELETE | `/api/users/me*` | ○ | (온보딩 이름 입력/수정, 회원 탈퇴)
 | GET / POST | `/api/subscriptions` | ○ |
 | GET / PUT / DELETE | `/api/subscriptions/{id}` | ○ |
 | PUT | `/api/subscriptions/{id}/status` | ○ |
@@ -87,7 +87,11 @@ enum:
 - 로그인 성공 시 `app.oauth.success-redirect`(env `OAUTH_SUCCESS_REDIRECT`)로 리다이렉트
   - **신규 유저(name null)** → `?onboarding=1` 붙여 리다이렉트 → FE는 이름 입력 화면 표시 후 `PUT /api/users/me/name` 호출
   - 기존 유저 → 파라미터 없이 리다이렉트
+- 로그인 실패 시 `?login=fail&code=OAUTH_LOGIN_FAILED`로만 리다이렉트(예외 메시지는 URL에 노출 안 함, 원인은 서버 로그). `OAuth2LoginFailureHandler`가 처리
+- 미인증 요청은 `authenticationEntryPoint`가 **401 + `ApiResponse` JSON**(`{success:false, message:"로그인이 필요합니다.", data:null}`) 반환
 - 회원 탈퇴는 세션 인증만으로 처리(비번 확인 없음), 탈퇴 시 subscriptions·social_accounts 함께 삭제
+- 내 정보 조회는 `GET /api/auth/me` 하나로 통일(`GET /api/users/me`는 제거)
+- Swagger: `@CurrentUserId`는 `SpringDocUtils.addAnnotationsToIgnore` + 메타 `@Parameter(hidden)`로 문서에서 숨김. API 인터페이스의 요청 Body 파라미터에는 `@RequestBody`를 명시해야 Swagger가 requestBody로 인식
 
 - `PUT /api/subscriptions/{id}` — **full update** 방식: 모든 필드 필수 전송 (partial update 불가)
 - `SubscriptionResponse`에 `nextBillingDate` 필드 포함 — BE에서 계산해 내려보냄 (FE 자체 계산 금지)

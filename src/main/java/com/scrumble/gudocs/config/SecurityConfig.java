@@ -1,15 +1,18 @@
 package com.scrumble.gudocs.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scrumble.gudocs.auth.oauth.CustomOAuth2UserService;
 import com.scrumble.gudocs.auth.oauth.CustomOidcUserService;
+import com.scrumble.gudocs.auth.oauth.OAuth2LoginFailureHandler;
 import com.scrumble.gudocs.auth.oauth.UserPrincipal;
+import com.scrumble.gudocs.global.response.ApiResponse;
 import com.scrumble.gudocs.users.repository.UserRepository;
 import jakarta.servlet.http.HttpServletResponse;
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.MediaType;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -36,6 +39,8 @@ public class SecurityConfig {
             SecurityContextRepository securityContextRepository,
             CustomOAuth2UserService customOAuth2UserService,
             CustomOidcUserService customOidcUserService,
+            OAuth2LoginFailureHandler oAuth2LoginFailureHandler,
+            ObjectMapper objectMapper,
             UserRepository userRepository) throws Exception {
         http
                 .cors(Customizer.withDefaults())
@@ -60,20 +65,19 @@ public class SecurityConfig {
                                     ? oauthSuccessRedirect + "?onboarding=1"
                                     : oauthSuccessRedirect);
                         })
-                        .failureHandler((request, response, exception) -> {
-                            String reason = URLEncoder.encode(
-                                    exception.getMessage() == null ? "" : exception.getMessage(),
-                                    StandardCharsets.UTF_8);
-                            response.sendRedirect(oauthSuccessRedirect + "?login=fail&reason=" + reason);
-                        })
+                        .failureHandler(oAuth2LoginFailureHandler)
                 )
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
                 )
                 .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint((request, response, e) ->
-                                response.sendError(HttpServletResponse.SC_UNAUTHORIZED,
-                                        "Unauthorized"))
+                        .authenticationEntryPoint((request, response, e) -> {
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                            response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+                            objectMapper.writeValue(response.getWriter(),
+                                    ApiResponse.error("로그인이 필요합니다."));
+                        })
                 );
         return http.build();
     }

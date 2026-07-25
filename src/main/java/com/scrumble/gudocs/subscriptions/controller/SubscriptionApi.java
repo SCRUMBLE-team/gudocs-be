@@ -14,6 +14,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.RequestBody;
 import com.scrumble.gudocs.global.security.CurrentUserId;
 
 import java.util.List;
@@ -29,7 +30,7 @@ public interface SubscriptionApi {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "로그인 필요")
     })
     ResponseEntity<ApiResponse<SubscriptionResponse>> create(@CurrentUserId Long userId,
-            @Valid SubscriptionCreateRequest request);
+            @Valid @RequestBody SubscriptionCreateRequest request);
 
     @Operation(summary = "구독 목록 조회", description = "현재 사용자의 구독 목록을 조회합니다. (삭제된 항목 제외)")
     @ApiResponses({
@@ -57,7 +58,7 @@ public interface SubscriptionApi {
     })
     ResponseEntity<ApiResponse<SubscriptionResponse>> update(@CurrentUserId Long userId,
             Long subscriptionId,
-            @Valid SubscriptionUpdateRequest request);
+            @Valid @RequestBody SubscriptionUpdateRequest request);
 
     @Operation(summary = "구독 삭제", description = "구독 서비스를 삭제합니다. (soft delete)")
     @ApiResponses({
@@ -74,7 +75,8 @@ public interface SubscriptionApi {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "로그인 필요")
     })
     ResponseEntity<ApiResponse<Boolean>> checkDuplicateName(@CurrentUserId Long userId,
-            @Parameter(description = "확인할 서비스명", example = "Netflix", required = true)
+            @Parameter(description = "확인할 서비스명 (기본 서비스 선택 시 프론트 CATEGORY_SERVICES의 name 값을 그대로 전달)",
+                    example = "넷플릭스", required = true)
             @NotBlank @Size(max = 100) String name);
 
     @Operation(summary = "구독 상태 변경", description = "구독 상태를 ACTIVE 또는 PAUSED로 변경합니다.")
@@ -85,5 +87,5 @@ public interface SubscriptionApi {
     })
     ResponseEntity<ApiResponse<SubscriptionResponse>> updateStatus(@CurrentUserId Long userId,
             Long subscriptionId,
-            @Valid SubscriptionStatusUpdateRequest request);
+            @Valid @RequestBody SubscriptionStatusUpdateRequest request);
 }

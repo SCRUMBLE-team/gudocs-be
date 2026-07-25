@@ -11,7 +11,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 
-@Tag(name = "Auth", description = "인증 API (소셜 로그인, 로그아웃, 내 정보)")
+@Tag(name = "Auth", description = "세션 인증 상태 확인 및 로그아웃 API. "
+        + "소셜 로그인 시작 URL(`/oauth2/authorization/{provider}`)은 Spring Security가 자동 처리하므로 "
+        + "Swagger에 직접 노출되지 않습니다.")
 public interface AuthApi {
 
     @Operation(summary = "로그아웃", description = "현재 세션을 무효화합니다.")

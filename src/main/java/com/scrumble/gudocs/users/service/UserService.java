@@ -20,12 +20,6 @@ public class UserService {
     private final SubscriptionRepository subscriptionRepository;
     private final SocialAccountRepository socialAccountRepository;
 
-    @Transactional(readOnly = true)
-    public UserInfoResponse getMyInfo(Long userId) {
-        User user = findUser(userId);
-        return UserInfoResponse.from(user);
-    }
-
     @Transactional
     public UserInfoResponse updateName(Long userId, UserNameUpdateRequest request) {
         User user = findUser(userId);

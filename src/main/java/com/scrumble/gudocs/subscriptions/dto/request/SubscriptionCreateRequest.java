@@ -12,7 +12,7 @@ import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
 
 public record SubscriptionCreateRequest(
-        @Schema(description = "서비스명", example = "Netflix")
+        @Schema(description = "서비스명 (기본 서비스 선택 시 프론트 CATEGORY_SERVICES의 name 값을 그대로 전달)", example = "넷플릭스")
         @NotBlank(message = "서비스명은 필수입니다.")
         String serviceName,
 
