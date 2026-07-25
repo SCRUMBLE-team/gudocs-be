@@ -2,6 +2,8 @@ package com.scrumble.gudocs.ocr.client;
 
 import com.scrumble.gudocs.global.exception.BusinessException;
 import com.scrumble.gudocs.global.exception.ErrorCode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -14,6 +16,8 @@ import java.util.UUID;
 
 @Component
 public class ClovaOcrClientImpl implements ClovaOcrClient {
+
+    private static final Logger log = LoggerFactory.getLogger(ClovaOcrClientImpl.class);
 
     private final RestClient restClient = RestClient.create();
 
@@ -43,6 +47,7 @@ public class ClovaOcrClientImpl implements ClovaOcrClient {
 
             return toPlainText(response);
         } catch (RestClientException e) {
+            log.error("CLOVA OCR API 호출 실패", e);
             throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
         }
     }
