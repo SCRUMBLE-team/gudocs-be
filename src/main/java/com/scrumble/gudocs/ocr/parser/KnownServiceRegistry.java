@@ -83,6 +83,9 @@ public final class KnownServiceRegistry {
                 .findFirst();
     }
 
+    // ponytail: contains()로 짧은 alias(FLO, NYT 등)가 무관한 텍스트의 부분 문자열과 오매칭될 수 있음.
+    // best-effort 파서라 사용자가 결과를 확인/수정하므로 감내 가능한 리스크로 판단. 오탐이 실제 문제가 되면
+    // 단어 경계(\b) 매칭으로 전환.
     private static boolean matches(KnownService service, String normalizedText) {
         if (normalizedText.contains(normalize(service.canonicalName()))) {
             return true;
