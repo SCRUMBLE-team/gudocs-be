@@ -4,6 +4,10 @@ spring:
     username: sa
     password:
     driver-class-name: org.h2.Driver
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
   jpa:
     hibernate:
       ddl-auto: create-drop
@@ -28,3 +32,7 @@ app:
     allowed-origins: http://localhost:5173
   oauth:
     success-redirect: http://localhost:5173
+  ocr:
+    clova:
+      invoke-url: http://localhost/test-clova-ocr
+      secret-key: test-secret-key
