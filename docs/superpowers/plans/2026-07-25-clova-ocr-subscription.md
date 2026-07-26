@@ -15,7 +15,7 @@
 - 이미지: `jpg`/`png`만 허용, 최대 10MB, 위반 시 `ErrorCode.INVALID_IMAGE_FILE`(400)
 - CLOVA OCR 호출 실패 시 `ErrorCode.EXTERNAL_API_ERROR`(502)
 - OCR은 성공했지만 필드를 못 찾은 경우는 에러가 아님 — 해당 필드만 `null`로 200 응답
-- 응답 DTO(`OcrSubscriptionResult`)는 전 필드 nullable
+- 응답 DTO(`OcrSubscriptionResult`)는 `billingCycle`을 제외한 전 필드 nullable. `billingCycle`은 인식 실패 시에도 `null`이 아니라 `MONTHLY`를 기본값으로 반환한다(구독 등록 폼에서 사용자가 매번 주기를 고르지 않도록)
 - `serviceName`/`category`는 프론트 `CATEGORY_SERVICES` 목록과 정확히 같은 한글 canonical name으로 매칭 성공 시 채움 (로고 매칭을 위해 원문 대신 canonical name 반환)
 - `firstBillingDate`는 연도 없이 추출되면 현재 연도로 채움(다음 결제일 계산은 day/month만 사용하므로 무해)
 - 세션 인증 필요, `@CurrentUserId Long userId`로 주입 (기존 `subscriptions`/`notification` 컨트롤러와 동일 패턴)
