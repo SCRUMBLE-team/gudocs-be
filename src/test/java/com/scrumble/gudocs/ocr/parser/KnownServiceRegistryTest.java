@@ -39,6 +39,23 @@ class KnownServiceRegistryTest {
     }
 
     @Test
+    void 괄호가_섞인_표기도_alias와_매칭된다() {
+        Optional<KnownServiceRegistry.KnownService> result =
+                KnownServiceRegistry.match("쿠팡(와우 멤버십) 7,890원");
+
+        assertThat(result).isPresent();
+        assertThat(result.get().canonicalName()).isEqualTo("쿠팡 와우");
+    }
+
+    @Test
+    void 신규_추가된_국내_서비스도_매칭된다() {
+        assertThat(KnownServiceRegistry.match("배민클럽_우아한형제들 1,990원 결제").get().canonicalName())
+                .isEqualTo("배민클럽");
+        assertThat(KnownServiceRegistry.match("탈잉 클래스 결제 안내").get().canonicalName())
+                .isEqualTo("탈잉");
+    }
+
+    @Test
     void 매칭되는_서비스가_없으면_빈값을_반환한다() {
         assertThat(KnownServiceRegistry.match("알 수 없는 서비스 결제 안내")).isEmpty();
     }

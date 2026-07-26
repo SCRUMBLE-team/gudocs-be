@@ -90,7 +90,7 @@ public final class SubscriptionTextParser {
     private static PaymentMethod parsePaymentMethod(String text) {
         if (text.contains("간편결제")) return PaymentMethod.SIMPLE_PAY;
         if (text.contains("계좌이체")) return PaymentMethod.BANK_TRANSFER;
-        if (text.contains("카드")) return PaymentMethod.CARD;
+        if (text.contains("카드") || text.contains("일시불") || text.contains("할부")) return PaymentMethod.CARD;
         return null;
     }
 }

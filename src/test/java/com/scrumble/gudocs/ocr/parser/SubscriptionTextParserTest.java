@@ -60,6 +60,15 @@ class SubscriptionTextParserTest {
     }
 
     @Test
+    void 일시불_할부는_카드_결제로_인식한다() {
+        String text = "7월 15일 수요일\n배민클럽_우아한형제들\n1,990원\n일시불";
+
+        OcrSubscriptionResult result = SubscriptionTextParser.parse(text, TODAY);
+
+        assertThat(result.paymentMethod()).isEqualTo(PaymentMethod.CARD);
+    }
+
+    @Test
     void 아무것도_인식하지_못하면_전_필드가_null이거나_기본값이다() {
         OcrSubscriptionResult result = SubscriptionTextParser.parse("", TODAY);
 
