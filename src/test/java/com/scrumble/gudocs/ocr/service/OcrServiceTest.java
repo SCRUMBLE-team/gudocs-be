@@ -27,15 +27,27 @@ class OcrServiceTest {
     @InjectMocks
     private OcrService ocrService;
 
+    private static final byte[] JPEG_BYTES = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 1, 2, 3};
+
     @Test
     void 정상_이미지는_OCR_결과를_파싱해서_반환한다() {
-        MultipartFile image = new MockMultipartFile("image", "receipt.jpg", "image/jpeg", new byte[]{1, 2, 3});
+        MultipartFile image = new MockMultipartFile("image", "receipt.jpg", "image/jpeg", JPEG_BYTES);
         given(clovaOcrClient.extractText(any(byte[].class), eq("jpg"))).willReturn("넷플릭스 17,000원 2026.07.15 카드");
 
         OcrSubscriptionResult result = ocrService.scanSubscription(image);
 
         assertThat(result.serviceName()).isEqualTo("넷플릭스");
         assertThat(result.price()).isEqualTo(17000L);
+    }
+
+    @Test
+    void Content_Type을_위장한_파일은_매직바이트_검증에서_거부된다() {
+        MultipartFile fakeImage = new MockMultipartFile(
+                "image", "fake.jpg", "image/jpeg", "%PDF-1.4 fake content".getBytes());
+
+        assertThatThrownBy(() -> ocrService.scanSubscription(fakeImage))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_IMAGE_FILE);
     }
 
     @Test

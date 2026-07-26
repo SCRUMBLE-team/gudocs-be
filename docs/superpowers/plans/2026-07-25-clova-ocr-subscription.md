@@ -223,7 +223,9 @@ import java.util.Optional;
 import static com.scrumble.gudocs.subscriptions.entity.SubscriptionCategory.*;
 
 /**
- * 프론트 CATEGORY_SERVICES와 정확히 같은 한글 서비스명을 canonical name으로 쓴다.
+ * canonical name은 원칙적으로 프론트 CATEGORY_SERVICES와 같은 한글 서비스명을 쓴다.
+ * 단, Notion/Figma/ChatGPT/Claude/Gemini/Slack/Google Workspace/Adobe CC/Canva/NYT/Medium처럼
+ * 영문 브랜드명이 더 널리 통용되는 서비스는 영문 그대로 canonical name으로 쓰고 한글 표기는 alias로 둔다.
  * "디지니플러스"는 프론트 표기의 오타를 그대로 반영한 것이다(로고 매칭이 이름 문자열 기준이므로 임의 수정 금지).
  */
 public final class KnownServiceRegistry {

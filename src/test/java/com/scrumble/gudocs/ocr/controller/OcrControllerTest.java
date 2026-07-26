@@ -28,6 +28,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Transactional
 class OcrControllerTest {
 
+    private static final byte[] JPEG_BYTES = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 1, 2, 3};
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -51,7 +53,7 @@ class OcrControllerTest {
     void 이미지를_업로드하면_인식된_구독_정보를_반환한다() throws Exception {
         given(clovaOcrClient.extractText(any(byte[].class), any(String.class)))
                 .willReturn("넷플릭스 17,000원 2026.07.15 카드");
-        MockMultipartFile image = new MockMultipartFile("image", "receipt.jpg", "image/jpeg", new byte[]{1, 2, 3});
+        MockMultipartFile image = new MockMultipartFile("image", "receipt.jpg", "image/jpeg", JPEG_BYTES);
 
         mockMvc.perform(multipart("/api/ocr/subscriptions/scan").file(image).session(session))
                 .andExpect(status().isOk())
@@ -72,7 +74,7 @@ class OcrControllerTest {
 
     @Test
     void 미인증_401() throws Exception {
-        MockMultipartFile image = new MockMultipartFile("image", "receipt.jpg", "image/jpeg", new byte[]{1, 2, 3});
+        MockMultipartFile image = new MockMultipartFile("image", "receipt.jpg", "image/jpeg", JPEG_BYTES);
 
         mockMvc.perform(multipart("/api/ocr/subscriptions/scan").file(image))
                 .andExpect(status().isUnauthorized());
@@ -82,7 +84,7 @@ class OcrControllerTest {
     void CLOVA_호출_실패시_502() throws Exception {
         given(clovaOcrClient.extractText(any(byte[].class), any(String.class)))
                 .willThrow(new BusinessException(ErrorCode.EXTERNAL_API_ERROR));
-        MockMultipartFile image = new MockMultipartFile("image", "receipt.jpg", "image/jpeg", new byte[]{1, 2, 3});
+        MockMultipartFile image = new MockMultipartFile("image", "receipt.jpg", "image/jpeg", JPEG_BYTES);
 
         mockMvc.perform(multipart("/api/ocr/subscriptions/scan").file(image).session(session))
                 .andExpect(status().isBadGateway())

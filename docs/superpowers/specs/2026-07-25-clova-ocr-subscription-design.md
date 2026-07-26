@@ -71,8 +71,10 @@ ocr/
 
 `SubscriptionTextParser`가 CLOVA OCR이 반환한 전체 텍스트를 입력받아 다음을 파싱한다.
 
-- **serviceName / category**: `KnownServiceRegistry`에 등록된 canonical name(프론트
-  `CATEGORY_SERVICES`의 정확한 한글 서비스명) 또는 그 alias와 대소문자/공백 무시
+- **serviceName / category**: `KnownServiceRegistry`에 등록된 canonical name(원칙은 프론트
+  `CATEGORY_SERVICES` 표기와 동일한 한글 서비스명이나, Notion/Figma/ChatGPT/Claude/Gemini/
+  Slack/Google Workspace/Adobe CC/Canva/NYT/Medium처럼 영문 브랜드명이 더 널리 통용되는
+  서비스는 영문 그대로 canonical name으로 쓴다) 또는 그 alias와 대소문자/공백 무시
   부분일치를 시도한다. 매치되면 `serviceName`은 canonical name 그대로(OCR 원문이 아님),
   `category`도 함께 채운다. 매치 안 되면 `serviceName`은 OCR 텍스트에서 뽑은 best-effort
   후보, `category`는 `null`.
@@ -88,16 +90,18 @@ ocr/
 
 ### KnownServiceRegistry
 
-프론트 `CATEGORY_SERVICES`(현재 ~40개 서비스, `ETC` 제외)에 있는 정확한 한글 서비스명을
-canonical name으로 하드코딩한 정적 테이블. 각 항목은 canonical name + alias 목록(영문
-브랜드명, 흔한 표기 1~3개)을 가진다.
+프론트 `CATEGORY_SERVICES`(현재 ~40개 서비스, `ETC` 제외)에 있는 서비스명을 canonical
+name으로 하드코딩한 정적 테이블. 원칙은 한글 표기이나, 영문 브랜드명이 더 널리 통용되는
+서비스(Notion, Figma, ChatGPT, Claude, Gemini, Slack, Google Workspace, Adobe CC, Canva,
+NYT, Medium 등)는 영문 그대로 canonical name으로 쓰고 한글 표기를 alias로 둔다. 각 항목은
+canonical name + alias 목록(흔한 표기 1~3개)을 가진다.
 
 ```java
 record KnownService(String canonicalName, SubscriptionCategory category, List<String> aliases) {}
 
 new KnownService("넷플릭스", OTT, List.of("netflix", "넷플"))
 new KnownService("유튜브 프리미엄", OTT, List.of("youtube premium", "유튜브프리미엄"))
-new KnownService("챗지피티", AI, List.of("chatgpt", "chatgpt plus", "openai"))
+new KnownService("ChatGPT", AI, List.of("chatgpt plus", "챗지피티", "openai"))
 ```
 
 `ETC`는 프론트에도 고정 목록이 없으므로 매핑 대상에서 제외한다 — 매치 안 되면 그대로

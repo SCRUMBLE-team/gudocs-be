@@ -12,6 +12,9 @@ import static com.scrumble.gudocs.subscriptions.entity.SubscriptionCategory.*;
  * canonical name은 프론트 로고 매칭 키로 쓰인다.
  * "디지니플러스"는 프론트 표기의 오타를 그대로 반영한 것이다(로고 매칭이 이름 문자열 기준이므로 임의 수정 금지).
  * 국내 이용자가 많이 쓰는 서비스 위주로 이 목록이 기준(source of truth)이며, 신규 추가분은 프론트 CATEGORY_SERVICES에도 동기화되어야 한다.
+ * 원칙은 한글 표기이지만, 브랜드가 영문으로 더 널리 통용되는 서비스(Notion, Figma, ChatGPT, Claude,
+ * Gemini, Slack, Google Workspace, Adobe CC, Canva, NYT, Medium 등)는 영문 브랜드명을 그대로
+ * canonical name으로 쓴다 — 한글 표기는 alias로 등록한다.
  */
 public final class KnownServiceRegistry {
 
