@@ -49,10 +49,17 @@ class KnownServiceRegistryTest {
 
     @Test
     void 신규_추가된_국내_서비스도_매칭된다() {
-        assertThat(KnownServiceRegistry.match("배민클럽_우아한형제들 1,990원 결제").get().canonicalName())
-                .isEqualTo("배민클럽");
-        assertThat(KnownServiceRegistry.match("탈잉 클래스 결제 안내").get().canonicalName())
-                .isEqualTo("탈잉");
+        Optional<KnownServiceRegistry.KnownService> baemin =
+                KnownServiceRegistry.match("배민클럽_우아한형제들 1,990원 결제");
+        assertThat(baemin).isPresent();
+        assertThat(baemin.get().canonicalName()).isEqualTo("배민클럽");
+        assertThat(baemin.get().category()).isEqualTo(SubscriptionCategory.SHOPPING);
+
+        Optional<KnownServiceRegistry.KnownService> taling =
+                KnownServiceRegistry.match("탈잉 클래스 결제 안내");
+        assertThat(taling).isPresent();
+        assertThat(taling.get().canonicalName()).isEqualTo("탈잉");
+        assertThat(taling.get().category()).isEqualTo(SubscriptionCategory.EDUCATION);
     }
 
     @Test

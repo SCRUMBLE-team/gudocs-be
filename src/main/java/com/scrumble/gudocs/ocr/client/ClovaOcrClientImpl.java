@@ -9,6 +9,7 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 import java.util.Base64;
 import java.util.List;
@@ -45,20 +46,22 @@ public class ClovaOcrClientImpl implements ClovaOcrClient {
                 List.of(new ClovaOcrRequest.Image(imageFormat, "image", Base64.getEncoder().encodeToString(imageBytes)))
         );
 
+        ClovaOcrResponse response;
         try {
-            ClovaOcrResponse response = restClient.post()
+            response = restClient.post()
                     .uri(invokeUrl)
                     .header("X-OCR-SECRET", secretKey)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(request)
                     .retrieve()
                     .body(ClovaOcrResponse.class);
-
-            return toPlainText(response);
-        } catch (RuntimeException e) {
+        } catch (RestClientException | IllegalArgumentException e) {
+            // IllegalArgumentException: invokeUrl이 비어있거나 형식이 잘못돼 URI 생성 자체가 실패하는 경우(RestClientException으로 래핑되지 않음)
             log.error("CLOVA OCR API 호출 실패", e);
             throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
         }
+
+        return toPlainText(response);
     }
 
     static String toPlainText(ClovaOcrResponse response) {

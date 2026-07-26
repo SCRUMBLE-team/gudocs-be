@@ -69,6 +69,24 @@ class SubscriptionTextParserTest {
     }
 
     @Test
+    void 연도_없는_날짜라도_연간_키워드가_있으면_YEARLY로_판단한다() {
+        String text = "Adobe CC 연간 구독\n결제일 7월 20일\n120,000원";
+
+        OcrSubscriptionResult result = SubscriptionTextParser.parse(text, TODAY);
+
+        assertThat(result.billingCycle()).isEqualTo(BillingCycle.YEARLY);
+    }
+
+    @Test
+    void Long_범위를_초과하는_금액은_null로_처리한다() {
+        String text = "이상한서비스 결제\n99999999999999999999원";
+
+        OcrSubscriptionResult result = SubscriptionTextParser.parse(text, TODAY);
+
+        assertThat(result.price()).isNull();
+    }
+
+    @Test
     void 아무것도_인식하지_못하면_전_필드가_null이거나_기본값이다() {
         OcrSubscriptionResult result = SubscriptionTextParser.parse("", TODAY);
 

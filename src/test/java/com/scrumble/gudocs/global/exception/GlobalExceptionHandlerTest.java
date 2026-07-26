@@ -2,6 +2,7 @@ package com.scrumble.gudocs.global.exception;
 
 import com.scrumble.gudocs.global.response.ApiResponse;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
@@ -19,5 +20,17 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getStatusCode()).isEqualTo(ErrorCode.INVALID_IMAGE_FILE.getStatus());
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().message()).isEqualTo(ErrorCode.INVALID_IMAGE_FILE.getMessage());
+    }
+
+    @Test
+    void 처리되지_않은_예외는_500_ApiResponse로_변환된다() {
+        GlobalExceptionHandler handler = new GlobalExceptionHandler();
+
+        ResponseEntity<ApiResponse<Void>> response =
+                handler.handleException(new NullPointerException("boom"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().success()).isFalse();
     }
 }

@@ -56,7 +56,11 @@ public final class SubscriptionTextParser {
         if (!matcher.find()) {
             return null;
         }
-        return Long.parseLong(matcher.group(1).replace(",", ""));
+        try {
+            return Long.parseLong(matcher.group(1).replace(",", ""));
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private static LocalDate parseDate(String text, LocalDate today) {
@@ -82,9 +86,7 @@ public final class SubscriptionTextParser {
     }
 
     private static BillingCycle parseBillingCycle(String text) {
-        boolean hasYearInDate = DATE_WITH_YEAR_PATTERN.matcher(text).find();
-        boolean hasYearlyKeyword = YEARLY_KEYWORD_PATTERN.matcher(text).find();
-        return (hasYearInDate && hasYearlyKeyword) ? BillingCycle.YEARLY : BillingCycle.MONTHLY;
+        return YEARLY_KEYWORD_PATTERN.matcher(text).find() ? BillingCycle.YEARLY : BillingCycle.MONTHLY;
     }
 
     private static PaymentMethod parsePaymentMethod(String text) {
