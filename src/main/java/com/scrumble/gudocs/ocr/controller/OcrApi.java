@@ -25,6 +25,6 @@ public interface OcrApi {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "502", description = "CLOVA OCR API 호출 실패")
     })
     ResponseEntity<ApiResponse<OcrSubscriptionResult>> scan(
-            @CurrentUserId Long userId,
+            @Parameter(hidden = true) @CurrentUserId Long userId,
             @Parameter(description = "구독 결제 관련 이미지 (jpg/png, 최대 10MB)") MultipartFile image);
 }
