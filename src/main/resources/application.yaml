@@ -6,6 +6,10 @@ spring:
     username: ${DB_USER:root}
     password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 11MB
   jpa:
     hibernate:
       ddl-auto: update
@@ -72,3 +76,7 @@ app:
   oauth:
     # 필수 환경변수 — 미설정 시 애플리케이션 기동 실패 (local/test 프로파일은 자체 기본값 보유)
     success-redirect: ${OAUTH_SUCCESS_REDIRECT}
+  ocr:
+    clova:
+      invoke-url: ${CLOVA_OCR_INVOKE_URL:}
+      secret-key: ${CLOVA_OCR_SECRET_KEY:}

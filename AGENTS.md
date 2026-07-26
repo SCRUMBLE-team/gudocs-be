@@ -26,6 +26,7 @@ src/main/java/com/scrumble/gudocs/
 ├── expense/        # 지출 분석 (월별, 카테고리별, 추이)
 ├── dashboard/      # 메인 대시보드 집계
 ├── notification/   # 결제 예정 알림 (헤더용 단독 엔드포인트)
+├── ocr/            # CLOVA OCR 기반 구독 정보 스캔 (결제 알림/영수증 이미지 → 필드 파싱)
 ├── global/         # BaseEntity, ErrorCode, BusinessException, ApiResponse, security/(CurrentUserId)
 └── config/         # SecurityConfig, WebConfig, CorsConfig, LocalSecurityConfig, DataInitializer
 
@@ -74,6 +75,7 @@ enum:
 | GET | `/api/subscriptions/expenses/{monthly,categories,trends,monthly/details}` | ○ |
 | GET | `/api/dashboard` | ○ |
 | GET | `/api/notifications/upcoming` | ○ |
+| POST | `/api/ocr/subscriptions/scan` | ○ |
 
 계층: Controller → Service → Repository
 
@@ -144,6 +146,8 @@ enum:
 | `COOKIE_SECURE` | `true` (`none` 사용 시 필수, HTTPS 강제) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google OAuth 크레덴셜 (Google Cloud Console 발급) |
 | `OAUTH_SUCCESS_REDIRECT` | 소셜 로그인 성공 후 리다이렉트할 프론트 주소 |
+| `CLOVA_OCR_INVOKE_URL` | CLOVA OCR General API Invoke URL (Naver Cloud Platform 콘솔 발급) |
+| `CLOVA_OCR_SECRET_KEY` | CLOVA OCR Secret Key (Naver Cloud Platform 콘솔 발급) |
 
 - Google 콘솔 Authorized redirect URI: `<BE주소>/login/oauth2/code/google` (로컬·배포 각각 등록)
 
