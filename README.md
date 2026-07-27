@@ -4,7 +4,7 @@
 월별 지출을 분석할 수 있는 웹 애플리케이션의 백엔드 서버입니다.
 
 **Frontend Repository:** [gudocs-fe](https://github.com/SCRUMBLE-team/gudocs-fe)  
-**API 문서 (Swagger):** [https://43-203-195-12.sslip.io/swagger-ui/index.html](https://43-203-195-12.sslip.io/swagger-ui/index.html)
+**API 문서 (Swagger):** [https://3-35-49-217.sslip.io/swagger-ui/index.html](https://43-203-195-12.sslip.io/swagger-ui/index.html)
 
 ---
 

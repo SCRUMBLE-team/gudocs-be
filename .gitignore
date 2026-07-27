@@ -31,3 +31,6 @@ application-dev.yaml
 # Others
 *.iml
 *.orig
+
+# Superpowers scratch workspace
+.superpowers/
