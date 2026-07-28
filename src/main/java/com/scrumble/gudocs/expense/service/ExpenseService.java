@@ -53,11 +53,12 @@ public class ExpenseService {
 
         long monthly = sumMonthlyAmount(filterByCycle(currentMonth, BillingCycle.MONTHLY));
         long yearlyConverted = sumMonthlyAmount(filterByCycle(currentMonth, BillingCycle.YEARLY));
+        long actualAmount = sumActualAmount(currentMonth, target);
 
         return new MonthlyExpenseResponse(
                 target.getYear(), target.getMonthValue(),
                 totalAmount, previousAmount, changeAmount, changeRate,
-                monthly, yearlyConverted
+                monthly, yearlyConverted, actualAmount
         );
     }
 
@@ -163,6 +164,12 @@ public class ExpenseService {
 
     private long sumMonthlyAmount(List<Subscription> subscriptions) {
         return subscriptions.stream().mapToLong(MonthlyAmountCalculator::monthlyAmount).sum();
+    }
+
+    private long sumActualAmount(List<Subscription> subscriptions, YearMonth target) {
+        return subscriptions.stream()
+                .mapToLong(s -> MonthlyAmountCalculator.actualAmount(s, target))
+                .sum();
     }
 
     private double calculateChangeRate(long current, long previous) {
