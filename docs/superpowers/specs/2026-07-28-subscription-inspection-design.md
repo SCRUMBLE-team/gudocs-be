@@ -44,18 +44,14 @@ dashboard/
   controller/DashboardApi.java          # getInspection 시그니처 추가
   controller/DashboardController.java   # GET /api/dashboard/inspection
 
-subscriptions/
-  util/MonthlyAmountCalculator.java     # 신규: 월 환산 금액 계산 단일 소스
 ```
 
-### 리팩터링: `MonthlyAmountCalculator` 추출
+### `MonthlyAmountCalculator` 재사용
 
-`DashboardService`에는 이미 월 환산 금액을 계산하는 private 메서드
-(`monthlyAmount(Subscription)`, `MONTHLY`면 `price` 그대로, `YEARLY`면 `price / 12`
-Long 버림)가 있다. 이번 기능도 동일 계산이 필요하므로, 프로젝트가 이미 `NextBillingDateCalculator`로
-"결제일 계산 단일 소스" 원칙을 쓰고 있는 것과 같은 방식으로
-`subscriptions/util/MonthlyAmountCalculator.calculate(Subscription)`로 추출해
-`DashboardService`의 기존 로직과 새 `getInspection`에서 함께 쓴다.
+월 환산 금액 계산 단일 소스인 `subscriptions/util/MonthlyAmountCalculator.monthlyAmount(Subscription)`는
+별도 PR(#28, 월별 지출 실결제금액)에서 이미 추출·merge됐고, `DashboardService`도 이미 이 유틸을 쓰도록
+리팩터링된 상태다. 이번 기능은 새로 추출할 것 없이 기존 `MonthlyAmountCalculator.monthlyAmount(Subscription)`를
+그대로 호출해서 쓴다.
 
 ### 흐름
 
@@ -111,7 +107,10 @@ Long 버림)가 있다. 이번 기능도 동일 계산이 필요하므로, 프�
 ## 테스트 계획
 
 `DashboardServiceTest`에 케이스를 추가한다 (기존 `getDashboard(userId, today)` 오버로드로
-기준 날짜를 주입하는 테스트 패턴을 그대로 재사용).
+기준 날짜를 주입하는 테스트 패턴을 그대로 재사용). `updatedAt`은 `BaseEntity`의
+`@LastModifiedDate`라 JPA 영속화 없이는 값이 채워지지 않으므로, 테스트에서는
+`org.springframework.test.util.ReflectionTestUtils.setField(subscription, "updatedAt", ...)`로
+직접 주입한다 (프로덕션 코드 변경 없음, 기존 Mockito 단위 테스트 스타일 유지).
 
 - `updatedAt`이 정확히 6개월 전 / 6개월에서 하루 모자란 경계값
 - `PAUSED` 구독은 `unusedCandidates`, `duplicateGroups` 양쪽 모두에서 제외되는지
@@ -120,8 +119,7 @@ Long 버림)가 있다. 이번 기능도 동일 계산이 필요하므로, 프�
 - `YEARLY` 구독의 `monthlyAmount`가 `price / 12` (버림)로 정확히 계산되는지
 - 후보가 하나도 없을 때 양쪽 다 빈 배열을 반환하는지
 
-`MonthlyAmountCalculator`는 순수 함수이므로 별도 단위 테스트
-(`MonthlyAmountCalculatorTest`)를 작성한다.
+`MonthlyAmountCalculator` 자체 테스트는 PR #28에서 이미 있으므로 이번 기능에서 추가하지 않는다.
 
 ## 범위 밖 (다루지 않음)
 
