@@ -1,6 +1,7 @@
 package com.scrumble.gudocs.dashboard.controller;
 
 import com.scrumble.gudocs.dashboard.dto.DashboardResponse;
+import com.scrumble.gudocs.dashboard.dto.InspectionResponse;
 import com.scrumble.gudocs.global.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -17,7 +18,16 @@ public interface DashboardApi {
     @Operation(summary = "대시보드 조회", description = "이번 달 총 지출, 카테고리별 요약, 결제 예정 알림 등 메인 대시보드 데이터를 조회합니다.")
     @ApiResponses({
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "로그인 필요")
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "로그인 필요"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "사용자를 찾을 수 없음")
     })
     ResponseEntity<ApiResponse<DashboardResponse>> getDashboard(@CurrentUserId Long userId);
+
+    @Operation(summary = "구독 점검", description = "미사용 구독 후보(6개월 이상 정보 미변경)와 카테고리 중복 구독 후보를 조회합니다.")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "로그인 필요"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "사용자를 찾을 수 없음")
+    })
+    ResponseEntity<ApiResponse<InspectionResponse>> getInspection(@CurrentUserId Long userId);
 }
