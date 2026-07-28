@@ -9,6 +9,7 @@ import com.scrumble.gudocs.users.entity.User;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -52,5 +53,39 @@ class MonthlyAmountCalculatorTest {
         Subscription s = yearly(100000L, 3, 1);
 
         assertThat(MonthlyAmountCalculator.monthlyAmount(s)).isEqualTo(8333L);
+    }
+
+    @Test
+    void MONTHLY_구독은_조회월과_무관하게_항상_price_전액() {
+        Subscription s = monthly(17000L, 15);
+
+        assertThat(MonthlyAmountCalculator.actualAmount(s, YearMonth.of(2026, 1)))
+                .isEqualTo(17000L);
+        assertThat(MonthlyAmountCalculator.actualAmount(s, YearMonth.of(2026, 7)))
+                .isEqualTo(17000L);
+    }
+
+    @Test
+    void YEARLY_구독은_결제월과_조회월이_같으면_price_전액() {
+        Subscription s = yearly(120000L, 3, 1);
+
+        assertThat(MonthlyAmountCalculator.actualAmount(s, YearMonth.of(2026, 3)))
+                .isEqualTo(120000L);
+    }
+
+    @Test
+    void YEARLY_구독은_결제월과_조회월이_다르면_0원() {
+        Subscription s = yearly(120000L, 3, 1);
+
+        assertThat(MonthlyAmountCalculator.actualAmount(s, YearMonth.of(2026, 4)))
+                .isEqualTo(0L);
+    }
+
+    @Test
+    void YEARLY_구독은_연도가_달라도_월만_같으면_price_전액() {
+        Subscription s = yearly(120000L, 3, 1);
+
+        assertThat(MonthlyAmountCalculator.actualAmount(s, YearMonth.of(2030, 3)))
+                .isEqualTo(120000L);
     }
 }
