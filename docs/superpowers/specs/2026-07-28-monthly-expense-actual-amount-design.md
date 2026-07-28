@@ -25,7 +25,7 @@
 
 ## 응답 변경
 
-`MonthlyExpenseResponse`에 필드 하나만 추가한다. 기존 5개 필드는 그대로 둔다.
+`MonthlyExpenseResponse`에 필드 하나만 추가한다. 기존 8개 필드는 그대로 둔다.
 
 ```json
 {

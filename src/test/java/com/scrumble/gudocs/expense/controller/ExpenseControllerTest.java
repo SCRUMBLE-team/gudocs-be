@@ -222,6 +222,9 @@ class ExpenseControllerTest {
                         .param("year", String.valueOf(now.getYear()))
                         .param("month", String.valueOf(now.getMonthValue())))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalAmount").value(27000))
+                .andExpect(jsonPath("$.data.monthlySubscriptionAmount").value(17000))
+                .andExpect(jsonPath("$.data.annualSubscriptionMonthlyConvertedAmount").value(10000))
                 .andExpect(jsonPath("$.data.actualAmount").value(137000));
     }
 

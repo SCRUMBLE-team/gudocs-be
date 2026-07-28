@@ -415,7 +415,7 @@ public record MonthlyExpenseResponse(
         @Schema(description = "연간 구독의 월 환산 합계(원)", example = "30000")
         long annualSubscriptionMonthlyConvertedAmount,
 
-        @Schema(description = "이번 달 실제 결제 금액(연간 구독은 결제월에만 전액 반영, 원)", example = "137000")
+        @Schema(description = "조회 월 실제 결제 금액(연간 구독은 결제월에만 전액 반영, 원)", example = "137000")
         long actualAmount
 ) {
 }
