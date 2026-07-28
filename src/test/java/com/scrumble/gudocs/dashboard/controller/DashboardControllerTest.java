@@ -112,4 +112,34 @@ class DashboardControllerTest {
         mockMvc.perform(get("/api/dashboard"))
                 .andExpect(status().isUnauthorized());
     }
+
+    @Test
+    void 구독_점검_카테고리_중복_후보_반환() throws Exception {
+        구독_등록("Netflix", SubscriptionCategory.OTT, 17000L, BillingCycle.MONTHLY, 15, null);
+        구독_등록("Watcha", SubscriptionCategory.OTT, 12900L, BillingCycle.MONTHLY, 5, null);
+
+        mockMvc.perform(get("/api/dashboard/inspection").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.duplicateGroups.length()").value(1))
+                .andExpect(jsonPath("$.data.duplicateGroups[0].category").value("OTT"))
+                .andExpect(jsonPath("$.data.duplicateGroups[0].subscriptions.length()").value(2))
+                .andExpect(jsonPath("$.data.unusedCandidates").isArray());
+    }
+
+    @Test
+    void 구독_점검_후보_없으면_빈_배열() throws Exception {
+        구독_등록("Netflix", SubscriptionCategory.OTT, 17000L, BillingCycle.MONTHLY, 15, null);
+
+        mockMvc.perform(get("/api/dashboard/inspection").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.unusedCandidates.length()").value(0))
+                .andExpect(jsonPath("$.data.duplicateGroups.length()").value(0));
+    }
+
+    @Test
+    void 미인증_구독_점검_401() throws Exception {
+        mockMvc.perform(get("/api/dashboard/inspection"))
+                .andExpect(status().isUnauthorized());
+    }
 }
