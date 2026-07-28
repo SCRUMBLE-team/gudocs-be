@@ -14,6 +14,7 @@ import com.scrumble.gudocs.expense.dto.response.MonthlyExpenseResponse;
 import com.scrumble.gudocs.expense.dto.response.MonthlyTrendItem;
 import com.scrumble.gudocs.expense.dto.response.SubscriptionExpenseDetail;
 import com.scrumble.gudocs.subscriptions.repository.SubscriptionRepository;
+import com.scrumble.gudocs.subscriptions.util.MonthlyAmountCalculator;
 import com.scrumble.gudocs.users.entity.User;
 import com.scrumble.gudocs.users.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -52,11 +53,12 @@ public class ExpenseService {
 
         long monthly = sumMonthlyAmount(filterByCycle(currentMonth, BillingCycle.MONTHLY));
         long yearlyConverted = sumMonthlyAmount(filterByCycle(currentMonth, BillingCycle.YEARLY));
+        long actualAmount = sumActualAmount(currentMonth, target);
 
         return new MonthlyExpenseResponse(
                 target.getYear(), target.getMonthValue(),
                 totalAmount, previousAmount, changeAmount, changeRate,
-                monthly, yearlyConverted
+                monthly, yearlyConverted, actualAmount
         );
     }
 
@@ -112,7 +114,7 @@ public class ExpenseService {
         long totalAmount = sumMonthlyAmount(currentMonth);
 
         List<SubscriptionExpenseDetail> details = currentMonth.stream()
-                .sorted(Comparator.comparingLong((Subscription s) -> monthlyAmount(s)).reversed())
+                .sorted(Comparator.comparingLong((Subscription s) -> MonthlyAmountCalculator.monthlyAmount(s)).reversed())
                 .map(s -> new SubscriptionExpenseDetail(
                         s.getId(),
                         s.getServiceName(),
@@ -120,7 +122,7 @@ public class ExpenseService {
                         s.getCategory().getDisplayName(),
                         s.getBillingCycle(),
                         s.getPrice(),
-                        monthlyAmount(s),
+                        MonthlyAmountCalculator.monthlyAmount(s),
                         s.getFirstBillingDate(),
                         s.getPaymentMethod(),
                         s.getStatus(),
@@ -161,11 +163,13 @@ public class ExpenseService {
     }
 
     private long sumMonthlyAmount(List<Subscription> subscriptions) {
-        return subscriptions.stream().mapToLong(this::monthlyAmount).sum();
+        return subscriptions.stream().mapToLong(MonthlyAmountCalculator::monthlyAmount).sum();
     }
 
-    private long monthlyAmount(Subscription s) {
-        return s.getBillingCycle() == BillingCycle.MONTHLY ? s.getPrice() : s.getPrice() / 12;
+    private long sumActualAmount(List<Subscription> subscriptions, YearMonth target) {
+        return subscriptions.stream()
+                .mapToLong(s -> MonthlyAmountCalculator.actualAmount(s, target))
+                .sum();
     }
 
     private double calculateChangeRate(long current, long previous) {

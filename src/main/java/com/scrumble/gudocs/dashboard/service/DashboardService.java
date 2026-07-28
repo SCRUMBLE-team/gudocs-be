@@ -5,11 +5,11 @@ import com.scrumble.gudocs.dashboard.dto.DashboardResponse;
 import com.scrumble.gudocs.global.exception.BusinessException;
 import com.scrumble.gudocs.global.exception.ErrorCode;
 import com.scrumble.gudocs.subscriptions.dto.response.SubscriptionResponse;
-import com.scrumble.gudocs.subscriptions.entity.BillingCycle;
 import com.scrumble.gudocs.subscriptions.entity.Subscription;
 import com.scrumble.gudocs.subscriptions.entity.SubscriptionCategory;
 import com.scrumble.gudocs.subscriptions.entity.SubscriptionStatus;
 import com.scrumble.gudocs.subscriptions.repository.SubscriptionRepository;
+import com.scrumble.gudocs.subscriptions.util.MonthlyAmountCalculator;
 import com.scrumble.gudocs.subscriptions.util.NextBillingDateCalculator;
 import com.scrumble.gudocs.users.entity.User;
 import com.scrumble.gudocs.users.repository.UserRepository;
@@ -56,18 +56,14 @@ public class DashboardService {
     }
 
     private long calculateMonthlyTotal(List<Subscription> subscriptions) {
-        return subscriptions.stream().mapToLong(this::monthlyAmount).sum();
-    }
-
-    private long monthlyAmount(Subscription s) {
-        return s.getBillingCycle() == BillingCycle.MONTHLY ? s.getPrice() : s.getPrice() / 12;
+        return subscriptions.stream().mapToLong(MonthlyAmountCalculator::monthlyAmount).sum();
     }
 
     private List<CategorySummary> calculateCategorySummaries(List<Subscription> active, long total) {
         Map<SubscriptionCategory, Long> amountByCategory = active.stream()
                 .collect(Collectors.groupingBy(
                         Subscription::getCategory,
-                        Collectors.summingLong(this::monthlyAmount)
+                        Collectors.summingLong(MonthlyAmountCalculator::monthlyAmount)
                 ));
 
         return amountByCategory.entrySet().stream()

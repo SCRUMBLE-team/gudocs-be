@@ -198,6 +198,52 @@ class ExpenseControllerTest {
     }
 
     @Test
+    void 월별_지출_분석_실결제금액_MONTHLY만_있으면_totalAmount와_동일() throws Exception {
+        구독_등록("Netflix", SubscriptionCategory.OTT, 17000L, BillingCycle.MONTHLY, 15, null);
+        구독_등록("Spotify", SubscriptionCategory.MUSIC, 10000L, BillingCycle.MONTHLY, 5, null);
+
+        YearMonth now = 현재월();
+        mockMvc.perform(get("/api/subscriptions/expenses/monthly")
+                        .session(session)
+                        .param("year", String.valueOf(now.getYear()))
+                        .param("month", String.valueOf(now.getMonthValue())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.actualAmount").value(27000));
+    }
+
+    @Test
+    void 월별_지출_분석_실결제금액_YEARLY_결제월과_같으면_전액() throws Exception {
+        YearMonth now = 현재월();
+        구독_등록("Adobe", SubscriptionCategory.DESIGN, 120000L, BillingCycle.YEARLY, 1, now.getMonthValue());
+        구독_등록("Netflix", SubscriptionCategory.OTT, 17000L, BillingCycle.MONTHLY, 15, null);
+
+        mockMvc.perform(get("/api/subscriptions/expenses/monthly")
+                        .session(session)
+                        .param("year", String.valueOf(now.getYear()))
+                        .param("month", String.valueOf(now.getMonthValue())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalAmount").value(27000))
+                .andExpect(jsonPath("$.data.monthlySubscriptionAmount").value(17000))
+                .andExpect(jsonPath("$.data.annualSubscriptionMonthlyConvertedAmount").value(10000))
+                .andExpect(jsonPath("$.data.actualAmount").value(137000));
+    }
+
+    @Test
+    void 월별_지출_분석_실결제금액_YEARLY_결제월과_다르면_0원() throws Exception {
+        YearMonth now = 현재월();
+        int otherMonth = now.getMonthValue() % 12 + 1;
+        구독_등록("Adobe", SubscriptionCategory.DESIGN, 120000L, BillingCycle.YEARLY, 1, otherMonth);
+        구독_등록("Netflix", SubscriptionCategory.OTT, 17000L, BillingCycle.MONTHLY, 15, null);
+
+        mockMvc.perform(get("/api/subscriptions/expenses/monthly")
+                        .session(session)
+                        .param("year", String.valueOf(now.getYear()))
+                        .param("month", String.valueOf(now.getMonthValue())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.actualAmount").value(17000));
+    }
+
+    @Test
     void 월별_지출_분석_month_범위_초과_400() throws Exception {
         mockMvc.perform(get("/api/subscriptions/expenses/monthly")
                         .session(session)
