@@ -2,14 +2,18 @@ package com.scrumble.gudocs.dashboard.service;
 
 import com.scrumble.gudocs.dashboard.dto.CategorySummary;
 import com.scrumble.gudocs.dashboard.dto.DashboardResponse;
+import com.scrumble.gudocs.dashboard.dto.DuplicateCategoryGroup;
+import com.scrumble.gudocs.dashboard.dto.DuplicateSubscriptionItem;
+import com.scrumble.gudocs.dashboard.dto.InspectionResponse;
+import com.scrumble.gudocs.dashboard.dto.UnusedSubscriptionCandidate;
 import com.scrumble.gudocs.global.exception.BusinessException;
 import com.scrumble.gudocs.global.exception.ErrorCode;
 import com.scrumble.gudocs.subscriptions.dto.response.SubscriptionResponse;
-import com.scrumble.gudocs.subscriptions.entity.BillingCycle;
 import com.scrumble.gudocs.subscriptions.entity.Subscription;
 import com.scrumble.gudocs.subscriptions.entity.SubscriptionCategory;
 import com.scrumble.gudocs.subscriptions.entity.SubscriptionStatus;
 import com.scrumble.gudocs.subscriptions.repository.SubscriptionRepository;
+import com.scrumble.gudocs.subscriptions.util.MonthlyAmountCalculator;
 import com.scrumble.gudocs.subscriptions.util.NextBillingDateCalculator;
 import com.scrumble.gudocs.users.entity.User;
 import com.scrumble.gudocs.users.repository.UserRepository;
@@ -55,19 +59,54 @@ public class DashboardService {
         return new DashboardResponse(monthlyTotal, active.size(), recent, categories);
     }
 
-    private long calculateMonthlyTotal(List<Subscription> subscriptions) {
-        return subscriptions.stream().mapToLong(this::monthlyAmount).sum();
+    @Transactional(readOnly = true)
+    public InspectionResponse getInspection(Long userId) {
+        return getInspection(userId, LocalDate.now());
     }
 
-    private long monthlyAmount(Subscription s) {
-        return s.getBillingCycle() == BillingCycle.MONTHLY ? s.getPrice() : s.getPrice() / 12;
+    @Transactional(readOnly = true)
+    InspectionResponse getInspection(Long userId, LocalDate today) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        List<Subscription> active = subscriptionRepository.findAllByUserOrderByCreatedAtDesc(user).stream()
+                .filter(s -> s.getStatus() == SubscriptionStatus.ACTIVE)
+                .toList();
+
+        return new InspectionResponse(findUnusedCandidates(active, today), findDuplicateGroups(active));
+    }
+
+    private List<UnusedSubscriptionCandidate> findUnusedCandidates(List<Subscription> active, LocalDate today) {
+        LocalDate threshold = today.minusMonths(6);
+        return active.stream()
+                .filter(s -> s.getUpdatedAt() != null && !s.getUpdatedAt().toLocalDate().isAfter(threshold))
+                .map(UnusedSubscriptionCandidate::from)
+                .toList();
+    }
+
+    private List<DuplicateCategoryGroup> findDuplicateGroups(List<Subscription> active) {
+        Map<SubscriptionCategory, List<Subscription>> grouped = active.stream()
+                .filter(s -> s.getCategory() != SubscriptionCategory.ETC)
+                .collect(Collectors.groupingBy(Subscription::getCategory));
+
+        return grouped.entrySet().stream()
+                .filter(entry -> entry.getValue().size() >= 2)
+                .map(entry -> new DuplicateCategoryGroup(
+                        entry.getKey(),
+                        entry.getValue().stream().map(DuplicateSubscriptionItem::from).toList()
+                ))
+                .toList();
+    }
+
+    private long calculateMonthlyTotal(List<Subscription> subscriptions) {
+        return subscriptions.stream().mapToLong(MonthlyAmountCalculator::monthlyAmount).sum();
     }
 
     private List<CategorySummary> calculateCategorySummaries(List<Subscription> active, long total) {
         Map<SubscriptionCategory, Long> amountByCategory = active.stream()
                 .collect(Collectors.groupingBy(
                         Subscription::getCategory,
-                        Collectors.summingLong(this::monthlyAmount)
+                        Collectors.summingLong(MonthlyAmountCalculator::monthlyAmount)
                 ));
 
         return amountByCategory.entrySet().stream()
