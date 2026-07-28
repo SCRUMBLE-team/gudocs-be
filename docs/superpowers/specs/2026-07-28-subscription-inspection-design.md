@@ -34,7 +34,7 @@ API를 정의한다.
 
 새 도메인을 만들지 않고 기존 `dashboard` 도메인에 추가한다.
 
-```
+```text
 dashboard/
   service/DashboardService.java         # getInspection(Long userId) 메서드 추가
   dto/InspectionResponse.java
