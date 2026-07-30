@@ -31,6 +31,7 @@ src/main/java/com/scrumble/gudocs/
 └── config/         # SecurityConfig, WebConfig, CorsConfig, LocalSecurityConfig, DataInitializer
 
 deploy/             # EC2 배포 리소스 (setup.sh, systemd, Caddyfile, mysql-init.sql)
+  migrations/       # 스키마 마이그레이션 버전 파일 + 적용 이력 (README.md 참고)
 .github/workflows/  # ci.yml (PR 테스트), deploy.yml (main → EC2 배포)
 ```
 
@@ -176,3 +177,4 @@ enum:
 - 다른 사용자 데이터 접근 가능한 API 금지 — 현재 로그인 사용자 기준만 (`@CurrentUserId Long userId`)
 - 배포 설정 변경 시 `deploy/env.example`과 `application.yaml` 기본값 동시 점검
 - CORS 도메인 추가는 코드가 아니라 `CORS_ALLOWED_ORIGINS` 환경변수에서 처리
+- 컬럼 삭제·타입/제약 변경(ddl-auto=update가 반영 못 하는 스키마 변경)은 `deploy/migrations/`에 `V<YYYYMMDD>__<설명>.sql`로 남기고 README 이력 갱신
