@@ -91,8 +91,7 @@ global/
 
 | 메서드    | 경로                               | 인증  | 설명                    |
 | ------ | -------------------------------- | --- | --------------------- |
-| POST   | `/api/auth/signup`               | 불필요 | 회원가입                  |
-| POST   | `/api/auth/login`                | 불필요 | 로그인                   |
+| GET    | `/oauth2/authorization/{provider}` | 불필요 | 소셜 로그인 (google/kakao/naver) |
 | POST   | `/api/auth/logout`               | 필요  | 로그아웃                  |
 | GET    | `/api/auth/me`                   | 필요  | 내 정보                  |
 | GET    | `/api/users/me`                  | 필요  | 마이페이지 내 정보 조회         |
