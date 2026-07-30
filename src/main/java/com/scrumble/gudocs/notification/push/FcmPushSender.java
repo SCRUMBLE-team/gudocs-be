@@ -25,8 +25,10 @@ public class FcmPushSender implements PushSender {
 
     @Override
     public PushResult send(String fid, PushMessage message) {
+        // firebase-admin 9.10.0+: FID 발송은 setFid 사용. setToken은 legacy registration token
+        // 호환용으로 deprecated 되었으므로 신규 구현에서는 사용하지 않는다.
         Message fcmMessage = Message.builder()
-                .setToken(fid)
+                .setFid(fid)
                 .setNotification(Notification.builder()
                         .setTitle(message.title())
                         .setBody(message.body())

@@ -114,7 +114,8 @@ enum:
 - **트랜잭션 경계**: 발송 서비스는 클래스/메서드 `@Transactional` 없음 → repository 저장이 개별 커밋. 특정 기기 발송 실패(캐치)가 알림 이력이나 다른 기기 처리를 롤백하지 않음. 중복은 `user_notifications` UNIQUE 제약 + 삽입 시 `DataIntegrityViolationException` 캐치로 다중 서버 대응
 - **FCM payload** — notification: `title="{서비스명} 결제 예정"`, `body="{N}일 후 {금액}원이 결제될 예정이에요."` / data(모두 문자열): `type=BILLING_REMINDER`, `subscriptionId`, `link={FRONTEND_BASE_URL}/subscriptions/{subscriptionId}`
 - **회원 탈퇴**: `UserService.deleteAccount`가 user 삭제 전에 `user_notifications`·`push_registrations`를 먼저 정리
-- **의존성**: `com.google.firebase:firebase-admin`. 크레덴셜은 `GOOGLE_APPLICATION_CREDENTIALS`(서비스 계정 JSON). 신규 테이블은 `ddl-auto=update`로 생성(Flyway 미도입)
+- **발송 대상**: `fid`는 Firebase Installation ID. `firebase-admin` 9.10.0+의 `Message.Builder.setFid()`로 발송(구 `setToken`은 legacy registration token 호환용으로 deprecated → 미사용)
+- **의존성**: `com.google.firebase:firebase-admin:9.10.0`. 크레덴셜은 `GOOGLE_APPLICATION_CREDENTIALS`(서비스 계정 JSON). 신규 테이블은 `ddl-auto=update`로 생성(Flyway 미도입)
 
 ---
 

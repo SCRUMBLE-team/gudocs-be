@@ -6,15 +6,18 @@ import com.google.firebase.messaging.Message;
 import com.google.firebase.messaging.MessagingErrorCode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class FcmPushSenderTest {
@@ -32,6 +35,20 @@ class FcmPushSenderTest {
         given(firebaseMessaging.send(any(Message.class))).willReturn("msg-id");
 
         assertThat(sender.send("fid-123456789", message)).isEqualTo(PushResult.SUCCESS);
+    }
+
+    @Test
+    void 발송_Message는_deprecated_token이_아니라_fid_대상으로_생성된다() throws Exception {
+        given(firebaseMessaging.send(any(Message.class))).willReturn("msg-id");
+
+        sender.send("fid-123456789", message);
+
+        ArgumentCaptor<Message> captor = ArgumentCaptor.forClass(Message.class);
+        verify(firebaseMessaging).send(captor.capture());
+        Message sent = captor.getValue();
+        // Message는 fid/token을 private 필드로만 보관 → 리플렉션으로 발송 대상 필드 검증
+        assertThat(ReflectionTestUtils.getField(sent, "fid")).isEqualTo("fid-123456789");
+        assertThat(ReflectionTestUtils.getField(sent, "token")).isNull();
     }
 
     @Test

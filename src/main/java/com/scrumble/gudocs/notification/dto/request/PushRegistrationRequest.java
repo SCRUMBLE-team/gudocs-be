@@ -5,7 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 
 public record PushRegistrationRequest(
-        @Schema(description = "Firebase 설치/토큰 식별자", example = "firebase-installation-id")
+        @Schema(description = "Firebase Installation ID (FID)", example = "firebase-installation-id")
         @NotBlank(message = "fid는 필수입니다.")
         String fid,
 
