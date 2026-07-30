@@ -2,6 +2,8 @@ package com.scrumble.gudocs.users.service;
 
 import com.scrumble.gudocs.global.exception.BusinessException;
 import com.scrumble.gudocs.global.exception.ErrorCode;
+import com.scrumble.gudocs.notification.repository.PushRegistrationRepository;
+import com.scrumble.gudocs.notification.repository.UserNotificationRepository;
 import com.scrumble.gudocs.subscriptions.repository.SubscriptionRepository;
 import com.scrumble.gudocs.users.dto.UserInfoResponse;
 import com.scrumble.gudocs.users.dto.UserNameUpdateRequest;
@@ -19,6 +21,8 @@ public class UserService {
     private final UserRepository userRepository;
     private final SubscriptionRepository subscriptionRepository;
     private final SocialAccountRepository socialAccountRepository;
+    private final PushRegistrationRepository pushRegistrationRepository;
+    private final UserNotificationRepository userNotificationRepository;
 
     @Transactional(readOnly = true)
     public UserInfoResponse getMyInfo(Long userId) {
@@ -36,6 +40,9 @@ public class UserService {
     @Transactional
     public void deleteAccount(Long userId) {
         User user = findUser(userId);
+        // 사용자 삭제 전에 FK 참조 데이터를 먼저 정리한다.
+        userNotificationRepository.deleteAllByUserId(userId);
+        pushRegistrationRepository.deleteAllByUser(user);
         subscriptionRepository.hardDeleteAllByUser(user);
         socialAccountRepository.deleteAllByUser(user);
         userRepository.delete(user);
