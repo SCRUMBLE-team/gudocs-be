@@ -43,10 +43,6 @@ public class Subscription extends BaseEntity {
     private LocalDate firstBillingDate;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "payment_method", nullable = false)
-    private PaymentMethod paymentMethod;
-
-    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
     private SubscriptionStatus status = SubscriptionStatus.ACTIVE;
@@ -58,14 +54,12 @@ public class Subscription extends BaseEntity {
     private LocalDateTime deletedAt;
 
     public void update(String serviceName, SubscriptionCategory category, Long price,
-                       BillingCycle billingCycle, LocalDate firstBillingDate,
-                       PaymentMethod paymentMethod) {
+                       BillingCycle billingCycle, LocalDate firstBillingDate) {
         this.serviceName = serviceName;
         this.category = category;
         this.price = price;
         this.billingCycle = billingCycle;
         this.firstBillingDate = firstBillingDate;
-        this.paymentMethod = paymentMethod;
     }
 
     public void updateStatus(SubscriptionStatus status) {

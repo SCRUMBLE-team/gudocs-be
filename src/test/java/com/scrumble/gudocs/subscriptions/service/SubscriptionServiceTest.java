@@ -47,7 +47,7 @@ class SubscriptionServiceTest {
                 .price(17000L)
                 .billingCycle(BillingCycle.MONTHLY)
                 .firstBillingDate(LocalDate.of(2025, 1, 15))
-                .paymentMethod(PaymentMethod.CARD)
+                
                 .build();
     }
 
@@ -56,7 +56,7 @@ class SubscriptionServiceTest {
         User user = UserFixture.create();
         SubscriptionCreateRequest request = new SubscriptionCreateRequest(
                 "Netflix", SubscriptionCategory.OTT, 17000L,
-                BillingCycle.MONTHLY, LocalDate.of(2025, 1, 15), PaymentMethod.CARD
+                BillingCycle.MONTHLY, LocalDate.of(2025, 1, 15)
         );
         given(userRepository.findById(1L)).willReturn(Optional.of(user));
         given(subscriptionRepository.save(any(Subscription.class))).willAnswer(inv -> inv.getArgument(0));
@@ -73,7 +73,7 @@ class SubscriptionServiceTest {
         User user = UserFixture.create();
         SubscriptionCreateRequest request = new SubscriptionCreateRequest(
                 "Adobe", SubscriptionCategory.DESIGN, 60000L,
-                BillingCycle.YEARLY, LocalDate.of(2025, 3, 1), PaymentMethod.CARD
+                BillingCycle.YEARLY, LocalDate.of(2025, 3, 1)
         );
         given(userRepository.findById(1L)).willReturn(Optional.of(user));
         given(subscriptionRepository.save(any(Subscription.class))).willAnswer(inv -> inv.getArgument(0));
@@ -89,7 +89,7 @@ class SubscriptionServiceTest {
         Subscription subscription = testSubscription(user);
         SubscriptionUpdateRequest request = new SubscriptionUpdateRequest(
                 "Netflix Premium", SubscriptionCategory.OTT, 20000L,
-                BillingCycle.MONTHLY, LocalDate.of(2025, 2, 20), PaymentMethod.SIMPLE_PAY
+                BillingCycle.MONTHLY, LocalDate.of(2025, 2, 20)
         );
         given(userRepository.findById(1L)).willReturn(Optional.of(user));
         given(subscriptionRepository.findById(1L)).willReturn(Optional.of(subscription));
@@ -98,7 +98,6 @@ class SubscriptionServiceTest {
 
         assertThat(response.serviceName()).isEqualTo("Netflix Premium");
         assertThat(response.firstBillingDate()).isEqualTo(LocalDate.of(2025, 2, 20));
-        assertThat(response.paymentMethod()).isEqualTo(PaymentMethod.SIMPLE_PAY);
     }
 
     @Test

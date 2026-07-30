@@ -37,7 +37,6 @@ public class SubscriptionService {
                 .price(request.price())
                 .billingCycle(request.billingCycle())
                 .firstBillingDate(request.firstBillingDate())
-                .paymentMethod(request.paymentMethod())
                 .build();
 
         return toResponse(subscriptionRepository.save(subscription));
@@ -69,8 +68,7 @@ public class SubscriptionService {
 
         subscription.update(
                 request.serviceName().strip(), request.category(), request.price(),
-                request.billingCycle(), request.firstBillingDate(),
-                request.paymentMethod()
+                request.billingCycle(), request.firstBillingDate()
         );
 
         return toResponse(subscription);

@@ -2,7 +2,6 @@ package com.scrumble.gudocs.subscriptions.util;
 
 import com.scrumble.gudocs.common.fixture.UserFixture;
 import com.scrumble.gudocs.subscriptions.entity.BillingCycle;
-import com.scrumble.gudocs.subscriptions.entity.PaymentMethod;
 import com.scrumble.gudocs.subscriptions.entity.Subscription;
 import com.scrumble.gudocs.subscriptions.entity.SubscriptionCategory;
 import com.scrumble.gudocs.users.entity.User;
@@ -25,7 +24,7 @@ class MonthlyAmountCalculatorTest {
                 .price(price)
                 .billingCycle(BillingCycle.MONTHLY)
                 .firstBillingDate(LocalDate.of(2025, 1, billingDay))
-                .paymentMethod(PaymentMethod.CARD)
+                
                 .build();
     }
 
@@ -37,7 +36,7 @@ class MonthlyAmountCalculatorTest {
                 .price(price)
                 .billingCycle(BillingCycle.YEARLY)
                 .firstBillingDate(LocalDate.of(2025, billingMonth, billingDay))
-                .paymentMethod(PaymentMethod.CARD)
+                
                 .build();
     }
 

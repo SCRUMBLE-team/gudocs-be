@@ -124,7 +124,6 @@ public class ExpenseService {
                         s.getPrice(),
                         MonthlyAmountCalculator.monthlyAmount(s),
                         s.getFirstBillingDate(),
-                        s.getPaymentMethod(),
                         s.getStatus(),
                         s.getDeletedAt() != null
                 ))

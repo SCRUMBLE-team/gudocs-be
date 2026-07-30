@@ -2,7 +2,6 @@ package com.scrumble.gudocs.ocr.parser;
 
 import com.scrumble.gudocs.ocr.dto.response.OcrSubscriptionResult;
 import com.scrumble.gudocs.subscriptions.entity.BillingCycle;
-import com.scrumble.gudocs.subscriptions.entity.PaymentMethod;
 import com.scrumble.gudocs.subscriptions.entity.SubscriptionCategory;
 import org.junit.jupiter.api.Test;
 
@@ -24,7 +23,6 @@ class SubscriptionTextParserTest {
         assertThat(result.category()).isEqualTo(SubscriptionCategory.OTT);
         assertThat(result.price()).isEqualTo(17000L);
         assertThat(result.firstBillingDate()).isEqualTo(LocalDate.of(2026, 7, 15));
-        assertThat(result.paymentMethod()).isEqualTo(PaymentMethod.CARD);
         assertThat(result.billingCycle()).isEqualTo(BillingCycle.MONTHLY);
     }
 
@@ -36,7 +34,6 @@ class SubscriptionTextParserTest {
 
         assertThat(result.serviceName()).isEqualTo("스포티파이");
         assertThat(result.firstBillingDate()).isEqualTo(LocalDate.of(2026, 7, 20));
-        assertThat(result.paymentMethod()).isEqualTo(PaymentMethod.SIMPLE_PAY);
     }
 
     @Test
@@ -46,7 +43,6 @@ class SubscriptionTextParserTest {
         OcrSubscriptionResult result = SubscriptionTextParser.parse(text, TODAY);
 
         assertThat(result.billingCycle()).isEqualTo(BillingCycle.YEARLY);
-        assertThat(result.paymentMethod()).isEqualTo(PaymentMethod.BANK_TRANSFER);
     }
 
     @Test
@@ -57,15 +53,6 @@ class SubscriptionTextParserTest {
 
         assertThat(result.serviceName()).isEqualTo("이상한서비스 정기결제");
         assertThat(result.category()).isNull();
-    }
-
-    @Test
-    void 일시불_할부는_카드_결제로_인식한다() {
-        String text = "7월 15일 수요일\n배민클럽_우아한형제들\n1,990원\n일시불";
-
-        OcrSubscriptionResult result = SubscriptionTextParser.parse(text, TODAY);
-
-        assertThat(result.paymentMethod()).isEqualTo(PaymentMethod.CARD);
     }
 
     @Test
@@ -94,7 +81,6 @@ class SubscriptionTextParserTest {
         assertThat(result.category()).isNull();
         assertThat(result.price()).isNull();
         assertThat(result.firstBillingDate()).isNull();
-        assertThat(result.paymentMethod()).isNull();
         assertThat(result.billingCycle()).isEqualTo(BillingCycle.MONTHLY);
     }
 }

@@ -23,13 +23,13 @@ SET @uid := (SELECT user_id FROM social_accounts
 
 INSERT INTO subscriptions
   (user_id, service_name, category, price, billing_cycle, first_billing_date,
-   payment_method, status, paused_at, deleted_at, created_at, updated_at)
+   status, paused_at, deleted_at, created_at, updated_at)
 VALUES
-  (@uid, 'Netflix',               'OTT',       17000, 'MONTHLY', '2025-01-05', 'CARD',       'ACTIVE', NULL,   NULL, NOW(), NOW()),
-  (@uid, 'YouTube Premium',       'OTT',       14900, 'MONTHLY', '2025-01-10', 'CARD',       'ACTIVE', NULL,   NULL, NOW(), NOW()),
-  (@uid, 'Spotify',               'MUSIC',     10900, 'MONTHLY', '2025-01-15', 'SIMPLE_PAY', 'ACTIVE', NULL,   NULL, NOW(), NOW()),
-  (@uid, 'iCloud+',               'CLOUD',      3900, 'MONTHLY', '2025-01-01', 'CARD',       'ACTIVE', NULL,   NULL, NOW(), NOW()),
-  (@uid, 'Google One',            'CLOUD',      2900, 'MONTHLY', '2025-01-08', 'CARD',       'ACTIVE', NULL,   NULL, NOW(), NOW()),
-  (@uid, 'ChatGPT Plus',          'AI',        24000, 'MONTHLY', '2025-01-20', 'CARD',       'ACTIVE', NULL,   NULL, NOW(), NOW()),
-  (@uid, 'Adobe Creative Cloud',  'DESIGN',   624000, 'YEARLY',  '2025-03-01', 'CARD',       'PAUSED', NOW(),  NULL, NOW(), NOW()),
-  (@uid, '인프런',                 'EDUCATION', 29000, 'MONTHLY', '2025-01-25', 'CARD',       'ACTIVE', NULL,   NULL, NOW(), NOW());
+  (@uid, 'Netflix',               'OTT',       17000, 'MONTHLY', '2025-01-05', 'ACTIVE', NULL,   NULL, NOW(), NOW()),
+  (@uid, 'YouTube Premium',       'OTT',       14900, 'MONTHLY', '2025-01-10', 'ACTIVE', NULL,   NULL, NOW(), NOW()),
+  (@uid, 'Spotify',               'MUSIC',     10900, 'MONTHLY', '2025-01-15', 'ACTIVE', NULL,   NULL, NOW(), NOW()),
+  (@uid, 'iCloud+',               'CLOUD',      3900, 'MONTHLY', '2025-01-01', 'ACTIVE', NULL,   NULL, NOW(), NOW()),
+  (@uid, 'Google One',            'CLOUD',      2900, 'MONTHLY', '2025-01-08', 'ACTIVE', NULL,   NULL, NOW(), NOW()),
+  (@uid, 'ChatGPT Plus',          'AI',        24000, 'MONTHLY', '2025-01-20', 'ACTIVE', NULL,   NULL, NOW(), NOW()),
+  (@uid, 'Adobe Creative Cloud',  'DESIGN',   624000, 'YEARLY',  '2025-03-01', 'PAUSED', NOW(),  NULL, NOW(), NOW()),
+  (@uid, '인프런',                 'EDUCATION', 29000, 'MONTHLY', '2025-01-25', 'ACTIVE', NULL,   NULL, NOW(), NOW());
