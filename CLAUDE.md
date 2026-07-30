@@ -67,10 +67,15 @@ subscriptions/
   util/NextBillingDateCalculator.java     # 다음 결제일 계산 단일 소스
   dto/response/SubscriptionResponse.java  # nextBillingDate 포함
 
-notification/
-  controller/NotificationController.java  # GET /api/notifications/upcoming
-  service/NotificationService.java        # 7일 이내 ACTIVE 구독 알림
-  dto/response/UpcomingNotification.java
+notification/                             # FCM Web Push
+  entity/                                 # PushRegistration, UserNotification, PushPlatform, NotificationType
+  repository/                             # PushRegistrationRepository, UserNotificationRepository
+  controller/PushRegistrationController.java  # POST/DELETE /api/push-registrations
+  service/PushRegistrationService.java    # FID 등록(upsert)/해제(enabled=false)
+  service/NotificationDispatchService.java # 결제 예정 알림 탐색→중복확인→FCM 발송
+  scheduler/NotificationScheduler.java    # cron 배치 (FIREBASE_ENABLED=true일 때만)
+  push/                                   # PushSender + FcmPushSender / NoopPushSender
+  util/BillingReminderCalculator.java     # 7일 이내 결제 대상 탐색 (NextBillingDateCalculator 재사용)
 
 global/
   entity/BaseEntity.java         # created_at, updated_at (JPA Auditing)
@@ -99,7 +104,8 @@ global/
 | PUT    | `/api/subscriptions/{id}`        | 필요  | 구독 수정                 |
 | DELETE | `/api/subscriptions/{id}`        | 필요  | 구독 삭제                 |
 | PUT    | `/api/subscriptions/{id}/status` | 필요  | 상태 변경 (ACTIVE/PAUSED) |
-| GET    | `/api/notifications/upcoming`    | 필요  | 다가오는 결제 알림 (7일 이내)   |
+| POST   | `/api/push-registrations`        | 필요  | FCM 기기 등록 (upsert)    |
+| DELETE | `/api/push-registrations/{id}`   | 필요  | 등록 해제 (enabled=false) |
 
 ---
 

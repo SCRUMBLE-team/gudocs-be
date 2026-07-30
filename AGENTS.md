@@ -25,10 +25,10 @@ src/main/java/com/scrumble/gudocs/
 ├── subscriptions/  # 구독 CRUD (entity/controller/service/repository/dto/util)
 ├── expense/        # 지출 분석 (월별, 카테고리별, 추이)
 ├── dashboard/      # 메인 대시보드 집계
-├── notification/   # 결제 예정 알림 (헤더용 단독 엔드포인트)
+├── notification/   # FCM Web Push (기기 등록 + 결제 예정 알림 스케줄러/발송)
 ├── ocr/            # CLOVA OCR 기반 구독 정보 스캔 (결제 알림/영수증 이미지 → 필드 파싱)
 ├── global/         # BaseEntity, ErrorCode, BusinessException, ApiResponse, security/(CurrentUserId)
-└── config/         # SecurityConfig, WebConfig, CorsConfig, LocalSecurityConfig, DataInitializer
+└── config/         # SecurityConfig, WebConfig, CorsConfig, LocalSecurityConfig, DataInitializer, FirebaseConfig
 
 deploy/             # EC2 배포 리소스 (setup.sh, systemd, Caddyfile, mysql-init.sql)
   migrations/       # 스키마 마이그레이션 버전 파일 + 적용 이력 (README.md 참고)
@@ -52,11 +52,20 @@ deploy/             # EC2 배포 리소스 (setup.sh, systemd, Caddyfile, mysql-
 **subscriptions** — id, user_id(FK), service_name, category, price, billing_cycle, first_billing_date(최초 결제일 앵커), status, paused_at, deleted_at(soft delete), created_at, updated_at
 - `first_billing_date`: 다음 결제일 계산의 단일 기준 앵커. 기존 `billing_day`+`billing_month`를 통합. 다음 결제일은 저장하지 않고 `NextBillingDateCalculator`가 앵커+주기로 재계산(월말 드리프트 없음)
 
+**push_registrations** — id, user_id(FK), fid, platform, device_name, enabled, last_registered_at, created_at, updated_at
+- users 1:N. `UNIQUE(fid)` — 동일 fid 재등록 시 새 행 없이 소유자/상태 갱신(다른 사용자면 현재 사용자로 연결 변경). 해제는 hard delete가 아니라 `enabled=false`
+- `fid` 전체 값은 로그에 남기지 않음(마스킹)
+
+**user_notifications** — id, user_id, subscription_id, type, title, body, target_date, sent_at, created_at, updated_at
+- 발송 이력 + 중복 방지. `UNIQUE(user_id, subscription_id, type, target_date)` — 같은 결제 예정일 중복 발송 차단(다중 서버 대비 DB 제약으로 멱등). `sent_at`은 1건 이상 발송 성공 시 기록. userId/subscriptionId는 연관관계 아닌 값 컬럼
+
 enum:
 - `provider`: GOOGLE, KAKAO, NAVER
 - `category`: OTT, MUSIC, CLOUD, PRODUCTIVITY, AI, NEWS, EDUCATION, GAME, SHOPPING, DESIGN, ETC
 - `billing_cycle`: MONTHLY, YEARLY
 - `status`: ACTIVE, PAUSED
+- `platform`(push): WEB
+- `notification type`: BILLING_REMINDER
 
 ---
 
@@ -74,7 +83,8 @@ enum:
 | PUT | `/api/subscriptions/{id}/status` | ○ |
 | GET | `/api/subscriptions/expenses/{monthly,categories,trends,monthly/details}` | ○ |
 | GET | `/api/dashboard` | ○ |
-| GET | `/api/notifications/upcoming` | ○ |
+| POST | `/api/push-registrations` | ○ | (FCM 기기 등록 upsert)
+| DELETE | `/api/push-registrations/{registrationId}` | ○ | (등록 해제 = enabled false, 멱등)
 | POST | `/api/ocr/subscriptions/scan` | ○ |
 
 계층: Controller → Service → Repository
@@ -93,7 +103,18 @@ enum:
 
 - `PUT /api/subscriptions/{id}` — **full update** 방식: 모든 필드 필수 전송 (partial update 불가)
 - `SubscriptionResponse`에 `nextBillingDate` 필드 포함 — BE에서 계산해 내려보냄 (FE 자체 계산 금지)
-- 결제일 계산은 `subscriptions/util/NextBillingDateCalculator` 단일 소스. 알림(`NotificationService`)·대시보드·구독 응답이 모두 이 헬퍼를 공유
+- 결제일 계산은 `subscriptions/util/NextBillingDateCalculator` 단일 소스. 대시보드·구독 응답·알림 배치가 모두 이 헬퍼를 공유
+
+---
+
+## FCM Web Push (결제 예정 알림)
+
+- **발송 흐름**: 스케줄러(`NotificationScheduler`, `@ConditionalOnProperty(app.firebase.enabled=true)`) → `NotificationDispatchService.dispatchDueReminders(today)` → ① 활성·미삭제 구독 조회(`SubscriptionRepository.findActiveForBillingReminder`, `JOIN FETCH user`) → ② `BillingReminderCalculator`로 7일 이내 대상 필터(결제일 계산은 `NextBillingDateCalculator` 재사용, SQL로 표현 불가) → ③ `UserNotification` 저장(중복이면 skip) → ④ 사용자 활성 `PushRegistration` 조회 → ⑤ `PushSender`로 FID별 발송 → ⑥ 성공 시 `sent_at` 기록, 무효 FID는 `enabled=false`
+- **PushSender 추상화**: `FcmPushSender`(firebase enabled=true, Firebase Admin SDK) / `NoopPushSender`(비활성·기본, 실제 발송 안 함) — `@ConditionalOnProperty`로 택1. local/test는 Noop
+- **트랜잭션 경계**: 발송 서비스는 클래스/메서드 `@Transactional` 없음 → repository 저장이 개별 커밋. 특정 기기 발송 실패(캐치)가 알림 이력이나 다른 기기 처리를 롤백하지 않음. 중복은 `user_notifications` UNIQUE 제약 + 삽입 시 `DataIntegrityViolationException` 캐치로 다중 서버 대응
+- **FCM payload** — notification: `title="{서비스명} 결제 예정"`, `body="{N}일 후 {금액}원이 결제될 예정이에요."` / data(모두 문자열): `type=BILLING_REMINDER`, `subscriptionId`, `link={FRONTEND_BASE_URL}/subscriptions/{subscriptionId}`
+- **회원 탈퇴**: `UserService.deleteAccount`가 user 삭제 전에 `user_notifications`·`push_registrations`를 먼저 정리
+- **의존성**: `com.google.firebase:firebase-admin`. 크레덴셜은 `GOOGLE_APPLICATION_CREDENTIALS`(서비스 계정 JSON). 신규 테이블은 `ddl-auto=update`로 생성(Flyway 미도입)
 
 ---
 
@@ -148,6 +169,10 @@ enum:
 | `OAUTH_SUCCESS_REDIRECT` | 소셜 로그인 성공 후 리다이렉트할 프론트 주소 |
 | `CLOVA_OCR_INVOKE_URL` | CLOVA OCR General API Invoke URL (Naver Cloud Platform 콘솔 발급) |
 | `CLOVA_OCR_SECRET_KEY` | CLOVA OCR Secret Key (Naver Cloud Platform 콘솔 발급) |
+| `FIREBASE_ENABLED` | `true`면 Firebase Admin 초기화 + FCM 발송 + 알림 스케줄러 활성화 (기본 false) |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Firebase 서비스 계정 JSON 경로 (예: `/etc/gudocs/firebase-service-account.json`) |
+| `FRONTEND_BASE_URL` | 알림 클릭 이동 URL 기준 (예: `https://gudocs-fe-v2.vercel.app`) |
+| `FCM_NOTIFICATION_CRON` | 결제 예정 알림 스케줄러 cron (Asia/Seoul, 기본 `0 0 9 * * *`) |
 
 - Google 콘솔 Authorized redirect URI: `<BE주소>/login/oauth2/code/google` (로컬·배포 각각 등록)
 
