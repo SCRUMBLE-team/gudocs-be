@@ -1,7 +1,6 @@
 package com.scrumble.gudocs.ocr.dto.response;
 
 import com.scrumble.gudocs.subscriptions.entity.BillingCycle;
-import com.scrumble.gudocs.subscriptions.entity.PaymentMethod;
 import com.scrumble.gudocs.subscriptions.entity.SubscriptionCategory;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -21,9 +20,6 @@ public record OcrSubscriptionResult(
         BillingCycle billingCycle,
 
         @Schema(description = "최초 결제일(연도 정보가 없으면 현재 연도로 추정)", example = "2026-07-15")
-        LocalDate firstBillingDate,
-
-        @Schema(description = "결제 수단", example = "CARD")
-        PaymentMethod paymentMethod
+        LocalDate firstBillingDate
 ) {
 }

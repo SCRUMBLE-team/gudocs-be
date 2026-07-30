@@ -37,7 +37,7 @@ class SubscriptionRepositoryTest {
                 .price(17000L)
                 .billingCycle(BillingCycle.MONTHLY)
                 .firstBillingDate(LocalDate.of(2025, 1, 15))
-                .paymentMethod(PaymentMethod.CARD)
+                
                 .build();
         return em.persistAndFlush(subscription);
     }

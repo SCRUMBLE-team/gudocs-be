@@ -48,43 +48,43 @@ public class DataInitializer implements ApplicationRunner {
                         .user(user).serviceName("Netflix")
                         .category(SubscriptionCategory.OTT).price(17000L)
                         .billingCycle(BillingCycle.MONTHLY).firstBillingDate(LocalDate.of(2025, 1, 5))
-                        .paymentMethod(PaymentMethod.CARD).build(),
+                        .build(),
 
                 Subscription.builder()
                         .user(user).serviceName("YouTube Premium")
                         .category(SubscriptionCategory.OTT).price(14900L)
                         .billingCycle(BillingCycle.MONTHLY).firstBillingDate(LocalDate.of(2025, 1, 10))
-                        .paymentMethod(PaymentMethod.CARD).build(),
+                        .build(),
 
                 Subscription.builder()
                         .user(user).serviceName("Spotify")
                         .category(SubscriptionCategory.MUSIC).price(10900L)
                         .billingCycle(BillingCycle.MONTHLY).firstBillingDate(LocalDate.of(2025, 1, 15))
-                        .paymentMethod(PaymentMethod.SIMPLE_PAY).build(),
+                        .build(),
 
                 Subscription.builder()
                         .user(user).serviceName("iCloud+")
                         .category(SubscriptionCategory.CLOUD).price(3900L)
                         .billingCycle(BillingCycle.MONTHLY).firstBillingDate(LocalDate.of(2025, 1, 1))
-                        .paymentMethod(PaymentMethod.CARD).build(),
+                        .build(),
 
                 Subscription.builder()
                         .user(user).serviceName("Google One")
                         .category(SubscriptionCategory.CLOUD).price(2900L)
                         .billingCycle(BillingCycle.MONTHLY).firstBillingDate(LocalDate.of(2025, 1, 8))
-                        .paymentMethod(PaymentMethod.CARD).build(),
+                        .build(),
 
                 Subscription.builder()
                         .user(user).serviceName("ChatGPT Plus")
                         .category(SubscriptionCategory.AI).price(24000L)
                         .billingCycle(BillingCycle.MONTHLY).firstBillingDate(LocalDate.of(2025, 1, 20))
-                        .paymentMethod(PaymentMethod.CARD).build(),
+                        .build(),
 
                 Subscription.builder()
                         .user(user).serviceName("Adobe Creative Cloud")
                         .category(SubscriptionCategory.DESIGN).price(624000L)
                         .billingCycle(BillingCycle.YEARLY).firstBillingDate(LocalDate.of(2025, 3, 1))
-                        .paymentMethod(PaymentMethod.CARD)
+                        
                         .status(SubscriptionStatus.PAUSED)
                         .pausedAt(LocalDateTime.now()).build(),
 
@@ -92,7 +92,7 @@ public class DataInitializer implements ApplicationRunner {
                         .user(user).serviceName("인프런")
                         .category(SubscriptionCategory.EDUCATION).price(29000L)
                         .billingCycle(BillingCycle.MONTHLY).firstBillingDate(LocalDate.of(2025, 1, 25))
-                        .paymentMethod(PaymentMethod.CARD).build()
+                        .build()
         ));
     }
 }

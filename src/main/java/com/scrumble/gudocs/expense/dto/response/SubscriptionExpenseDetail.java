@@ -1,7 +1,6 @@
 package com.scrumble.gudocs.expense.dto.response;
 
 import com.scrumble.gudocs.subscriptions.entity.BillingCycle;
-import com.scrumble.gudocs.subscriptions.entity.PaymentMethod;
 import com.scrumble.gudocs.subscriptions.entity.SubscriptionCategory;
 import com.scrumble.gudocs.subscriptions.entity.SubscriptionStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -32,9 +31,6 @@ public record SubscriptionExpenseDetail(
 
         @Schema(description = "최초 결제일(다음 결제일 계산의 기준 앵커)", example = "2026-07-15")
         LocalDate firstBillingDate,
-
-        @Schema(description = "결제 수단", example = "CARD")
-        PaymentMethod paymentMethod,
 
         @Schema(description = "구독 상태", example = "ACTIVE")
         SubscriptionStatus status,

@@ -47,7 +47,7 @@ class DashboardServiceTest {
                 .price(price)
                 .billingCycle(BillingCycle.MONTHLY)
                 .firstBillingDate(LocalDate.of(2025, 1, billingDay))
-                .paymentMethod(PaymentMethod.CARD)
+                
                 .build();
     }
 
@@ -59,7 +59,7 @@ class DashboardServiceTest {
                 .price(price)
                 .billingCycle(BillingCycle.YEARLY)
                 .firstBillingDate(LocalDate.of(2025, billingMonth, billingDay))
-                .paymentMethod(PaymentMethod.CARD)
+                
                 .build();
     }
 
@@ -77,7 +77,7 @@ class DashboardServiceTest {
         Subscription paused = Subscription.builder()
                 .user(u).serviceName("Spotify").category(SubscriptionCategory.MUSIC)
                 .price(10000L).billingCycle(BillingCycle.MONTHLY).firstBillingDate(LocalDate.of(2025, 1, 10))
-                .paymentMethod(PaymentMethod.CARD).status(SubscriptionStatus.PAUSED).build();
+                .status(SubscriptionStatus.PAUSED).build();
         setupUser(u, List.of(active, paused));
 
         DashboardResponse response = dashboardService.getDashboard(1L, TODAY);
@@ -114,7 +114,7 @@ class DashboardServiceTest {
         Subscription paused = Subscription.builder()
                 .user(u).serviceName("Spotify").category(SubscriptionCategory.MUSIC)
                 .price(10000L).billingCycle(BillingCycle.MONTHLY).firstBillingDate(LocalDate.of(2025, 1, 10))
-                .paymentMethod(PaymentMethod.CARD).status(SubscriptionStatus.PAUSED).build();
+                .status(SubscriptionStatus.PAUSED).build();
         setupUser(u, List.of(active, paused));
 
         DashboardResponse response = dashboardService.getDashboard(1L, TODAY);
@@ -229,7 +229,7 @@ class DashboardServiceTest {
         Subscription paused = Subscription.builder()
                 .user(u).serviceName("Spotify").category(SubscriptionCategory.MUSIC)
                 .price(10000L).billingCycle(BillingCycle.MONTHLY).firstBillingDate(LocalDate.of(2025, 1, 10))
-                .paymentMethod(PaymentMethod.CARD).status(SubscriptionStatus.PAUSED).build();
+                .status(SubscriptionStatus.PAUSED).build();
         ReflectionTestUtils.setField(paused, "updatedAt", TODAY.minusMonths(12).atStartOfDay());
         setupUser(u, List.of(paused));
 
@@ -297,7 +297,7 @@ class DashboardServiceTest {
         Subscription paused = Subscription.builder()
                 .user(u).serviceName("Watcha").category(SubscriptionCategory.OTT)
                 .price(12900L).billingCycle(BillingCycle.MONTHLY).firstBillingDate(LocalDate.of(2025, 1, 5))
-                .paymentMethod(PaymentMethod.CARD).status(SubscriptionStatus.PAUSED).build();
+                .status(SubscriptionStatus.PAUSED).build();
         setupUser(u, List.of(active, paused));
 
         InspectionResponse response = dashboardService.getInspection(1L, TODAY);

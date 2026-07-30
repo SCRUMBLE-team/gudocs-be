@@ -56,13 +56,11 @@ users/
 subscriptions/
   entity/
     Subscription.java            # id, user_id, service_name, category, price,
-                                 # billing_cycle, first_billing_date(앵커),
-                                 # payment_method, status
+                                 # billing_cycle, first_billing_date(앵커), status
     BillingCycle.java            # MONTHLY, YEARLY
     SubscriptionCategory.java    # OTT, MUSIC, CLOUD, PRODUCTIVITY, AI, NEWS,
                                  #   EDUCATION, GAME, SHOPPING, DESIGN, ETC
     SubscriptionStatus.java      # ACTIVE, PAUSED
-    PaymentMethod.java           # CARD, BANK_TRANSFER, SIMPLE_PAY, ETC
   controller/SubscriptionController.java
   service/SubscriptionService.java
   repository/SubscriptionRepository.java  # findAllByUserOrderByCreatedAtDesc

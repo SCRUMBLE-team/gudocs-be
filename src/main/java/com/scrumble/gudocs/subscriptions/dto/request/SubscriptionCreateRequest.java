@@ -1,7 +1,6 @@
 package com.scrumble.gudocs.subscriptions.dto.request;
 
 import com.scrumble.gudocs.subscriptions.entity.BillingCycle;
-import com.scrumble.gudocs.subscriptions.entity.PaymentMethod;
 import com.scrumble.gudocs.subscriptions.entity.SubscriptionCategory;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
@@ -32,10 +31,6 @@ public record SubscriptionCreateRequest(
 
         @Schema(description = "최초 결제일(다음 결제일 계산의 기준 앵커)", example = "2026-07-15")
         @NotNull(message = "최초 결제일은 필수입니다.")
-        LocalDate firstBillingDate,
-
-        @Schema(description = "결제 수단", example = "CARD")
-        @NotNull(message = "결제 수단은 필수입니다.")
-        PaymentMethod paymentMethod
+        LocalDate firstBillingDate
 ) {
 }
