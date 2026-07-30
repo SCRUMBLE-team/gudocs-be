@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionCreateRequest;
 import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionStatusUpdateRequest;
 import com.scrumble.gudocs.subscriptions.entity.BillingCycle;
-import com.scrumble.gudocs.subscriptions.entity.PaymentMethod;
 import com.scrumble.gudocs.subscriptions.entity.SubscriptionCategory;
 import com.scrumble.gudocs.subscriptions.entity.SubscriptionStatus;
 import org.junit.jupiter.api.BeforeEach;
@@ -59,7 +58,7 @@ class ExpenseControllerTest {
                           BillingCycle cycle, int day, Integer month) throws Exception {
         LocalDate firstBillingDate = LocalDate.of(2025, month != null ? month : 1, day);
         SubscriptionCreateRequest req = new SubscriptionCreateRequest(
-                name, category, price, cycle, firstBillingDate, PaymentMethod.CARD);
+                name, category, price, cycle, firstBillingDate);
         MvcResult result = mockMvc.perform(post("/api/subscriptions")
                         .session(session)
                         .contentType(MediaType.APPLICATION_JSON)

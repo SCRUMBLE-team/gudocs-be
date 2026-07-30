@@ -66,7 +66,7 @@ class SubscriptionControllerTest {
     void 구독_등록_성공() throws Exception {
         SubscriptionCreateRequest request = new SubscriptionCreateRequest(
                 "Netflix", SubscriptionCategory.OTT, 17000L,
-                BillingCycle.MONTHLY, LocalDate.of(2025, 1, 15), PaymentMethod.CARD
+                BillingCycle.MONTHLY, LocalDate.of(2025, 1, 15)
         );
 
         mockMvc.perform(post("/api/subscriptions")
@@ -81,7 +81,7 @@ class SubscriptionControllerTest {
 
     @Test
     void 구독_등록_필수값_누락_400() throws Exception {
-        String body = "{\"category\":\"OTT\",\"price\":17000,\"billingCycle\":\"MONTHLY\",\"firstBillingDate\":\"2025-01-15\",\"paymentMethod\":\"CARD\"}";
+        String body = "{\"category\":\"OTT\",\"price\":17000,\"billingCycle\":\"MONTHLY\",\"firstBillingDate\":\"2025-01-15\"}";
 
         mockMvc.perform(post("/api/subscriptions")
                         .session(session)
@@ -95,13 +95,13 @@ class SubscriptionControllerTest {
     void 구독_수정_필수값_누락_400() throws Exception {
         SubscriptionCreateRequest createRequest = new SubscriptionCreateRequest(
                 "Netflix", SubscriptionCategory.OTT, 17000L,
-                BillingCycle.MONTHLY, LocalDate.of(2025, 1, 15), PaymentMethod.CARD
+                BillingCycle.MONTHLY, LocalDate.of(2025, 1, 15)
         );
         MvcResult createResult = 구독_등록(session, createRequest);
         long id = 구독_ID_추출(createResult);
 
         SubscriptionUpdateRequest updateRequest = new SubscriptionUpdateRequest(
-                null, null, null, null, null, null
+                null, null, null, null, null
         );
 
         mockMvc.perform(put("/api/subscriptions/" + id)
@@ -116,7 +116,7 @@ class SubscriptionControllerTest {
     void 구독_목록_조회_성공() throws Exception {
         SubscriptionCreateRequest request = new SubscriptionCreateRequest(
                 "Netflix", SubscriptionCategory.OTT, 17000L,
-                BillingCycle.MONTHLY, LocalDate.of(2025, 1, 15), PaymentMethod.CARD
+                BillingCycle.MONTHLY, LocalDate.of(2025, 1, 15)
         );
         구독_등록(session, request);
 
@@ -131,7 +131,7 @@ class SubscriptionControllerTest {
     void 구독_상세_조회_성공() throws Exception {
         SubscriptionCreateRequest request = new SubscriptionCreateRequest(
                 "Netflix", SubscriptionCategory.OTT, 17000L,
-                BillingCycle.MONTHLY, LocalDate.of(2025, 1, 15), PaymentMethod.CARD
+                BillingCycle.MONTHLY, LocalDate.of(2025, 1, 15)
         );
         MvcResult createResult = 구독_등록(session, request);
         long id = 구독_ID_추출(createResult);
@@ -153,14 +153,14 @@ class SubscriptionControllerTest {
     void 구독_수정_성공() throws Exception {
         SubscriptionCreateRequest createRequest = new SubscriptionCreateRequest(
                 "Netflix", SubscriptionCategory.OTT, 17000L,
-                BillingCycle.MONTHLY, LocalDate.of(2025, 1, 15), PaymentMethod.CARD
+                BillingCycle.MONTHLY, LocalDate.of(2025, 1, 15)
         );
         MvcResult createResult = 구독_등록(session, createRequest);
         long id = 구독_ID_추출(createResult);
 
         SubscriptionUpdateRequest updateRequest = new SubscriptionUpdateRequest(
                 "Netflix Premium", SubscriptionCategory.OTT, 19000L,
-                BillingCycle.MONTHLY, LocalDate.of(2025, 1, 15), PaymentMethod.CARD
+                BillingCycle.MONTHLY, LocalDate.of(2025, 1, 15)
         );
 
         mockMvc.perform(put("/api/subscriptions/" + id)
@@ -177,7 +177,7 @@ class SubscriptionControllerTest {
     void 구독_삭제_성공() throws Exception {
         SubscriptionCreateRequest request = new SubscriptionCreateRequest(
                 "Netflix", SubscriptionCategory.OTT, 17000L,
-                BillingCycle.MONTHLY, LocalDate.of(2025, 1, 15), PaymentMethod.CARD
+                BillingCycle.MONTHLY, LocalDate.of(2025, 1, 15)
         );
         MvcResult createResult = 구독_등록(session, request);
         long id = 구독_ID_추출(createResult);
@@ -194,7 +194,7 @@ class SubscriptionControllerTest {
     void 구독_상태_변경_성공() throws Exception {
         SubscriptionCreateRequest request = new SubscriptionCreateRequest(
                 "Netflix", SubscriptionCategory.OTT, 17000L,
-                BillingCycle.MONTHLY, LocalDate.of(2025, 1, 15), PaymentMethod.CARD
+                BillingCycle.MONTHLY, LocalDate.of(2025, 1, 15)
         );
         MvcResult createResult = 구독_등록(session, request);
         long id = 구독_ID_추출(createResult);
@@ -214,7 +214,7 @@ class SubscriptionControllerTest {
     void 다른_사용자_구독_접근_403() throws Exception {
         SubscriptionCreateRequest request = new SubscriptionCreateRequest(
                 "Netflix", SubscriptionCategory.OTT, 17000L,
-                BillingCycle.MONTHLY, LocalDate.of(2025, 1, 15), PaymentMethod.CARD
+                BillingCycle.MONTHLY, LocalDate.of(2025, 1, 15)
         );
         MvcResult createResult = 구독_등록(session, request);
         long id = 구독_ID_추출(createResult);
@@ -230,7 +230,7 @@ class SubscriptionControllerTest {
     void 서비스명_중복_확인_중복있음() throws Exception {
         구독_등록(session, new SubscriptionCreateRequest(
                 "Netflix", SubscriptionCategory.OTT, 17000L,
-                BillingCycle.MONTHLY, LocalDate.of(2025, 1, 15), PaymentMethod.CARD));
+                BillingCycle.MONTHLY, LocalDate.of(2025, 1, 15)));
 
         mockMvc.perform(get("/api/subscriptions/check-name")
                         .param("name", "netflix")
@@ -254,7 +254,7 @@ class SubscriptionControllerTest {
     void 서비스명_중복_확인_삭제된_구독은_중복아님() throws Exception {
         MvcResult createResult = 구독_등록(session, new SubscriptionCreateRequest(
                 "Netflix", SubscriptionCategory.OTT, 17000L,
-                BillingCycle.MONTHLY, LocalDate.of(2025, 1, 15), PaymentMethod.CARD));
+                BillingCycle.MONTHLY, LocalDate.of(2025, 1, 15)));
         long id = 구독_ID_추출(createResult);
 
         mockMvc.perform(delete("/api/subscriptions/" + id).session(session));
@@ -285,7 +285,7 @@ class SubscriptionControllerTest {
     void 서비스명_중복_확인_앞뒤공백_트리밍() throws Exception {
         구독_등록(session, new SubscriptionCreateRequest(
                 "Netflix", SubscriptionCategory.OTT, 17000L,
-                BillingCycle.MONTHLY, LocalDate.of(2025, 1, 15), PaymentMethod.CARD));
+                BillingCycle.MONTHLY, LocalDate.of(2025, 1, 15)));
 
         mockMvc.perform(get("/api/subscriptions/check-name")
                         .param("name", "  Netflix  ")

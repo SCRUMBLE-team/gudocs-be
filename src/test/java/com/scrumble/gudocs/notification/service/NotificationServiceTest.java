@@ -48,7 +48,7 @@ class NotificationServiceTest {
                 .price(price)
                 .billingCycle(BillingCycle.MONTHLY)
                 .firstBillingDate(LocalDate.of(2025, 1, billingDay))
-                .paymentMethod(PaymentMethod.CARD)
+                
                 .build();
     }
 
@@ -60,7 +60,7 @@ class NotificationServiceTest {
                 .price(price)
                 .billingCycle(BillingCycle.YEARLY)
                 .firstBillingDate(LocalDate.of(2025, billingMonth, billingDay))
-                .paymentMethod(PaymentMethod.CARD)
+                
                 .build();
     }
 
@@ -149,7 +149,7 @@ class NotificationServiceTest {
         Subscription paused = Subscription.builder()
                 .user(u).serviceName("Netflix").category(SubscriptionCategory.OTT)
                 .price(17000L).billingCycle(BillingCycle.MONTHLY).firstBillingDate(LocalDate.of(2025, 1, 15))
-                .paymentMethod(PaymentMethod.CARD).status(SubscriptionStatus.PAUSED).build();
+                .status(SubscriptionStatus.PAUSED).build();
         setupUser(u, List.of(paused));
 
         List<UpcomingNotification> result = notificationService.findUpcoming(1L, TODAY);

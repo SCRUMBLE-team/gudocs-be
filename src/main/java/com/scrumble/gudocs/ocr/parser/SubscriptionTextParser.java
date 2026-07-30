@@ -2,7 +2,6 @@ package com.scrumble.gudocs.ocr.parser;
 
 import com.scrumble.gudocs.ocr.dto.response.OcrSubscriptionResult;
 import com.scrumble.gudocs.subscriptions.entity.BillingCycle;
-import com.scrumble.gudocs.subscriptions.entity.PaymentMethod;
 import com.scrumble.gudocs.subscriptions.entity.SubscriptionCategory;
 
 import java.time.DateTimeException;
@@ -38,9 +37,8 @@ public final class SubscriptionTextParser {
         Long price = parsePrice(text);
         LocalDate firstBillingDate = parseDate(text, today);
         BillingCycle billingCycle = parseBillingCycle(text);
-        PaymentMethod paymentMethod = parsePaymentMethod(text);
 
-        return new OcrSubscriptionResult(serviceName, category, price, billingCycle, firstBillingDate, paymentMethod);
+        return new OcrSubscriptionResult(serviceName, category, price, billingCycle, firstBillingDate);
     }
 
     private static String guessServiceName(String text) {
@@ -87,12 +85,5 @@ public final class SubscriptionTextParser {
 
     private static BillingCycle parseBillingCycle(String text) {
         return YEARLY_KEYWORD_PATTERN.matcher(text).find() ? BillingCycle.YEARLY : BillingCycle.MONTHLY;
-    }
-
-    private static PaymentMethod parsePaymentMethod(String text) {
-        if (text.contains("간편결제")) return PaymentMethod.SIMPLE_PAY;
-        if (text.contains("계좌이체")) return PaymentMethod.BANK_TRANSFER;
-        if (text.contains("카드") || text.contains("일시불") || text.contains("할부")) return PaymentMethod.CARD;
-        return null;
     }
 }

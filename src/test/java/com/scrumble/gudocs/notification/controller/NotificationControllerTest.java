@@ -3,7 +3,6 @@ package com.scrumble.gudocs.notification.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionCreateRequest;
 import com.scrumble.gudocs.subscriptions.entity.BillingCycle;
-import com.scrumble.gudocs.subscriptions.entity.PaymentMethod;
 import com.scrumble.gudocs.subscriptions.entity.SubscriptionCategory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,7 +52,7 @@ class NotificationControllerTest {
     private void 구독_등록(String name, LocalDate firstBillingDate) throws Exception {
         SubscriptionCreateRequest req = new SubscriptionCreateRequest(
                 name, SubscriptionCategory.OTT, 17000L,
-                BillingCycle.MONTHLY, firstBillingDate, PaymentMethod.CARD);
+                BillingCycle.MONTHLY, firstBillingDate);
         mockMvc.perform(post("/api/subscriptions")
                 .session(session)
                 .contentType(MediaType.APPLICATION_JSON)
