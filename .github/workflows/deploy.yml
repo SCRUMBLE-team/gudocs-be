@@ -57,15 +57,26 @@ jobs:
           NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
           CLOVA_OCR_INVOKE_URL: ${{ secrets.CLOVA_OCR_INVOKE_URL }}
           CLOVA_OCR_SECRET_KEY: ${{ secrets.CLOVA_OCR_SECRET_KEY }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          envs: DB_PASSWORD,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,KAKAO_CLIENT_ID,KAKAO_CLIENT_SECRET,NAVER_CLIENT_ID,NAVER_CLIENT_SECRET,CLOVA_OCR_INVOKE_URL,CLOVA_OCR_SECRET_KEY
+          envs: DB_PASSWORD,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,KAKAO_CLIENT_ID,KAKAO_CLIENT_SECRET,NAVER_CLIENT_ID,NAVER_CLIENT_SECRET,CLOVA_OCR_INVOKE_URL,CLOVA_OCR_SECRET_KEY,FIREBASE_SERVICE_ACCOUNT
           script: |
             set -e
-            # /etc/gudocs/env 를 배포마다 시크릿에서 렌더링 (GitHub Secrets가 소스)
             sudo install -d -m 755 /etc/gudocs
+
+            # FCM: 서비스 계정 JSON 시크릿이 있을 때만 파일을 렌더링하고 FCM을 켠다.
+            # (파일 없이 FIREBASE_ENABLED=true면 크레덴셜 로드 실패로 앱이 기동하지 않음)
+            FIREBASE_ENABLED=false
+            if [ -n "${FIREBASE_SERVICE_ACCOUNT}" ]; then
+              printf '%s' "${FIREBASE_SERVICE_ACCOUNT}" | sudo tee /etc/gudocs/firebase-service-account.json > /dev/null
+              sudo chmod 600 /etc/gudocs/firebase-service-account.json
+              FIREBASE_ENABLED=true
+            fi
+
+            # /etc/gudocs/env 를 배포마다 시크릿에서 렌더링 (GitHub Secrets가 소스)
             sudo tee /etc/gudocs/env > /dev/null <<EOF
             DB_URL=jdbc:mysql://127.0.0.1:3306/gudocs
             DB_USER=gudocs
@@ -83,6 +94,10 @@ jobs:
             OAUTH_REDIRECT_BASE=https://gudocs-fe-v2.vercel.app
             CLOVA_OCR_INVOKE_URL=${CLOVA_OCR_INVOKE_URL}
             CLOVA_OCR_SECRET_KEY=${CLOVA_OCR_SECRET_KEY}
+            FIREBASE_ENABLED=${FIREBASE_ENABLED}
+            GOOGLE_APPLICATION_CREDENTIALS=/etc/gudocs/firebase-service-account.json
+            FRONTEND_BASE_URL=https://gudocs-fe-v2.vercel.app
+            FCM_NOTIFICATION_CRON=0 0 9 * * *
             EOF
             sudo chmod 600 /etc/gudocs/env
             sudo mv /tmp/app.jar /opt/gudocs/app.jar

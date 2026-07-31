@@ -181,8 +181,9 @@ enum:
 ### CI/CD
 
 - **`ci.yml`** — PR(main/develop) + develop push → `gradlew test` + build
-- **`deploy.yml`** — main push 또는 수동 → 빌드 → SCP → `systemctl restart gudocs`
-- **GitHub Secrets**: `EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY`
+- **`deploy.yml`** — main push 또는 수동 → 빌드 → SCP → `/etc/gudocs/env` 렌더링 → `systemctl restart gudocs`
+  - FCM: `FIREBASE_SERVICE_ACCOUNT`(서비스 계정 JSON 전체) 시크릿이 있으면 `/etc/gudocs/firebase-service-account.json`으로 렌더링하고 `FIREBASE_ENABLED=true`로 켠다. 시크릿이 없으면 `false`(파일 없이 켜면 기동 실패하므로 안전 가드)
+- **GitHub Secrets**: `EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY`, `FIREBASE_SERVICE_ACCOUNT`(선택 — 미설정 시 FCM 비활성)
 
 설정만 바꿀 때: EC2에서 `/etc/gudocs/env` 수정 → `sudo systemctl restart gudocs` (재배포 불필요)
 로그: `sudo journalctl -u gudocs -f`
