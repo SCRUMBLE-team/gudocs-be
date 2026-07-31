@@ -1,0 +1,63 @@
+package com.scrumble.gudocs.notification.push;
+
+import com.google.firebase.messaging.FirebaseMessaging;
+import com.google.firebase.messaging.FirebaseMessagingException;
+import com.google.firebase.messaging.Message;
+import com.google.firebase.messaging.MessagingErrorCode;
+import com.google.firebase.messaging.Notification;
+import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Component;
+
+/**
+ * Firebase Admin SDK 기반 실제 FCM 발송기. app.firebase.enabled=true 일 때만 활성화된다.
+ */
+@Component
+@ConditionalOnProperty(prefix = "app.firebase", name = "enabled", havingValue = "true")
+@RequiredArgsConstructor
+public class FcmPushSender implements PushSender {
+
+    private static final Logger log = LoggerFactory.getLogger(FcmPushSender.class);
+
+    private final FirebaseMessaging firebaseMessaging;
+
+    @Override
+    public PushResult send(String fid, PushMessage message) {
+        // FID 발송은 setFid 사용 (setToken은 legacy registration token용으로 deprecated)
+        Message fcmMessage = Message.builder()
+                .setFid(fid)
+                .setNotification(Notification.builder()
+                        .setTitle(message.title())
+                        .setBody(message.body())
+                        .build())
+                .putAllData(message.data())
+                .build();
+        try {
+            firebaseMessaging.send(fcmMessage);
+            return PushResult.SUCCESS;
+        } catch (FirebaseMessagingException e) {
+            if (isInvalidToken(e.getMessagingErrorCode())) {
+                log.info("무효 FID 발송 실패 (비활성화 대상) fid={} code={}", mask(fid), e.getMessagingErrorCode());
+                return PushResult.INVALID_TOKEN;
+            }
+            log.warn("FCM 발송 실패 fid={} code={}", mask(fid), e.getMessagingErrorCode());
+            return PushResult.FAILED;
+        }
+    }
+
+    private boolean isInvalidToken(MessagingErrorCode code) {
+        // UNREGISTERED만 확실한 무효 FID 신호로 취급한다.
+        // INVALID_ARGUMENT는 잘못된 title/body/data 등 payload 검증 오류로도 발생하는 광범위 코드라,
+        // 이를 무효 FID로 오인해 등록을 영구 비활성화하면 정상 기기가 잘못 꺼질 수 있다 → FAILED로 처리.
+        return code == MessagingErrorCode.UNREGISTERED;
+    }
+
+    private String mask(String fid) {
+        if (fid == null || fid.length() <= 6) {
+            return "***";
+        }
+        return fid.substring(0, 6) + "***";
+    }
+}
