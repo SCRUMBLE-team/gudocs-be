@@ -6,10 +6,6 @@ package com.scrumble.gudocs.notification.push;
  */
 public interface PushSender {
 
-    /**
-     * @param fid     대상 기기의 Firebase Installation ID (FE가 등록한 값)
-     * @param message 알림 페이로드
-     * @return 발송 결과
-     */
+    /** fid는 대상 기기의 Firebase Installation ID. */
     PushResult send(String fid, PushMessage message);
 }
