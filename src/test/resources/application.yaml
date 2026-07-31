@@ -36,3 +36,7 @@ app:
     clova:
       invoke-url: http://localhost/test-clova-ocr
       secret-key: test-secret-key
+  firebase:
+    enabled: false
+    frontend-base-url: https://gudocs-fe-v2.vercel.app
+    notification-cron: 0 0 9 * * *

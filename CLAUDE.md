@@ -33,25 +33,22 @@
 
 ```text
 config/
-  SecurityConfig.java         # BCrypt, CORS(5173), 세션 인증
+  SecurityConfig.java         # OAuth2 로그인, CORS(5173), 세션 인증
   LocalSecurityConfig.java    # @Profile("local") — H2 콘솔 허용
   DataInitializer.java        # @Profile("local") — 앱 시작 시 mock data 삽입
 
 auth/
-  controller/AuthController.java
-  service/AuthService.java       # UserDetailsService 구현
-  dto/LoginRequest, SignupRequest, UserResponse
+  oauth/                         # CustomOAuth2UserService, CustomOAuth2User(UserPrincipal), 로그인 성공/실패 핸들러
+  controller/AuthController.java # 로그아웃, 내 정보(GET /api/auth/me)
 
 users/
-  entity/User.java               # id, name, email, password_hash
+  entity/User.java               # id, name, email
   repository/UserRepository.java # findByEmail, existsByEmail
   controller/UserController.java # 마이페이지 사용자 정보 조회/수정/탈퇴
   service/UserService.java
   dto/
     UserInfoResponse.java
     UserNameUpdateRequest.java
-    UserPasswordUpdateRequest.java
-    UserDeleteRequest.java
 
 subscriptions/
   entity/
@@ -67,10 +64,15 @@ subscriptions/
   util/NextBillingDateCalculator.java     # 다음 결제일 계산 단일 소스
   dto/response/SubscriptionResponse.java  # nextBillingDate 포함
 
-notification/
-  controller/NotificationController.java  # GET /api/notifications/upcoming
-  service/NotificationService.java        # 7일 이내 ACTIVE 구독 알림
-  dto/response/UpcomingNotification.java
+notification/                             # FCM Web Push
+  entity/                                 # PushRegistration, UserNotification, PushPlatform, NotificationType
+  repository/                             # PushRegistrationRepository, UserNotificationRepository
+  controller/PushRegistrationController.java  # POST/DELETE /api/push-registrations
+  service/PushRegistrationService.java    # FID 등록(upsert)/해제(enabled=false)
+  service/NotificationDispatchService.java # 결제 예정 알림 탐색→중복확인→FCM 발송
+  scheduler/NotificationScheduler.java    # cron 배치 (FIREBASE_ENABLED=true일 때만)
+  push/                                   # PushSender + FcmPushSender / NoopPushSender
+  util/BillingReminderCalculator.java     # 7일 이내 결제 대상 탐색 (NextBillingDateCalculator 재사용)
 
 global/
   entity/BaseEntity.java         # created_at, updated_at (JPA Auditing)
@@ -86,27 +88,26 @@ global/
 
 | 메서드    | 경로                               | 인증  | 설명                    |
 | ------ | -------------------------------- | --- | --------------------- |
-| POST   | `/api/auth/signup`               | 불필요 | 회원가입                  |
-| POST   | `/api/auth/login`                | 불필요 | 로그인                   |
+| GET    | `/oauth2/authorization/{provider}` | 불필요 | 소셜 로그인 (google/kakao/naver) |
 | POST   | `/api/auth/logout`               | 필요  | 로그아웃                  |
 | GET    | `/api/auth/me`                   | 필요  | 내 정보                  |
 | GET    | `/api/users/me`                  | 필요  | 마이페이지 내 정보 조회         |
 | PUT    | `/api/users/me/name`             | 필요  | 이름 수정                 |
-| PUT    | `/api/users/me/password`         | 필요  | 비밀번호 수정               |
 | DELETE | `/api/users/me`                  | 필요  | 회원 탈퇴                 |
 | GET    | `/api/subscriptions`             | 필요  | 구독 목록 조회              |
 | POST   | `/api/subscriptions`             | 필요  | 구독 등록                 |
 | PUT    | `/api/subscriptions/{id}`        | 필요  | 구독 수정                 |
 | DELETE | `/api/subscriptions/{id}`        | 필요  | 구독 삭제                 |
 | PUT    | `/api/subscriptions/{id}/status` | 필요  | 상태 변경 (ACTIVE/PAUSED) |
-| GET    | `/api/notifications/upcoming`    | 필요  | 다가오는 결제 알림 (7일 이내)   |
+| POST   | `/api/push-registrations`        | 필요  | FCM 기기 등록 (upsert)    |
+| DELETE | `/api/push-registrations/{id}`   | 필요  | 등록 해제 (enabled=false) |
 
 ---
 
 ## MyPage / User API 요구사항
 
 마이페이지 기능은 인증 도메인이 아니라 `users` 도메인에서 구현한다.
-회원가입, 로그인, 로그아웃은 `auth` 도메인에 속하고, 마이페이지의 사용자 정보 조회/수정/탈퇴는 `users` 도메인에 속한다.
+소셜 로그인, 로그아웃, 내 정보 조회는 `auth` 도메인에 속하고, 마이페이지의 이름 수정/탈퇴는 `users` 도메인에 속한다.
 
 ### 구현 대상 API
 
@@ -114,7 +115,6 @@ global/
 | ------- | ------ | ------------------------ |
 | 내 정보 조회 | GET    | `/api/users/me`          |
 | 이름 수정   | PUT    | `/api/users/me/name`     |
-| 비밀번호 수정 | PUT    | `/api/users/me/password` |
 | 회원 탈퇴   | DELETE | `/api/users/me`          |
 
 ### 공통 요구사항
@@ -122,8 +122,8 @@ global/
 * 모든 MyPage/User API는 로그인 세션 쿠키가 필요하다.
 * 현재 로그인한 사용자 기준으로만 처리한다.
 * 현재 로그인한 사용자 조회 방식은 기존 `auth` 구현 방식을 따른다.
-* Controller에서는 기존 방식처럼 `@AuthenticationPrincipal UserDetails userDetails`를 사용한다.
-* `userDetails.getUsername()`으로 이메일을 얻고, `UserRepository.findByEmail()`로 사용자 엔티티를 조회한다.
+* Controller에서는 `@CurrentUserId Long userId`로 현재 사용자 id를 주입받는다.
+* 주입받은 `userId`로 `UserRepository.findById()`를 통해 사용자 엔티티를 조회한다.
 * 기존 `ApiResponse`, `BusinessException`, `ErrorCode`, `GlobalExceptionHandler` 구조를 따른다.
 * 기존 인증 구조, SecurityConfig, 세션 구조를 임의로 변경하지 않는다.
 * DTO는 기존 프로젝트 스타일에 맞춰 Java `record`를 우선 사용한다.
@@ -208,57 +208,7 @@ PUT /api/users/me/name
 
 ---
 
-### 3. 비밀번호 수정 API
-
-```http
-PUT /api/users/me/password
-```
-
-#### Request
-
-로그인 세션 쿠키가 필요하다.
-비밀번호 수정 시에는 현재 비밀번호와 새 비밀번호를 모두 입력받는다.
-
-```json
-{
-  "currentPassword": "Test1234!",
-  "newPassword": "NewTest1234!"
-}
-```
-
-#### Response
-
-```json
-{
-  "success": true,
-  "message": "비밀번호가 수정되었습니다.",
-  "data": null
-}
-```
-
-#### Validation
-
-* 현재 비밀번호가 누락되면 `400 Bad Request`
-* 새 비밀번호가 누락되면 `400 Bad Request`
-* 새 비밀번호가 비밀번호 정책에 맞지 않으면 `400 Bad Request`
-* 현재 비밀번호가 일치하지 않으면 `400 Bad Request`
-* 현재 비밀번호와 새 비밀번호가 같으면 `400 Bad Request`
-
-#### 구현 규칙
-
-* 현재 비밀번호 검증은 `PasswordEncoder.matches(currentPassword, user.getPassword())` 방식으로 처리한다.
-* 새 비밀번호는 `PasswordEncoder.encode(newPassword)`로 암호화하여 저장한다.
-* 비밀번호 변경 후에도 기존 세션을 유지할지, 로그아웃 처리할지는 기존 프로젝트 정책을 따른다.
-* 별도 정책이 없다면 비밀번호 변경 후 세션은 유지한다.
-
-#### Error
-
-* `401 Unauthorized`: 로그인 세션이 없거나 만료된 경우
-* `404 Not Found`: 사용자를 찾을 수 없는 경우
-
----
-
-### 4. 회원 탈퇴 API
+### 3. 회원 탈퇴 API
 
 ```http
 DELETE /api/users/me
@@ -267,13 +217,7 @@ DELETE /api/users/me
 #### Request
 
 로그인 세션 쿠키가 필요하다.
-회원 탈퇴 시 현재 비밀번호를 입력받아 본인 확인을 한다.
-
-```json
-{
-  "currentPassword": "Test1234!"
-}
-```
+소셜 로그인 전용이므로 별도 본인 확인 입력 없이 세션 인증만으로 처리한다. Request body는 없다.
 
 #### Response
 
@@ -285,16 +229,10 @@ DELETE /api/users/me
 }
 ```
 
-#### Validation
-
-* 현재 비밀번호가 누락되면 `400 Bad Request`
-* 현재 비밀번호가 일치하지 않으면 `400 Bad Request`
-
 #### 구현 규칙
 
-* 현재 비밀번호가 일치하는 경우에만 회원 탈퇴를 처리한다.
-* 회원 탈퇴 시 해당 사용자의 구독 정보도 함께 삭제한다.
-* 구독 정보를 먼저 삭제한 뒤 사용자 정보를 삭제한다.
+* 회원 탈퇴 시 해당 사용자의 구독 정보, 소셜 계정, 푸시 등록/알림 이력도 함께 삭제한다.
+* FK 참조 데이터를 먼저 삭제한 뒤 사용자 정보를 삭제한다.
 * 회원 탈퇴 완료 후 현재 세션을 무효화한다.
 * `SubscriptionRepository`에 사용자 기준 삭제 메서드를 추가할 수 있다.
 
@@ -316,8 +254,6 @@ DELETE /api/users/me
 
 ```text
 USER_NOT_FOUND
-INVALID_PASSWORD
-SAME_AS_OLD_PASSWORD
 ```
 
 단, 이미 동일 의미의 ErrorCode가 존재한다면 새로 만들지 말고 기존 코드를 재사용한다.
@@ -327,8 +263,6 @@ SAME_AS_OLD_PASSWORD
 | ErrorCode            | Status          | Message                   |
 | -------------------- | --------------- | ------------------------- |
 | USER_NOT_FOUND       | 404 Not Found   | 사용자를 찾을 수 없습니다.           |
-| INVALID_PASSWORD     | 400 Bad Request | 현재 비밀번호가 일치하지 않습니다.       |
-| SAME_AS_OLD_PASSWORD | 400 Bad Request | 새 비밀번호는 현재 비밀번호와 달라야 합니다. |
 
 ---
 
@@ -342,7 +276,7 @@ SAME_AS_OLD_PASSWORD
 
 **local 프로파일 mock 계정**
 
-* email: `test@test.com` / password: `Test1234!`
+* mock 사용자(email: `test@test.com`) 및 소셜 계정 자동 삽입
 * 구독 8개 자동 삽입 (Netflix, YouTube Premium, Spotify, iCloud+, Google One, ChatGPT Plus, Adobe CC, 인프런)
 
 ---
@@ -368,10 +302,8 @@ SAME_AS_OLD_PASSWORD
 
 ## 절대 하지 말 것
 
-* secrets(DB 비밀번호, JWT Secret 등) 코드 또는 응답에 노출
+* secrets(DB 비밀번호, OAuth Client Secret 등) 코드 또는 응답에 노출
 * `application.yaml` 내용을 응답에 직접 포함
 * 기존 인증 구조, SecurityConfig, 세션 정책을 임의로 변경
-* 비밀번호를 평문으로 저장
-* 비밀번호를 응답 데이터에 포함
 * 다른 사용자의 정보를 조회, 수정, 삭제할 수 있는 API 구현
 * 회원 탈퇴 시 구독 정보가 남도록 구현

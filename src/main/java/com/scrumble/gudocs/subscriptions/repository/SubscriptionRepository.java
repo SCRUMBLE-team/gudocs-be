@@ -19,6 +19,12 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
     @Query("SELECT s FROM Subscription s WHERE s.user = :user ORDER BY s.createdAt DESC")
     List<Subscription> findAllByUserIncludingDeleted(@Param("user") User user);
 
+    // 결제 예정 알림 배치용: 삭제되지 않은 ACTIVE 구독. user를 함께 로딩해 배치에서 지연 로딩 없이 사용.
+    // (다음 결제일은 앵커+주기로 계산되어 SQL로 표현 불가하므로 여기서는 상태/삭제 조건만 필터링)
+    @Query("SELECT s FROM Subscription s JOIN FETCH s.user " +
+            "WHERE s.deletedAt IS NULL AND s.status = com.scrumble.gudocs.subscriptions.entity.SubscriptionStatus.ACTIVE")
+    List<Subscription> findActiveForBillingReminder();
+
     boolean existsByUserAndServiceNameIgnoreCaseAndDeletedAtIsNull(User user, String serviceName);
 
     @Modifying
