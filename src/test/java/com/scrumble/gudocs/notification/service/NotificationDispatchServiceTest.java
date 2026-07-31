@@ -23,7 +23,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -81,9 +83,9 @@ class NotificationDispatchServiceTest {
     private void givenOneDueSubscriptionNotYetSent() {
         given(subscriptionRepository.findActiveForBillingReminder())
                 .willReturn(List.of(dueSubscription()));
-        given(userNotificationRepository.existsByUserIdAndSubscriptionIdAndTypeAndTargetDate(
+        given(userNotificationRepository.findByUserIdAndSubscriptionIdAndTypeAndTargetDate(
                 eq(USER_ID), eq(SUB_ID), eq(NotificationType.BILLING_REMINDER), any()))
-                .willReturn(false);
+                .willReturn(Optional.empty());
         given(userNotificationRepository.saveAndFlush(any(UserNotification.class)))
                 .willAnswer(inv -> inv.getArgument(0));
     }
@@ -132,17 +134,43 @@ class NotificationDispatchServiceTest {
     }
 
     @Test
-    void 이미_발송한_결제예정일은_건너뜀() {
+    void 이미_발송_성공한_결제예정일은_건너뜀() {
+        UserNotification alreadySent = UserNotification.builder()
+                .userId(USER_ID).subscriptionId(SUB_ID).type(NotificationType.BILLING_REMINDER)
+                .title("t").body("b").targetDate(TODAY).build();
+        alreadySent.markSent(LocalDateTime.of(2026, 5, 10, 9, 0)); // sentAt != null
         given(subscriptionRepository.findActiveForBillingReminder())
                 .willReturn(List.of(dueSubscription()));
-        given(userNotificationRepository.existsByUserIdAndSubscriptionIdAndTypeAndTargetDate(
+        given(userNotificationRepository.findByUserIdAndSubscriptionIdAndTypeAndTargetDate(
                 eq(USER_ID), eq(SUB_ID), eq(NotificationType.BILLING_REMINDER), any()))
-                .willReturn(true);
+                .willReturn(Optional.of(alreadySent));
 
         dispatchService.dispatchDueReminders(TODAY);
 
         verify(userNotificationRepository, never()).saveAndFlush(any());
         verify(pushSender, never()).send(anyString(), any());
         verify(pushRegistrationRepository, never()).findByUserIdAndEnabledTrue(anyLong());
+    }
+
+    @Test
+    void 미발송_이력이_있으면_기존_행을_재사용해_재발송() {
+        UserNotification pending = UserNotification.builder()
+                .userId(USER_ID).subscriptionId(SUB_ID).type(NotificationType.BILLING_REMINDER)
+                .title("t").body("b").targetDate(TODAY).build(); // sentAt == null
+        given(subscriptionRepository.findActiveForBillingReminder())
+                .willReturn(List.of(dueSubscription()));
+        given(userNotificationRepository.findByUserIdAndSubscriptionIdAndTypeAndTargetDate(
+                eq(USER_ID), eq(SUB_ID), eq(NotificationType.BILLING_REMINDER), any()))
+                .willReturn(Optional.of(pending));
+        given(pushRegistrationRepository.findByUserIdAndEnabledTrue(USER_ID))
+                .willReturn(List.of(registration(1L, "fid-A")));
+        given(pushSender.send(anyString(), any(PushMessage.class))).willReturn(PushResult.SUCCESS);
+
+        dispatchService.dispatchDueReminders(TODAY);
+
+        // 새로 만들지 않고(saveAndFlush 미호출) 기존 행 재사용, 재발송 후 sentAt 기록(save)
+        verify(userNotificationRepository, never()).saveAndFlush(any());
+        verify(pushSender).send(eq("fid-A"), any(PushMessage.class));
+        verify(userNotificationRepository).save(pending);
     }
 }

@@ -54,21 +54,27 @@ public class NotificationDispatchService {
         List<DueBilling> dueList = BillingReminderCalculator.findDue(active, today, WINDOW_DAYS);
 
         for (DueBilling due : dueList) {
-            recordIfAbsent(due).ifPresent(notification -> sendToUserDevices(due, notification));
+            resolvePendingNotification(due).ifPresent(notification -> sendToUserDevices(due, notification));
         }
     }
 
     /**
-     * 중복 방지: 이미 같은 (user, subscription, type, targetDate) 이력이 있으면 건너뛴다.
-     * 다중 서버 경합 시에도 UNIQUE 제약 위반을 캐치해 한 번만 기록되도록 한다.
+     * 발송이 필요한 알림 이력을 준비한다.
+     * <ul>
+     *   <li>이미 발송 성공한 이력(sentAt != null)이면 건너뛴다 → 중복 발송 방지.</li>
+     *   <li>이력은 있으나 아직 발송 성공 전(sentAt == null)이면 그 행을 재사용해 재발송한다
+     *       (활성 FID가 없었거나 일시 장애로 실패한 경우 다음 스케줄에 재시도).</li>
+     *   <li>이력이 없으면 새로 기록한다. 다중 서버 경합 시 UNIQUE 제약 위반을 캐치해 한 번만 기록한다.</li>
+     * </ul>
      */
-    private Optional<UserNotification> recordIfAbsent(DueBilling due) {
+    private Optional<UserNotification> resolvePendingNotification(DueBilling due) {
         Long userId = due.subscription().getUser().getId();
         Long subscriptionId = due.subscription().getId();
 
-        if (userNotificationRepository.existsByUserIdAndSubscriptionIdAndTypeAndTargetDate(
-                userId, subscriptionId, NotificationType.BILLING_REMINDER, due.targetDate())) {
-            return Optional.empty();
+        Optional<UserNotification> existing = findExisting(userId, subscriptionId, due.targetDate());
+        if (existing.isPresent()) {
+            // 이미 발송 성공했으면 skip, 아직이면 재사용해 재발송
+            return existing.filter(n -> n.getSentAt() == null);
         }
 
         UserNotification notification = UserNotification.builder()
@@ -82,9 +88,15 @@ public class NotificationDispatchService {
         try {
             return Optional.of(userNotificationRepository.saveAndFlush(notification));
         } catch (DataIntegrityViolationException e) {
-            // 다른 인스턴스가 먼저 기록함 → 이번 실행에서는 발송하지 않음
-            return Optional.empty();
+            // 다른 인스턴스가 먼저 기록함 → 다시 읽어 미발송(sentAt == null)이면 재사용
+            return findExisting(userId, subscriptionId, due.targetDate())
+                    .filter(n -> n.getSentAt() == null);
         }
+    }
+
+    private Optional<UserNotification> findExisting(Long userId, Long subscriptionId, LocalDate targetDate) {
+        return userNotificationRepository.findByUserIdAndSubscriptionIdAndTypeAndTargetDate(
+                userId, subscriptionId, NotificationType.BILLING_REMINDER, targetDate);
     }
 
     /**
