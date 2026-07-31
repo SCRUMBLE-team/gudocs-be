@@ -49,7 +49,10 @@ public class FcmPushSender implements PushSender {
     }
 
     private boolean isInvalidToken(MessagingErrorCode code) {
-        return code == MessagingErrorCode.UNREGISTERED || code == MessagingErrorCode.INVALID_ARGUMENT;
+        // UNREGISTERED만 확실한 무효 FID 신호로 취급한다.
+        // INVALID_ARGUMENT는 잘못된 title/body/data 등 payload 검증 오류로도 발생하는 광범위 코드라,
+        // 이를 무효 FID로 오인해 등록을 영구 비활성화하면 정상 기기가 잘못 꺼질 수 있다 → FAILED로 처리.
+        return code == MessagingErrorCode.UNREGISTERED;
     }
 
     /** fid 전체 값을 로그에 남기지 않는다. */

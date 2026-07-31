@@ -67,6 +67,15 @@ class FcmPushSenderTest {
         assertThat(sender.send("fid-123456789", message)).isEqualTo(PushResult.FAILED);
     }
 
+    @Test
+    void INVALID_ARGUMENT는_무효FID가_아니라_FAILED로_처리() throws Exception {
+        // payload 검증 오류 등 광범위 코드 → 등록을 비활성화하면 안 됨
+        FirebaseMessagingException ex = mock(MessagingErrorCode.INVALID_ARGUMENT);
+        given(firebaseMessaging.send(any(Message.class))).willThrow(ex);
+
+        assertThat(sender.send("fid-123456789", message)).isEqualTo(PushResult.FAILED);
+    }
+
     private FirebaseMessagingException mock(MessagingErrorCode code) {
         FirebaseMessagingException ex = org.mockito.Mockito.mock(FirebaseMessagingException.class);
         given(ex.getMessagingErrorCode()).willReturn(code);
