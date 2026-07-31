@@ -73,6 +73,8 @@ jobs:
             FIREBASE_ENABLED=false
             if [ -n "${FIREBASE_SERVICE_ACCOUNT_JSON_BASE64}" ]; then
               printf '%s' "${FIREBASE_SERVICE_ACCOUNT_JSON_BASE64}" | base64 -d | sudo tee /etc/gudocs/firebase-service-account.json > /dev/null
+              # 서비스는 ubuntu 사용자로 실행되므로 크레덴셜 파일 소유자도 ubuntu여야 읽을 수 있다.
+              sudo chown ubuntu:ubuntu /etc/gudocs/firebase-service-account.json
               sudo chmod 600 /etc/gudocs/firebase-service-account.json
               FIREBASE_ENABLED=true
             fi
