@@ -84,8 +84,8 @@ enum:
 | PUT | `/api/subscriptions/{id}/status` | ○ |
 | GET | `/api/subscriptions/expenses/{monthly,categories,trends,monthly/details}` | ○ |
 | GET | `/api/dashboard` | ○ |
-| POST | `/api/push-registrations` | ○ | (FCM 기기 등록 upsert)
-| DELETE | `/api/push-registrations/{registrationId}` | ○ | (등록 해제 = enabled false, 멱등)
+| POST | `/api/push-registrations` (FCM 기기 등록 upsert) | ○ |
+| DELETE | `/api/push-registrations/{registrationId}` (등록 해제 = enabled false, 멱등) | ○ |
 | POST | `/api/ocr/subscriptions/scan` | ○ |
 
 계층: Controller → Service → Repository

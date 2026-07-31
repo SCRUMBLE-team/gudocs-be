@@ -71,6 +71,15 @@ class PushRegistrationControllerTest {
     }
 
     @Test
+    void fid가_255자_초과면_400() throws Exception {
+        mockMvc.perform(post("/api/push-registrations")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body("a".repeat(256))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void 미인증_요청_401() throws Exception {
         mockMvc.perform(post("/api/push-registrations")
                         .contentType(MediaType.APPLICATION_JSON)
