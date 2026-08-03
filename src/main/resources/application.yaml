@@ -88,3 +88,5 @@ app:
     frontend-base-url: ${FRONTEND_BASE_URL:https://gudocs-fe-v2.vercel.app}
     # 결제 예정 알림 스케줄러 cron (Asia/Seoul). 기본: 매일 09:00
     notification-cron: ${FCM_NOTIFICATION_CRON:0 0 9 * * *}
+    # 구독 검사 유도 알림 스케줄러 cron (Asia/Seoul). 기본: 매일 09:10
+    review-cron: ${FCM_REVIEW_CRON:0 10 9 * * *}

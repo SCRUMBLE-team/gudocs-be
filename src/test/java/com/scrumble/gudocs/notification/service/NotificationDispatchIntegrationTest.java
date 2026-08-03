@@ -5,6 +5,7 @@ import com.scrumble.gudocs.notification.entity.PushPlatform;
 import com.scrumble.gudocs.notification.entity.PushRegistration;
 import com.scrumble.gudocs.notification.push.PushMessage;
 import com.scrumble.gudocs.notification.push.PushResult;
+import com.scrumble.gudocs.notification.entity.UserNotification;
 import com.scrumble.gudocs.notification.push.PushSender;
 import com.scrumble.gudocs.notification.repository.UserNotificationRepository;
 import com.scrumble.gudocs.subscriptions.entity.BillingCycle;
@@ -85,11 +86,11 @@ class NotificationDispatchIntegrationTest {
     }
 
     @Test
-    void 활성_미삭제_7일이내_구독만_대상이며_활성_FID에만_발송() {
-        saveSub("Netflix-due", SubscriptionStatus.ACTIVE, TODAY, false);          // 대상 O
+    void 활성_미삭제_당일_구독만_대상이며_활성_FID에만_발송() {
+        saveSub("Netflix-due", SubscriptionStatus.ACTIVE, TODAY, false);          // 당일(D-0) 대상 O
         saveSub("Paused-due", SubscriptionStatus.PAUSED, TODAY, false);           // PAUSED 제외
         saveSub("Deleted-due", SubscriptionStatus.ACTIVE, TODAY, true);           // 삭제 제외
-        saveSub("Later", SubscriptionStatus.ACTIVE, TODAY.plusDays(10), false);   // 7일 밖 제외
+        saveSub("Later", SubscriptionStatus.ACTIVE, TODAY.plusDays(10), false);   // D-10 제외
         saveRegistration("fid-enabled", true);
         saveRegistration("fid-disabled", false);
 
@@ -100,6 +101,50 @@ class NotificationDispatchIntegrationTest {
         // 활성 FID에만 발송
         verify(pushSender, times(1)).send(anyString(), any(PushMessage.class));
         verify(pushSender).send(org.mockito.ArgumentMatchers.eq("fid-enabled"), any(PushMessage.class));
+    }
+
+    @Test
+    void D3_구독은_대상이고_D7은_제외() {
+        saveSub("Netflix-D3", SubscriptionStatus.ACTIVE, TODAY.plusDays(3), false); // D-3 대상 O
+        saveSub("Spotify-D7", SubscriptionStatus.ACTIVE, TODAY.plusDays(7), false); // D-7 제외
+        saveRegistration("fid-enabled", true);
+
+        dispatchService.dispatchDueReminders(TODAY);
+
+        assertThat(userNotificationRepository.count()).isEqualTo(1);
+        UserNotification saved = userNotificationRepository.findAll().get(0);
+        assertThat(saved.getRemindOffset()).isEqualTo(3);
+        assertThat(saved.getSubscriptionId()).isNull(); // 묶음 알림 → 특정 구독 없음
+        verify(pushSender, times(1)).send(anyString(), any(PushMessage.class));
+    }
+
+    @Test
+    void 같은_결제일_여러_구독은_한건으로_묶여_발송() {
+        saveSub("Netflix", SubscriptionStatus.ACTIVE, TODAY, false);
+        saveSub("Spotify", SubscriptionStatus.ACTIVE, TODAY, false);
+        saveSub("YouTube", SubscriptionStatus.ACTIVE, TODAY, false);
+        saveRegistration("fid-enabled", true);
+
+        dispatchService.dispatchDueReminders(TODAY);
+
+        // 3개 구독이 같은 결제일 → 알림 1건, 발송 1회
+        assertThat(userNotificationRepository.count()).isEqualTo(1);
+        UserNotification saved = userNotificationRepository.findAll().get(0);
+        assertThat(saved.getBody()).contains("3건");
+        verify(pushSender, times(1)).send(anyString(), any(PushMessage.class));
+    }
+
+    @Test
+    void 결제일이_다르면_각각_별도_알림() {
+        saveSub("Netflix-today", SubscriptionStatus.ACTIVE, TODAY, false);          // D-0
+        saveSub("Spotify-D3", SubscriptionStatus.ACTIVE, TODAY.plusDays(3), false); // D-3
+        saveRegistration("fid-enabled", true);
+
+        dispatchService.dispatchDueReminders(TODAY);
+
+        // 결제일이 다르므로 묶이지 않고 2건
+        assertThat(userNotificationRepository.count()).isEqualTo(2);
+        verify(pushSender, times(2)).send(anyString(), any(PushMessage.class));
     }
 
     @Test

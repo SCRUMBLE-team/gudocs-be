@@ -30,6 +30,7 @@ ssh <USER>@<EC2_HOST> "mysql -u gudocs -p gudocs" < deploy/migrations/<파일>.s
 | 버전 | 설명 | 대상 | 운영 적용일 | 상태 |
 |------|------|------|-------------|------|
 | V20260730 | subscriptions.payment_method 컬럼 제거 (결제수단 기능 폐지) | 운영 MySQL | 2026-07-30 | ✅ 적용 완료 |
+| V20260804 | user_notifications dedup 키를 유저 단위로 재편 (subscription_id nullable, remind_offset 추가, UNIQUE 재정의) | 운영 MySQL | — | ⏳ 미적용 |
 
 > 새 마이그레이션을 추가하면 위 표에 한 줄 기록하고, 운영 적용 후 상태/일자를 채운다.
 

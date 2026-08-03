@@ -1,6 +1,7 @@
 package com.scrumble.gudocs.notification.scheduler;
 
 import com.scrumble.gudocs.notification.service.NotificationDispatchService;
+import com.scrumble.gudocs.notification.service.SubscriptionReviewDispatchService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,6 +25,7 @@ public class NotificationScheduler {
     private static final ZoneId ZONE = ZoneId.of("Asia/Seoul");
 
     private final NotificationDispatchService dispatchService;
+    private final SubscriptionReviewDispatchService reviewDispatchService;
 
     @Scheduled(cron = "${app.firebase.notification-cron}", zone = "Asia/Seoul")
     public void dispatchBillingReminders() {
@@ -31,5 +33,13 @@ public class NotificationScheduler {
         log.info("결제 예정 알림 스케줄러 시작 today={}", today);
         dispatchService.dispatchDueReminders(today);
         log.info("결제 예정 알림 스케줄러 종료 today={}", today);
+    }
+
+    @Scheduled(cron = "${app.firebase.review-cron}", zone = "Asia/Seoul")
+    public void dispatchSubscriptionReviews() {
+        LocalDate today = LocalDate.now(ZONE);
+        log.info("구독 검사 유도 알림 스케줄러 시작 today={}", today);
+        reviewDispatchService.dispatchDueReviews(today);
+        log.info("구독 검사 유도 알림 스케줄러 종료 today={}", today);
     }
 }
