@@ -23,7 +23,7 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    void 처리되지_않은_예외는_500_ApiResponse로_변환된다() {
+    void 처리되지_않은_예외는_500_ApiResponse로_변환된다() throws Exception {
         GlobalExceptionHandler handler = new GlobalExceptionHandler();
 
         ResponseEntity<ApiResponse<Void>> response =

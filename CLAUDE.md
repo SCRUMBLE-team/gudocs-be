@@ -68,11 +68,16 @@ notification/                             # FCM Web Push
   entity/                                 # PushRegistration, UserNotification, PushPlatform, NotificationType
   repository/                             # PushRegistrationRepository, UserNotificationRepository
   controller/PushRegistrationController.java  # POST/DELETE /api/push-registrations
+  controller/PushTestController.java      # POST /api/push-registrations/test (진단용 즉시 발송)
   service/PushRegistrationService.java    # FID 등록(upsert)/해제(enabled=false)
-  service/NotificationDispatchService.java # 결제 예정 알림 탐색→중복확인→FCM 발송
-  scheduler/NotificationScheduler.java    # cron 배치 (FIREBASE_ENABLED=true일 때만)
+  service/PushTestService.java            # 진단용 테스트 푸시 발송(기기별 결과)
+  service/NotificationSender.java         # 공통 발송기 (draft→중복확인→FID별 FCM 발송→sent_at)
+  service/NotificationDraft.java          # 발송할 알림 1건(dedup 키+문구+data)
+  service/NotificationDispatchService.java # 결제 알림: D-3·당일 대상 선별 + 결제일 묶음 draft
+  service/SubscriptionReviewDispatchService.java # 검사 유도: 가입일 기준 2주/4주 주기 draft
+  scheduler/NotificationScheduler.java    # cron 배치 2개 (FIREBASE_ENABLED=true일 때만)
   push/                                   # PushSender + FcmPushSender / NoopPushSender
-  util/BillingReminderCalculator.java     # 7일 이내 결제 대상 탐색 (NextBillingDateCalculator 재사용)
+  util/BillingReminderCalculator.java     # D-3·당일 결제 대상 탐색 (NextBillingDateCalculator 재사용)
 
 global/
   entity/BaseEntity.java         # created_at, updated_at (JPA Auditing)
@@ -101,6 +106,7 @@ global/
 | PUT    | `/api/subscriptions/{id}/status` | 필요  | 상태 변경 (ACTIVE/PAUSED) |
 | POST   | `/api/push-registrations`        | 필요  | FCM 기기 등록 (upsert)    |
 | DELETE | `/api/push-registrations/{id}`   | 필요  | 등록 해제 (enabled=false) |
+| POST   | `/api/push-registrations/test`   | 필요  | 테스트 푸시 즉시 발송 (진단용) |
 
 ---
 

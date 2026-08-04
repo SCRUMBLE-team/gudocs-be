@@ -19,14 +19,6 @@ public class UserController implements UserApi {
     private final UserService userService;
 
     @Override
-    @GetMapping("/me")
-    public ResponseEntity<ApiResponse<UserInfoResponse>> getMyInfo(
-            @CurrentUserId Long userId) {
-        UserInfoResponse response = userService.getMyInfo(userId);
-        return ResponseEntity.ok(ApiResponse.success("내 정보 조회에 성공했습니다.", response));
-    }
-
-    @Override
     @PutMapping("/me/name")
     public ResponseEntity<ApiResponse<UserInfoResponse>> updateName(
             @CurrentUserId Long userId,

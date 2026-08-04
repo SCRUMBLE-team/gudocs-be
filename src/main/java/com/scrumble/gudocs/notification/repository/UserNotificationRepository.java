@@ -9,8 +9,8 @@ import java.util.Optional;
 
 public interface UserNotificationRepository extends JpaRepository<UserNotification, Long> {
 
-    Optional<UserNotification> findByUserIdAndSubscriptionIdAndTypeAndTargetDate(
-            Long userId, Long subscriptionId, NotificationType type, LocalDate targetDate);
+    Optional<UserNotification> findByUserIdAndTypeAndTargetDateAndRemindOffset(
+            Long userId, NotificationType type, LocalDate targetDate, int remindOffset);
 
     void deleteAllByUserId(Long userId);
 }

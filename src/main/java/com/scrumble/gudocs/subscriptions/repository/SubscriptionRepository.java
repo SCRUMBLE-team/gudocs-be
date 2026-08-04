@@ -25,6 +25,12 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
             "WHERE s.deletedAt IS NULL AND s.status = com.scrumble.gudocs.subscriptions.entity.SubscriptionStatus.ACTIVE")
     List<Subscription> findActiveForBillingReminder();
 
+    // 검사 유도 배치용: 지정한 유저들의 삭제되지 않은 ACTIVE 구독만 조회(대상=활성 기기 보유 유저로 한정해 불필요한 적재 방지).
+    @Query("SELECT s FROM Subscription s JOIN FETCH s.user " +
+            "WHERE s.deletedAt IS NULL AND s.status = com.scrumble.gudocs.subscriptions.entity.SubscriptionStatus.ACTIVE " +
+            "AND s.user.id IN :userIds")
+    List<Subscription> findActiveByUserIds(@Param("userIds") List<Long> userIds);
+
     boolean existsByUserAndServiceNameIgnoreCaseAndDeletedAtIsNull(User user, String serviceName);
 
     @Modifying

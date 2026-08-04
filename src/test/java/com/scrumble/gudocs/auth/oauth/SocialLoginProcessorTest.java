@@ -11,13 +11,11 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 
 import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
@@ -103,12 +101,22 @@ class SocialLoginProcessorTest {
     }
 
     @Test
-    void 이메일이_없으면_예외를_던진다() {
-        Map<String, Object> noEmail = Map.of("sub", "g-1", "email_verified", false, "name", "구글");
+    void 이메일_미동의로_email이_없어도_email_null로_가입한다() {
+        // 카카오 이메일 선택 동의 미동의 → kakao_account에 email 키 없음
+        Map<String, Object> noEmail = Map.of("id", 777L, "kakao_account", Map.of(
+                "profile", Map.of("nickname", "카카오")));
+        given(socialAccountRepository.findByProviderAndProviderId(SocialProvider.KAKAO, "777"))
+                .willReturn(Optional.empty());
+        given(userRepository.save(any(User.class)))
+                .willAnswer(inv -> User.builder().id(30L).email(inv.getArgument(0, User.class).getEmail()).build());
+        given(socialAccountRepository.save(any(SocialAccount.class)))
+                .willAnswer(inv -> inv.getArgument(0));
 
-        assertThatThrownBy(() -> socialLoginProcessor.login(SocialProvider.GOOGLE, noEmail))
-                .isInstanceOf(OAuth2AuthenticationException.class)
-                .hasMessageContaining("이메일 제공에 동의");
-        verify(userRepository, never()).save(any());
+        Long userId = socialLoginProcessor.login(SocialProvider.KAKAO, noEmail);
+
+        assertThat(userId).isEqualTo(30L);
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(userCaptor.capture());
+        assertThat(userCaptor.getValue().getEmail()).isNull();
     }
 }
