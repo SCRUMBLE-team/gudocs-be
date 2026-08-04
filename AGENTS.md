@@ -32,7 +32,7 @@ src/main/java/com/scrumble/gudocs/
 
 deploy/             # EC2 배포 리소스 (setup.sh, systemd, Caddyfile, mysql-init.sql)
   migrations/       # 스키마 마이그레이션 버전 파일 + 적용 이력 (README.md 참고)
-.github/workflows/  # ci.yml (PR 테스트), deploy.yml (main → EC2 배포)
+.github/workflows/  # ci.yml (PR 테스트), deploy.yml (develop → EC2 배포)
 ```
 
 ---
@@ -198,7 +198,7 @@ enum:
 ### CI/CD
 
 - **`ci.yml`** — PR(main/develop) + develop push → `gradlew test` + build
-- **`deploy.yml`** — main push 또는 수동 → 빌드 → SCP → `/etc/gudocs/env` 렌더링 → `systemctl restart gudocs`
+- **`deploy.yml`** — develop CI(`ci.yml`)가 **success로 완료**됐을 때(`workflow_run`) 또는 수동 → 빌드 → SCP → `/etc/gudocs/env` 렌더링 → `systemctl restart gudocs`. 즉 테스트 통과 후에만 배포되며, CI를 통과한 그 커밋(`workflow_run.head_sha`)을 체크아웃한다. (PR CI·실패 CI는 배포 안 함)
   - FCM: `FIREBASE_SERVICE_ACCOUNT_JSON_BASE64`(서비스 계정 JSON을 base64 인코딩) 시크릿이 있으면 디코드해 `/etc/gudocs/firebase-service-account.json`으로 렌더링하고 `FIREBASE_ENABLED=true`로 켠다. 시크릿이 없으면 `false`(파일 없이 켜면 기동 실패하므로 안전 가드). JSON은 멀티라인/특수문자가 많아 raw 대신 base64로 전달
 - **GitHub Secrets**: `EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY`, `FIREBASE_SERVICE_ACCOUNT_JSON_BASE64`(선택 — 미설정 시 FCM 비활성)
 
