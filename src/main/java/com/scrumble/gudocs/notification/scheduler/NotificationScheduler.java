@@ -31,15 +31,24 @@ public class NotificationScheduler {
     public void dispatchBillingReminders() {
         LocalDate today = LocalDate.now(ZONE);
         log.info("결제 예정 알림 스케줄러 시작 today={}", today);
-        dispatchService.dispatchDueReminders(today);
-        log.info("결제 예정 알림 스케줄러 종료 today={}", today);
+        try {
+            dispatchService.dispatchDueReminders(today);
+            log.info("결제 예정 알림 스케줄러 종료 today={}", today);
+        } catch (RuntimeException e) {
+            // 배치 예외를 삼켜 로그로 남긴다. 단일 스레드 스케줄러라 예외를 던지면 다른 배치 실행에 영향을 줄 수 있다.
+            log.error("결제 예정 알림 스케줄러 실패 today={}", today, e);
+        }
     }
 
     @Scheduled(cron = "${app.firebase.review-cron}", zone = "Asia/Seoul")
     public void dispatchSubscriptionReviews() {
         LocalDate today = LocalDate.now(ZONE);
         log.info("구독 검사 유도 알림 스케줄러 시작 today={}", today);
-        reviewDispatchService.dispatchDueReviews(today);
-        log.info("구독 검사 유도 알림 스케줄러 종료 today={}", today);
+        try {
+            reviewDispatchService.dispatchDueReviews(today);
+            log.info("구독 검사 유도 알림 스케줄러 종료 today={}", today);
+        } catch (RuntimeException e) {
+            log.error("구독 검사 유도 알림 스케줄러 실패 today={}", today, e);
+        }
     }
 }

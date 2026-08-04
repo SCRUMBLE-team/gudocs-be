@@ -70,7 +70,7 @@ class SubscriptionReviewDispatchServiceTest {
     private void givenReachableUser(User user, List<Subscription> subscriptions) {
         given(pushRegistrationRepository.findDistinctUserIdsWithEnabledRegistration())
                 .willReturn(List.of(USER_ID));
-        given(subscriptionRepository.findActiveForBillingReminder()).willReturn(subscriptions);
+        given(subscriptionRepository.findActiveByUserIds(List.of(USER_ID))).willReturn(subscriptions);
         given(userRepository.findAllById(List.of(USER_ID))).willReturn(List.of(user));
     }
 
@@ -149,7 +149,7 @@ class SubscriptionReviewDispatchServiceTest {
 
         reviewDispatchService.dispatchDueReviews(TODAY);
 
-        verify(subscriptionRepository, never()).findActiveForBillingReminder();
+        verify(subscriptionRepository, never()).findActiveByUserIds(any());
         verify(notificationSender, never()).send(anyLong(), any());
     }
 }

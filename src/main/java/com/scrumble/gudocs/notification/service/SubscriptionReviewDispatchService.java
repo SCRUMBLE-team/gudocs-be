@@ -56,7 +56,7 @@ public class SubscriptionReviewDispatchService {
             return;
         }
 
-        Map<Long, List<Subscription>> activeByUser = subscriptionRepository.findActiveForBillingReminder().stream()
+        Map<Long, List<Subscription>> activeByUser = subscriptionRepository.findActiveByUserIds(reachableUserIds).stream()
                 .collect(Collectors.groupingBy(s -> s.getUser().getId()));
         Map<Long, User> userById = userRepository.findAllById(reachableUserIds).stream()
                 .collect(Collectors.toMap(User::getId, u -> u));
@@ -67,18 +67,19 @@ public class SubscriptionReviewDispatchService {
                 continue;
             }
             List<Subscription> subscriptions = activeByUser.getOrDefault(userId, List.of());
-            if (isDueToday(user, subscriptions, today)) {
-                notificationSender.send(userId, toDraft(subscriptions, today));
+            boolean duplicate = hasCategoryDuplicate(subscriptions); // 발송 판정·문구 구성에 함께 쓰이므로 1회만 계산
+            if (isDueToday(user, duplicate, today)) {
+                notificationSender.send(userId, toDraft(duplicate, today));
             }
         }
     }
 
-    private boolean isDueToday(User user, List<Subscription> subscriptions, LocalDate today) {
+    private boolean isDueToday(User user, boolean duplicate, LocalDate today) {
         long daysSinceSignup = ChronoUnit.DAYS.between(user.getCreatedAt().toLocalDate(), today);
         if (daysSinceSignup <= 0) {
             return false; // 가입 당일/미래 기준일은 대상 아님
         }
-        int period = hasCategoryDuplicate(subscriptions) ? PERIOD_WITH_DUPLICATE_DAYS : PERIOD_DEFAULT_DAYS;
+        int period = duplicate ? PERIOD_WITH_DUPLICATE_DAYS : PERIOD_DEFAULT_DAYS;
         return daysSinceSignup % period == 0;
     }
 
@@ -90,8 +91,7 @@ public class SubscriptionReviewDispatchService {
                 .anyMatch(count -> count >= 2);
     }
 
-    private NotificationDraft toDraft(List<Subscription> subscriptions, LocalDate today) {
-        boolean duplicate = hasCategoryDuplicate(subscriptions);
+    private NotificationDraft toDraft(boolean duplicate, LocalDate today) {
         Map<String, String> data = Map.of(
                 "type", NotificationType.SUBSCRIPTION_REVIEW.name(),
                 "link", frontendBaseUrl + REVIEW_PATH

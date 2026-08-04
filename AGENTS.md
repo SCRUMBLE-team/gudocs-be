@@ -80,8 +80,8 @@ enum:
 | GET | `/oauth2/authorization/{google,kakao,naver}` | × |
 | GET | `/login/oauth2/code/{provider}` (콜백, provider가 호출) | × |
 | POST | `/api/auth/logout` | ○ |
-| GET | `/api/auth/me` | ○ | (로그인 상태·기본 정보 확인 — 내 정보 조회 단일 창구)
-| PUT(`/name`) / DELETE | `/api/users/me*` | ○ | (온보딩 이름 입력/수정, 회원 탈퇴)
+| GET | `/api/auth/me` (로그인 상태·기본 정보 확인 — 내 정보 조회 단일 창구) | ○ |
+| PUT(`/name`) / DELETE | `/api/users/me*` (온보딩 이름 입력/수정, 회원 탈퇴) | ○ |
 | GET / POST | `/api/subscriptions` | ○ |
 | GET / PUT / DELETE | `/api/subscriptions/{id}` | ○ |
 | PUT | `/api/subscriptions/{id}/status` | ○ |

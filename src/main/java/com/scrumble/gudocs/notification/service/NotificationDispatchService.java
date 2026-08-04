@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -41,6 +42,10 @@ public class NotificationDispatchService {
     private record BillingGroup(Long userId, LocalDate targetDate, int daysUntil, List<Subscription> subscriptions) {
     }
 
+    /** 묶음 그룹 키: 같은 유저의 같은 결제일. */
+    private record GroupKey(Long userId, LocalDate targetDate) {
+    }
+
     /**
      * 오늘 기준 D-3·당일 결제 예정 구독을 유저·결제일 단위로 묶어, 아직 보내지 않은 대상에게 푸시를 발송한다.
      */
@@ -57,10 +62,10 @@ public class NotificationDispatchService {
      * 같은 유저의 같은 결제일 구독을 하나의 묶음으로 만든다. dueList가 결제일 오름차순이라 그룹 순서도 유지된다.
      */
     private List<BillingGroup> groupByUserAndBillingDate(List<DueBilling> dueList) {
-        // key: userId + targetDate (같은 결제일이면 daysUntil도 동일)
-        Map<String, List<DueBilling>> grouped = dueList.stream()
+        // key: (userId, targetDate) — 같은 결제일이면 daysUntil도 동일
+        Map<GroupKey, List<DueBilling>> grouped = dueList.stream()
                 .collect(Collectors.groupingBy(
-                        d -> d.subscription().getUser().getId() + "|" + d.targetDate(),
+                        d -> new GroupKey(d.subscription().getUser().getId(), d.targetDate()),
                         LinkedHashMap::new, Collectors.toList()));
 
         return grouped.values().stream()
@@ -100,8 +105,8 @@ public class NotificationDispatchService {
         long total = group.subscriptions().stream().mapToLong(Subscription::getPrice).sum();
         int count = group.subscriptions().size();
         if (count == 1) {
-            return String.format("%s %,d원이 결제될 예정이에요.", when, total);
+            return String.format(Locale.KOREA, "%s %,d원이 결제될 예정이에요.", when, total);
         }
-        return String.format("%s %d건 %,d원이 결제될 예정이에요.", when, count, total);
+        return String.format(Locale.KOREA, "%s %d건 %,d원이 결제될 예정이에요.", when, count, total);
     }
 }

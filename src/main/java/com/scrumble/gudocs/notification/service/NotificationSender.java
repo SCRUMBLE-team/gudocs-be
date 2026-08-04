@@ -68,6 +68,9 @@ public class NotificationSender {
         try {
             return Optional.of(userNotificationRepository.saveAndFlush(notification));
         } catch (DataIntegrityViolationException e) {
+            // 정상 경로: dedup UNIQUE 위반(다른 인스턴스가 먼저 기록). 다른 제약 위반도 여기로 오므로 원인 추적용 로그를 남긴다.
+            log.debug("알림 저장 중 제약 충돌 → 기존 행 재조회 userId={} type={} targetDate={} offset={}",
+                    userId, draft.type(), draft.targetDate(), draft.remindOffset(), e);
             return find(userId, draft).filter(n -> n.getSentAt() == null);
         }
     }
