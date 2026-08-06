@@ -27,7 +27,8 @@ spring:
     baseline-on-migrate: true
     baseline-version: 1
   session:
-    store-type: jdbc
+    # 저장소 선택은 classpath(spring-session-jdbc)에 맡긴다.
+    # (spring.session.store-type 은 Boot 3.4+ 에서 제거된 프로퍼티)
     timeout: ${SESSION_TIMEOUT:30d}   # idle timeout (기본 30분 → 30일)
     jdbc:
       initialize-schema: never        # 세션 테이블은 Flyway(V3)로 생성
