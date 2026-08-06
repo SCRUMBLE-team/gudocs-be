@@ -15,6 +15,12 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.H2Dialect
     show-sql: true
+  # local 은 H2 create-drop 로 스키마 생성 → Flyway(MySQL 방언) 비활성
+  flyway:
+    enabled: false
+  session:
+    jdbc:
+      initialize-schema: embedded   # H2 에 SPRING_SESSION 테이블 자동 생성
 
 app:
   oauth:

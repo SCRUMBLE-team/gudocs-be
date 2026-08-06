@@ -12,13 +12,25 @@ spring:
       max-request-size: 11MB
   jpa:
     hibernate:
-      ddl-auto: update
+      # Flyway 가 스키마 단일 소스. 앱은 검증만(불일치 시 기동 실패로 조기 감지)
+      ddl-auto: validate
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
         format_sql: true
         use_sql_comments: true
     show-sql: false
+  flyway:
+    enabled: true
+    # 기존 운영 DB(ddl-auto=update 로 생성됨)는 V1 을 "이미 적용됨"으로 봉인하고 V2 부터 적용.
+    # 빈 DB 는 V1 부터 전부 실행.
+    baseline-on-migrate: true
+    baseline-version: 1
+  session:
+    store-type: jdbc
+    timeout: ${SESSION_TIMEOUT:30d}   # idle timeout (기본 30분 → 30일)
+    jdbc:
+      initialize-schema: never        # 세션 테이블은 Flyway(V3)로 생성
   security:
     oauth2:
       client:
@@ -70,6 +82,7 @@ server:
       cookie:
         same-site: ${COOKIE_SAME_SITE:lax}
         secure: ${COOKIE_SECURE:false}
+        max-age: ${SESSION_COOKIE_MAX_AGE:30d}   # persistent cookie (브라우저 종료 후에도 유지)
 
 app:
   cors:

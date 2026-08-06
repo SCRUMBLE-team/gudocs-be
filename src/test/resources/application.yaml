@@ -1,4 +1,10 @@
 spring:
+  # 테스트는 MockHttpSession 에 SecurityContext 를 직접 심어 인증한다.
+  # Spring Session(jdbc)이 켜지면 SessionRepositoryFilter 가 그 세션을 가로채 인증이 유실되므로
+  # 세션 자동설정을 통째로 제외한다(기본 서블릿 세션 사용).
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.session.SessionAutoConfiguration
   datasource:
     url: jdbc:h2:mem:testdb;MODE=MySQL
     username: sa
@@ -15,6 +21,9 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.H2Dialect
     show-sql: false
+  # test 는 H2 create-drop 로 스키마 생성 → Flyway(MySQL 방언) 비활성
+  flyway:
+    enabled: false
   security:
     oauth2:
       client:
