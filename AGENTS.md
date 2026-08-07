@@ -22,15 +22,15 @@
 src/main/java/com/scrumble/gudocs/
 ├── auth/           # 소셜 로그인(oauth/), 로그아웃, 내 정보
 ├── users/          # User·SocialAccount 엔티티, 마이페이지 (이름 수정, 탈퇴)
-├── subscriptions/  # 구독 CRUD (entity/controller/service/repository/dto/util)
+├── subscriptions/  # 구독 CRUD (entity/controller/service/repository/dto/util) + catalog/(서비스·요금제 카탈로그)
 ├── expense/        # 지출 분석 (월별, 카테고리별, 추이)
 ├── dashboard/      # 메인 대시보드 집계
 ├── notification/   # FCM Web Push (기기 등록 + 결제 예정 알림 스케줄러/발송)
-├── ocr/            # CLOVA OCR 기반 구독 정보 스캔 (결제 알림/영수증 이미지 → 필드 파싱)
+├── ocr/            # CLOVA OCR 기반 구독 정보 스캔 (결제 알림/영수증 이미지 → 필드 파싱, 서비스 인식은 카탈로그 공유)
 ├── global/         # BaseEntity, ErrorCode, BusinessException, ApiResponse, security/(CurrentUserId)
 └── config/         # SecurityConfig, WebConfig, CorsConfig, LocalSecurityConfig, DataInitializer, FirebaseConfig
 
-src/main/resources/db/migration/  # Flyway 마이그레이션 (V1 baseline, V2 알림 dedup, V3 세션) — 앱 기동 시 자동 적용
+src/main/resources/db/migration/  # Flyway 마이그레이션 (V1 baseline, V2 알림 dedup, V3 세션, V4 구독 service_code) — 앱 기동 시 자동 적용
 deploy/             # EC2 배포 리소스 (setup.sh, systemd, Caddyfile, mysql-init.sql)
   migrations/       # (아카이브) Flyway 승격 이전 수동 실행 SQL — 신규 추가 금지 (README.md 참고)
 .github/workflows/  # ci.yml (PR 테스트), deploy.yml (develop → EC2 배포)
@@ -50,7 +50,8 @@ deploy/             # EC2 배포 리소스 (setup.sh, systemd, Caddyfile, mysql-
 - `UNIQUE(provider, provider_id)` — 로그인 조회키
 - `UNIQUE(user_id, provider)` — 같은 provider 중복 연결 금지
 
-**subscriptions** — id, user_id(FK), service_name, category, price, billing_cycle, first_billing_date(최초 결제일 앵커), status, paused_at, deleted_at(soft delete), created_at, updated_at
+**subscriptions** — id, user_id(FK), service_name, service_code(**nullable**), category, price, billing_cycle, first_billing_date(최초 결제일 앵커), status, paused_at, deleted_at(soft delete), created_at, updated_at
+- `service_code`: 카탈로그 서비스의 불변 키(`ServiceCatalog.code`, 예 `NETFLIX`). **프론트가 로고를 찾는 기준**이다. 표시 이름은 오타 수정·브랜드 변경으로 바뀌므로 조인 키로 쓸 수 없다. 카탈로그에 없는 서비스를 직접 입력해 등록하면 null(로고 없음). 쓰기 시점에 카탈로그 존재 여부를 검증해 없는 코드면 400(`UNKNOWN_SERVICE_CODE`) — 저장돼 버리면 영영 로고를 못 찾기 때문. `V4__subscription_service_code.sql`
 - `first_billing_date`: 다음 결제일 계산의 단일 기준 앵커. 기존 `billing_day`+`billing_month`를 통합. 다음 결제일은 저장하지 않고 `NextBillingDateCalculator`가 앵커+주기로 재계산(월말 드리프트 없음)
 
 **push_registrations** — id, user_id(FK), fid, platform, device_name, enabled, last_registered_at, created_at, updated_at
@@ -88,6 +89,8 @@ enum:
 | GET / POST | `/api/subscriptions` | ○ |
 | GET / PUT / DELETE | `/api/subscriptions/{id}` | ○ |
 | PUT | `/api/subscriptions/{id}/status` | ○ |
+| GET | `/api/subscriptions/check-name?name=` (활성 구독 서비스명 중복 확인 — 경고 용도) | ○ |
+| GET | `/api/subscriptions/catalog` (등록 화면용 서비스·요금제 목록) | ○ |
 | GET | `/api/subscriptions/expenses/{monthly,categories,trends,monthly/details}` | ○ |
 | GET | `/api/dashboard` | ○ |
 | POST | `/api/push-registrations` (FCM 기기 등록 upsert) | ○ |
@@ -119,6 +122,50 @@ enum:
 
 ---
 
+## 서비스·요금제 카탈로그 (`subscriptions/catalog/ServiceCatalog`)
+
+구독 등록 시 사용자가 결제 금액을 직접 입력하지 않도록, 서비스를 고르면 요금이 자동으로 채워지게 하는 데이터.
+
+- **정적 상수 단일 소스**. 실시간 크롤링하지 않는다 — 서비스마다 파서가 필요하고, 상당수가 JS 렌더링·로그인·지역 뒤에 있으며, 파싱이 조용히 깨지면 사용자가 그 값을 저장해 지출 분석이 오염된다. 요금 변경은 **이 파일 수정 + 재배포**(국내 구독료는 연 1~2회 수준으로 변동).
+- 요금은 `PRICES_CHECKED_ON` 시점에 공개 자료로 확인한 **국내 원화 정가**이고, API 응답에 이 날짜를 함께 내린다. 어디까지나 **기본값(참고값)** — 할인·프로모션·구 요금제 사용자가 있어 등록 화면에서 수정 가능하다.
+- **신뢰할 만한 원화 가격을 못 찾으면 추측해 채우지 않고 `plans`를 빈 배열로 둔다** (해외 USD 결제라 원화 정가가 없는 서비스, 종료된 서비스, 구독이 아니라 건별 구매인 서비스). 프론트는 빈 배열이면 직접 입력 fallback.
+- `aliases`는 OCR 매칭 전용 — `GET /api/subscriptions/catalog` 응답에는 내보내지 않는다.
+- 이 카탈로그는 OCR(`ocr/parser/SubscriptionTextParser`)과 공유한다. 그래서 `ocr`이 아니라 `subscriptions` 하위에 둔다(`ocr` → `subscriptions` 단방향 의존).
+
+### 데이터 주인과 FE 연결 (`code`)
+
+```
+ServiceCatalog.java (BE 단일 소스)
+   ├── OCR 매칭 (ServiceCatalog.match)
+   └── GET /api/subscriptions/catalog  ──code──►  FE: assets/logo/service/<CODE>.png
+```
+
+**서비스 데이터의 주인은 BE, 로고 이미지의 주인은 FE**이고 둘은 `code`로 연결한다. BE는 OCR 인식 때문에 목록을 못 버리고, FE는 번들링 때문에 PNG를 못 버리므로 이 경계가 최소 접점이다.
+
+- **`code`(UPPER_SNAKE)는 불변이다.** `NETFLIX`, `YOUTUBE_PREMIUM` 처럼. FE 로고 파일명이 code라서 바꾸면 매칭이 깨진다. 형식·중복은 `ServiceCatalogTest`가 검사한다.
+- **`canonicalName`은 순수 표시용**이라 오타 수정·브랜드 변경으로 자유롭게 고쳐도 된다. 예전엔 표시 이름이 조인 키여서 `"디지니플러스"` 오타를 고치자 FE 로고 매칭이 깨졌고, 그래서 `code`를 도입했다. **표시 이름을 키로 쓰지 말 것.**
+- **`selectable=false`인 서비스는 신규 등록 대상이 아니다.** 등록 화면 선택지에서 빼고 **서버도 그 code 로 들어온 등록을 400(`SERVICE_NOT_SELECTABLE`)으로 거부한다** — FE 필터만으로는 직접 호출을 막을 수 없다. 다만 **OCR 매칭 대상으로는 남긴다**(과거 영수증을 계속 인식해야 하므로). 요금제는 두지 않는다.
+  - 종료된 서비스: 클로바X(2026-04), SSG.COM 유니버스클럽(2026-01)
+  - 살아 있지만 독립 구독 상품이 아닌 서비스: 쿠팡이츠(무료배달은 와우 멤버십 혜택)
+  - 플래그를 `discontinued`가 아니라 `selectable` 로 둔 이유: 소비자가 필요한 정보는 "고를 수 있나" 하나이고, 종료·비독립상품이라는 *이유*는 코드 주석에 남기면 충분하다. 두 플래그를 두면 항상 같이 움직이는 값이 둘이 된다.
+- **같은 금액을 두 서비스에 넣지 않는다.** 와우 멤버십 7,890원의 주인은 `COUPANG_WOW` 하나다. 쿠팡플레이·쿠팡이츠에도 같은 금액을 두면 사용자가 둘 다 등록해 **실제로 한 번 내는 돈이 지출에 두 번 잡힌다.** 쿠팡플레이는 와우와 별개로 결제하는 자기 상품(스포츠 패스)만 갖는다.
+- FE에 로고 PNG가 없으면 `getServiceLogo()`가 `undefined`를 반환할 뿐 기능은 정상이다(자리표시자 처리). 서비스 추가 시 FE 로고는 여전히 수동이지만, 실패가 조용하지 않고 눈에 보인다.
+- **저장된 구독도 code로 연결한다.** 카탈로그에만 code를 두면 `subscriptions`는 여전히 표시 이름만 갖고 있어서, 이름을 바꾸는 순간 기존 구독이 로고를 잃는다(= 애초의 문제 그대로). 그래서 `subscriptions.service_code`에 함께 저장하고 `SubscriptionResponse`로 내려준다. **프론트는 이름을 전혀 보지 않고 로고를 찾는다.**
+- **서비스명을 내려주는 응답은 `serviceCode`도 함께 내려준다** — `SubscriptionResponse`, `SubscriptionExpenseDetail`, `DuplicateSubscriptionItem`, `UnusedSubscriptionCandidate`. 하나라도 빠지면 그 화면만 이름으로 code를 되찾는 폴백이 생겨 결국 이름 결합이 되살아난다. 서비스명을 노출하는 DTO를 새로 만들 때도 code를 같이 실을 것.
+- **`serviceCode`가 있으면 `serviceName`은 서버가 카탈로그의 `canonicalName`으로 덮어쓴다.** 클라이언트 이름을 그대로 믿으면 `serviceCode=NETFLIX` + `serviceName="동네 헬스장"` 같은 모순된 행이 저장돼 목록엔 헬스장, 로고는 넷플릭스가 붙는다. 등록·수정이 같은 `resolveService()`를 쓴다. `category`는 덮어쓰지 않는다 — 이름·코드가 서비스의 *정체성*인 것과 달리 카테고리는 사용자가 자기 기준으로 분류하는 값이고, 기존 API도 임의 카테고리를 허용해 왔다.
+- **중복 확인(`/check-name`)은 code 우선.** `code` 쿼리 파라미터를 주면 code 로, 없으면 기존대로 이름을 대소문자 무시 비교한다(직접 입력 서비스). 이름만 비교하면 같은 넷플릭스를 "Netflix"/"넷플릭스"로 두 번 등록해도 통과한다. `code`는 선택값이라 기존 호출은 그대로 동작한다.
+- 등록/수정 요청의 `serviceCode`는 선택값이다 — 카탈로그에서 고른 서비스면 code를 그대로 전달하고, 직접 입력한 서비스면 생략한다. OCR 스캔 응답(`OcrSubscriptionResult.serviceCode`)도 code를 실어주므로 스캔 → 등록 흐름에서 그대로 넘기면 된다.
+
+### 매칭 규칙 (OCR)
+
+`ServiceCatalog.match()`는 완전 일치가 아니라 **등록된 이름이 OCR 텍스트에 부분 문자열로 들어있는지**를 본다(구두점·대소문자·공백 무시).
+
+- **최장 매칭 우선** — 여러 서비스가 걸리면 매칭된 이름이 가장 긴 것을 고른다. 쿠팡 와우/플레이/이츠처럼 브랜드를 공유해도 선언 순서와 무관하게 가장 구체적인 것이 잡힌다. ("쿠팡" 같은 브랜드 단독 항목을 넣어 부분 매칭시키면 계열 서비스가 전부 뭉개지므로 금지)
+- **짧은 ASCII alias는 단어 경계 확인** — `FLO`, `NYT` 등 3자 이하 영문 alias가 `workflow` 같은 무관한 단어 속에 우연히 겹치는 것을 막는다. 한글 짧은 이름(멜론·티빙·왓챠 …)은 조사·복합어가 띄어쓰기 없이 붙는 일이 흔해 이 규칙에서 제외한다.
+- **요금제 역추적** — `CatalogService.planByPrice()`로 OCR 금액과 정확히 일치하는 요금제를 찾아 `OcrSubscriptionResult.planName`을 채운다. **OCR로 읽은 금액이 항상 우선**이고 카탈로그 정가로 덮어쓰지 않는다. 일치하는 요금제가 없으면 `planName`만 null.
+
+---
+
 ## 세션 장기 유지 (Spring Session JDBC) + Flyway
 
 - **세션 저장소 = DB**(`spring-session-jdbc`). 세션이 `SPRING_SESSION`/`SPRING_SESSION_ATTRIBUTES` 테이블에 저장돼 **재배포·재기동·다중 서버에도 로그인 유지**된다(기존 in-memory 세션은 재시작 시 소실됐음).
@@ -127,6 +174,7 @@ enum:
   - `V1__baseline.sql` — 승격 시점 운영 DB 스냅샷. 기존 운영 DB는 `flyway.baseline-on-migrate=true`+`baseline-version=1`로 V1을 봉인(미실행)하고 V2부터 적용. 빈 DB는 V1부터 전부 실행.
   - `V2__notification_dedup_userlevel.sql` — 구 수동 `V20260804` 승계 + `user_notifications.type` enum에 `SUBSCRIPTION_REVIEW` 추가(누락 시 검사 유도 알림 INSERT 실패하던 드리프트 정합화).
   - `V3__spring_session.sql` — 세션 테이블.
+  - `V4__subscription_service_code.sql` — `subscriptions.service_code` 추가(nullable). 기존 행 백필 없음 — 승격 시점에 운영 데이터가 없었다.
 - **배포**: Flyway가 앱 기동 시 자동 실행 → `systemctl restart gudocs` 만으로 마이그레이션 반영(수동 SSH SQL 불필요).
 - **local/test**: H2라 `flyway.enabled=false` + `ddl-auto=create-drop` 유지(MySQL 방언 마이그레이션 미적용). 세션 테이블은 local은 `session.jdbc.initialize-schema=embedded`로 H2 자동 생성, **test는 `SessionAutoConfiguration` 제외**(테스트는 `MockHttpSession`에 SecurityContext를 직접 심어 인증 → Spring Session 필터가 켜지면 인증 유실). `spring.session.store-type`은 Boot 3.4+에서 제거된 프로퍼티라 무효.
 

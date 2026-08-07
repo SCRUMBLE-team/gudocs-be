@@ -118,6 +118,7 @@ public class ExpenseService {
                 .map(s -> new SubscriptionExpenseDetail(
                         s.getId(),
                         s.getServiceName(),
+                        s.getServiceCode(),
                         s.getCategory(),
                         s.getCategory().getDisplayName(),
                         s.getBillingCycle(),

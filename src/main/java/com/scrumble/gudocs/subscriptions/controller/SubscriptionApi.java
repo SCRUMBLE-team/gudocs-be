@@ -4,6 +4,7 @@ import com.scrumble.gudocs.global.response.ApiResponse;
 import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionCreateRequest;
 import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionStatusUpdateRequest;
 import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionUpdateRequest;
+import com.scrumble.gudocs.subscriptions.dto.response.CatalogResponse;
 import com.scrumble.gudocs.subscriptions.dto.response.SubscriptionResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -69,15 +70,30 @@ public interface SubscriptionApi {
     ResponseEntity<ApiResponse<Void>> delete(@CurrentUserId Long userId,
             Long subscriptionId);
 
-    @Operation(summary = "서비스명 중복 확인", description = "동일한 서비스명의 활성 구독이 있는지 확인합니다. (대소문자 무시, 경고 용도)")
+    @Operation(summary = "서비스 중복 확인",
+            description = "이미 등록한 서비스인지 확인합니다. (삭제되지 않은 구독 대상, 경고 용도) "
+                    + "code를 함께 보내면 서비스 코드로 판정하고, 없으면 서비스명을 대소문자 무시하고 비교합니다.")
     @ApiResponses({
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "확인 완료"),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "로그인 필요")
     })
     ResponseEntity<ApiResponse<Boolean>> checkDuplicateName(@CurrentUserId Long userId,
-            @Parameter(description = "확인할 서비스명 (기본 서비스 선택 시 프론트 CATEGORY_SERVICES의 name 값을 그대로 전달)",
+            @Parameter(description = "확인할 서비스명 (카탈로그에서 고른 서비스면 카탈로그의 name)",
                     example = "넷플릭스", required = true)
-            @NotBlank @Size(max = 100) String name);
+            @NotBlank @Size(max = 100) String name,
+            @Parameter(description = "카탈로그 서비스 코드. 있으면 이름 대신 이 값으로 판정한다. 직접 입력한 서비스면 생략.",
+                    example = "NETFLIX")
+            @Size(max = 64) String code);
+
+    @Operation(summary = "구독 서비스 카탈로그 조회",
+            description = "구독 등록 화면에서 쓰는 서비스·요금제 목록을 조회합니다. "
+                    + "요금은 서버에 고정된 참고값이며 사용자가 수정할 수 있습니다. "
+                    + "원화 정가를 확인하지 못한 서비스는 요금제가 빈 배열로 내려갑니다.")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "로그인 필요")
+    })
+    ResponseEntity<ApiResponse<CatalogResponse>> getCatalog();
 
     @Operation(summary = "구독 상태 변경", description = "구독 상태를 ACTIVE 또는 PAUSED로 변경합니다.")
     @ApiResponses({

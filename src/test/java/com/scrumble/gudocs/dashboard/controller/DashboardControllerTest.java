@@ -53,7 +53,7 @@ class DashboardControllerTest {
                          BillingCycle cycle, int day, Integer month) throws Exception {
         LocalDate firstBillingDate = LocalDate.of(2025, month != null ? month : 1, day);
         SubscriptionCreateRequest req = new SubscriptionCreateRequest(
-                name, category, price, cycle, firstBillingDate);
+                name, null, category, price, cycle, firstBillingDate);
         mockMvc.perform(post("/api/subscriptions")
                 .session(session)
                 .contentType(MediaType.APPLICATION_JSON)

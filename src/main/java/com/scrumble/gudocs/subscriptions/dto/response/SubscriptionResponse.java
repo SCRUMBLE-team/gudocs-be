@@ -10,8 +10,12 @@ public record SubscriptionResponse(
         @Schema(description = "구독 ID", example = "1")
         Long id,
 
-        @Schema(description = "서비스명", example = "Netflix")
+        @Schema(description = "서비스명(표시용)", example = "넷플릭스")
         String serviceName,
+
+        @Schema(description = "카탈로그 서비스 코드. 프론트는 이 값으로 로고를 찾는다. "
+                + "직접 입력한 서비스면 null(로고 없음).", example = "NETFLIX")
+        String serviceCode,
 
         @Schema(description = "카테고리", example = "OTT")
         SubscriptionCategory category,
@@ -41,6 +45,7 @@ public record SubscriptionResponse(
         return new SubscriptionResponse(
                 subscription.getId(),
                 subscription.getServiceName(),
+                subscription.getServiceCode(),
                 subscription.getCategory(),
                 subscription.getPrice(),
                 subscription.getBillingCycle(),

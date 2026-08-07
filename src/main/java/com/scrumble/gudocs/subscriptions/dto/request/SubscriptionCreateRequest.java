@@ -7,13 +7,22 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 
 public record SubscriptionCreateRequest(
-        @Schema(description = "서비스명 (기본 서비스 선택 시 프론트 CATEGORY_SERVICES의 name 값을 그대로 전달)", example = "넷플릭스")
+        @Schema(description = "서비스명(표시용). 카탈로그에서 고른 서비스면 카탈로그의 name 을 그대로 전달한다.",
+                example = "넷플릭스")
         @NotBlank(message = "서비스명은 필수입니다.")
         String serviceName,
+
+        @Schema(description = "카탈로그 서비스 코드. GET /api/subscriptions/catalog 의 code 를 그대로 전달한다. "
+                + "직접 입력한 서비스면 생략(null).", example = "NETFLIX")
+        @Pattern(regexp = "[A-Z][A-Z0-9_]*", message = "서비스 코드 형식이 올바르지 않습니다.")
+        @Size(max = 64, message = "서비스 코드는 64자 이하여야 합니다.")
+        String serviceCode,
 
         @Schema(description = "카테고리", example = "OTT")
         @NotNull(message = "카테고리는 필수입니다.")

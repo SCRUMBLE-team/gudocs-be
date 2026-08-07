@@ -15,6 +15,10 @@ public record UnusedSubscriptionCandidate(
         @Schema(description = "서비스명", example = "Adobe CC")
         String serviceName,
 
+        @Schema(description = "카탈로그 서비스 코드. 프론트는 이 값으로 로고를 찾는다(직접 입력 서비스면 null).",
+                example = "NETFLIX")
+        String serviceCode,
+
         @Schema(description = "카테고리", example = "DESIGN")
         SubscriptionCategory category,
 
@@ -34,6 +38,7 @@ public record UnusedSubscriptionCandidate(
         return new UnusedSubscriptionCandidate(
                 subscription.getId(),
                 subscription.getServiceName(),
+                subscription.getServiceCode(),
                 subscription.getCategory(),
                 subscription.getPrice(),
                 subscription.getBillingCycle(),
