@@ -24,4 +24,4 @@ spring:
 
 app:
   oauth:
-    success-redirect: http://localhost:5174
+    success-redirect: ${OAUTH_SUCCESS_REDIRECT:http://localhost:5173}
