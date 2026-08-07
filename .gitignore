@@ -34,3 +34,5 @@ application-dev.yaml
 
 # Superpowers scratch workspace
 .superpowers/
+# Claude Code 로컬 설정
+.claude/
