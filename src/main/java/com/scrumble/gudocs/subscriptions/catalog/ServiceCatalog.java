@@ -48,12 +48,13 @@ public final class ServiceCatalog {
     }
 
     /**
-     * @param code         프론트 로고 매칭 키. UPPER_SNAKE, 불변.
-     * @param discontinued 서비스가 종료됐는지. 등록 화면 선택지에서는 빼지만 과거 영수증을 인식해야 하므로
-     *                     OCR 매칭 대상으로는 남긴다.
+     * @param code       프론트 로고 매칭 키. UPPER_SNAKE, 불변.
+     * @param selectable 신규 구독 등록 대상으로 고를 수 있는지. false 면 등록 화면 선택지에서 빠지고
+     *                   서버도 이 code 로 들어온 등록을 거부한다. 다만 과거 영수증을 계속 인식해야 하므로
+     *                   OCR 매칭 대상으로는 남는다. (종료된 서비스, 독립 구독 상품이 아닌 서비스)
      */
     public record CatalogService(String code, String canonicalName, SubscriptionCategory category,
-                                 boolean discontinued, List<String> aliases, List<Plan> plans) {
+                                 boolean selectable, List<String> aliases, List<Plan> plans) {
 
         /** OCR로 읽은 금액과 정확히 일치하는 요금제를 찾는다. 없으면 비어 있는 값. */
         public Optional<Plan> planByPrice(Long price) {
@@ -66,13 +67,16 @@ public final class ServiceCatalog {
 
     private static CatalogService service(String code, String name, SubscriptionCategory category,
                                           List<String> aliases, List<Plan> plans) {
-        return new CatalogService(code, name, category, false, aliases, plans);
+        return new CatalogService(code, name, category, true, aliases, plans);
     }
 
-    /** 종료된 서비스. 신규 등록 대상이 아니므로 요금제를 두지 않는다. */
-    private static CatalogService discontinued(String code, String name, SubscriptionCategory category,
-                                               List<String> aliases) {
-        return new CatalogService(code, name, category, true, aliases, List.of());
+    /**
+     * OCR 인식 전용 항목. 신규 등록 대상이 아니므로 요금제를 두지 않는다.
+     * 서비스가 종료됐거나, 살아 있어도 독립적으로 결제하는 구독 상품이 아닌 경우다.
+     */
+    private static CatalogService ocrOnly(String code, String name, SubscriptionCategory category,
+                                          List<String> aliases) {
+        return new CatalogService(code, name, category, false, aliases, List.of());
     }
 
     private static final List<CatalogService> SERVICES = List.of(
@@ -92,9 +96,11 @@ public final class ServiceCatalog {
                             new Plan("베이직", 9500L, MONTHLY),
                             new Plan("스탠다드", 13500L, MONTHLY),
                             new Plan("프리미엄", 17000L, MONTHLY))),
-            // 쿠팡플레이는 단독 상품이 없고 와우 멤버십에 포함된다.
+            // 쿠팡플레이 기본 시청은 와우 멤버십에 포함된다 — 그 금액은 COUPANG_WOW 한 곳에만 둔다.
+            // 여기 요금제는 와우와 별개로 결제하는 쿠팡플레이 자체 유료 상품이다.
             service("COUPANG_PLAY", "쿠팡플레이", OTT, List.of("coupang play"),
-                    List.of(new Plan("와우 멤버십", 7890L, MONTHLY))),
+                    List.of(new Plan("스포츠 패스 (와우회원)", 12400L, MONTHLY),
+                            new Plan("스포츠 패스 (일반회원)", 19300L, MONTHLY))),
             service("WATCHA", "왓챠", OTT, List.of("watcha"),
                     List.of(new Plan("베이직", 7900L, MONTHLY),
                             new Plan("프리미엄", 12900L, MONTHLY))),
@@ -116,7 +122,8 @@ public final class ServiceCatalog {
             service("YOUTUBE_MUSIC", "유튜브뮤직", MUSIC, List.of("youtube music"),
                     List.of(new Plan("뮤직 프리미엄", 11900L, MONTHLY))),
             service("SPOTIFY", "스포티파이", MUSIC, List.of("spotify"),
-                    List.of(new Plan("개인", 10900L, MONTHLY),
+                    List.of(new Plan("베이직", 8690L, MONTHLY),
+                            new Plan("개인", 11990L, MONTHLY),
                             new Plan("듀오", 17985L, MONTHLY),
                             new Plan("학생", 6600L, MONTHLY))),
             service("MELON", "멜론", MUSIC, List.of("melon"),
@@ -165,7 +172,7 @@ public final class ServiceCatalog {
             // 뤼튼은 개인 사용자 무료 정책이라 유료 요금제가 없다.
             service("WRTN", "뤼튼", AI, List.of("wrtn"), List.of()),
             // 클로바X는 2026-04-09 개인 서비스 종료.
-            discontinued("CLOVA_X", "클로바X", AI, List.of("clova x", "클로바엑스")),
+            ocrOnly("CLOVA_X", "클로바X", AI, List.of("clova x", "클로바엑스")),
 
             service("NYT", "NYT", NEWS, List.of("new york times", "뉴욕타임스"), List.of()),
             service("MEDIUM", "Medium", NEWS, List.of("미디엄"), List.of()),
@@ -200,14 +207,15 @@ public final class ServiceCatalog {
 
             service("COUPANG_WOW", "쿠팡 와우", SHOPPING, List.of("coupang wow", "쿠팡와우"),
                     List.of(new Plan("와우 멤버십", 7890L, MONTHLY))),
-            // 쿠팡이츠 무료배달도 와우 멤버십에 포함된다. 쿠팡 계열 표기가 섞여 들어와도
+            // 쿠팡이츠는 독립적으로 결제하는 구독 상품이 아니다(무료배달은 와우 멤버십 혜택).
+            // 요금제를 주면 와우와 별개 지출로 이중 등록되므로 신규 등록 선택지에서 뺀다.
+            // 다만 영수증에 "쿠팡이츠" 표기가 들어오므로 OCR 매칭 대상으로는 남긴다 —
             // 최장 매칭 덕분에 와우/플레이/이츠가 서로 뭉개지지 않는다.
-            service("COUPANG_EATS", "쿠팡이츠", SHOPPING, List.of("coupang eats", "쿠팡 이츠"),
-                    List.of(new Plan("와우 멤버십", 7890L, MONTHLY))),
+            ocrOnly("COUPANG_EATS", "쿠팡이츠", SHOPPING, List.of("coupang eats", "쿠팡 이츠")),
             service("NAVER_PLUS", "네이버플러스", SHOPPING, List.of("naver plus", "네이버 플러스"),
                     List.of(new Plan("멤버십", 4900L, MONTHLY))),
             // 신세계 유니버스 클럽은 2026-01-01 신규 가입·연장 종료.
-            discontinued("SSG_UNIVERSE_CLUB", "SSG.COM 유니버스클럽", SHOPPING, List.of("ssg 유니버스클럽")),
+            ocrOnly("SSG_UNIVERSE_CLUB", "SSG.COM 유니버스클럽", SHOPPING, List.of("ssg 유니버스클럽")),
             service("BAEMIN_CLUB", "배민클럽", SHOPPING, List.of("우아한형제들", "배달의민족", "baemin club"),
                     List.of(new Plan("배민클럽", 3990L, MONTHLY))),
             service("YOGIPASS", "요기패스", SHOPPING, List.of("yogiyo", "요기요"),

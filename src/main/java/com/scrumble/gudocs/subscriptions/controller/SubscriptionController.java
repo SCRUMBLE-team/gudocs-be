@@ -75,9 +75,10 @@ public class SubscriptionController implements SubscriptionApi {
     @GetMapping("/check-name")
     public ResponseEntity<ApiResponse<Boolean>> checkDuplicateName(
             @CurrentUserId Long userId,
-            @RequestParam String name) {
-        boolean isDuplicate = subscriptionService.isDuplicateName(userId, name);
-        return ResponseEntity.ok(ApiResponse.success("서비스명 중복 확인", isDuplicate));
+            @RequestParam String name,
+            @RequestParam(required = false) String code) {
+        boolean isDuplicate = subscriptionService.isDuplicateService(userId, name, code);
+        return ResponseEntity.ok(ApiResponse.success("서비스 중복 확인", isDuplicate));
     }
 
     @Override

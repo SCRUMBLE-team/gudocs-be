@@ -33,6 +33,12 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
 
     boolean existsByUserAndServiceNameIgnoreCaseAndDeletedAtIsNull(User user, String serviceName);
 
+    /**
+     * 카탈로그 서비스의 중복 판정. 표시 이름은 바뀔 수 있으므로 code 가 있으면 code 로 본다
+     * (같은 넷플릭스를 이름만 다르게 적어 두 번 등록하는 것을 잡아낸다).
+     */
+    boolean existsByUserAndServiceCodeAndDeletedAtIsNull(User user, String serviceCode);
+
     @Modifying
     @Transactional
     @Query("DELETE FROM Subscription s WHERE s.user = :user")

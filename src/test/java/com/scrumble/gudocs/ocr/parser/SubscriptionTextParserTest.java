@@ -103,6 +103,17 @@ class SubscriptionTextParserTest {
     }
 
     @Test
+    void 신규_등록_불가_서비스도_OCR에서는_계속_인식된다() {
+        // 등록 선택지에서는 빠지지만 과거 영수증은 계속 읽혀야 한다.
+        OcrSubscriptionResult eats = SubscriptionTextParser.parse("쿠팡이츠 결제 안내\n7,890원", TODAY);
+        assertThat(eats.serviceName()).isEqualTo("쿠팡이츠");
+        assertThat(eats.serviceCode()).isEqualTo("COUPANG_EATS");
+
+        OcrSubscriptionResult clovaX = SubscriptionTextParser.parse("클로바X 이용료 결제", TODAY);
+        assertThat(clovaX.serviceCode()).isEqualTo("CLOVA_X");
+    }
+
+    @Test
     void 아무것도_인식하지_못하면_전_필드가_null이거나_기본값이다() {
         OcrSubscriptionResult result = SubscriptionTextParser.parse("", TODAY);
 

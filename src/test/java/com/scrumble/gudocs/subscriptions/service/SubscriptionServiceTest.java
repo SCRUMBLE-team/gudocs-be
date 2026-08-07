@@ -25,6 +25,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -200,9 +202,24 @@ class SubscriptionServiceTest {
         given(subscriptionRepository.existsByUserAndServiceNameIgnoreCaseAndDeletedAtIsNull(user, "Netflix"))
                 .willReturn(true);
 
-        boolean result = subscriptionService.isDuplicateName(1L, "Netflix");
+        boolean result = subscriptionService.isDuplicateService(1L, "Netflix", null);
 
         assertThat(result).isTrue();
+    }
+
+    @Test
+    void 카탈로그_서비스는_code로_중복을_판정한다() {
+        // 표시 이름을 다르게 적어도 같은 서비스면 중복으로 잡혀야 한다.
+        User user = UserFixture.create();
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+        given(subscriptionRepository.existsByUserAndServiceCodeAndDeletedAtIsNull(user, "NETFLIX"))
+                .willReturn(true);
+
+        boolean result = subscriptionService.isDuplicateService(1L, "Netflix", "NETFLIX");
+
+        assertThat(result).isTrue();
+        then(subscriptionRepository).should(never())
+                .existsByUserAndServiceNameIgnoreCaseAndDeletedAtIsNull(any(), any());
     }
 
     @Test
@@ -212,7 +229,7 @@ class SubscriptionServiceTest {
         given(subscriptionRepository.existsByUserAndServiceNameIgnoreCaseAndDeletedAtIsNull(user, "Spotify"))
                 .willReturn(false);
 
-        boolean result = subscriptionService.isDuplicateName(1L, "Spotify");
+        boolean result = subscriptionService.isDuplicateService(1L, "Spotify", null);
 
         assertThat(result).isFalse();
     }

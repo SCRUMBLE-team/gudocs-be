@@ -302,9 +302,9 @@ class SubscriptionControllerTest {
                 .andExpect(jsonPath("$.data.pricesCheckedOn").isNotEmpty())
                 .andExpect(jsonPath("$.data.services[?(@.code == 'NETFLIX')].name").value("넷플릭스"))
                 .andExpect(jsonPath("$.data.services[?(@.code == 'NETFLIX')].category").value("OTT"))
-                .andExpect(jsonPath("$.data.services[?(@.code == 'NETFLIX')].discontinued").value(false))
+                .andExpect(jsonPath("$.data.services[?(@.code == 'NETFLIX')].selectable").value(true))
                 .andExpect(jsonPath("$.data.services[?(@.code == 'NETFLIX')].plans[0].price").value(7000))
-                .andExpect(jsonPath("$.data.services[?(@.code == 'CLOVA_X')].discontinued").value(true))
+                .andExpect(jsonPath("$.data.services[?(@.code == 'CLOVA_X')].selectable").value(false))
                 // aliases 는 OCR 매칭 전용이라 응답에 노출하지 않는다.
                 .andExpect(jsonPath("$.data.services[0].aliases").doesNotExist());
     }
@@ -340,6 +340,78 @@ class SubscriptionControllerTest {
         mockMvc.perform(get("/api/subscriptions/" + 구독_ID_추출(result) + "").session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.serviceCode").doesNotExist());
+    }
+
+    @Test
+    void serviceCode를_보내면_serviceName은_카탈로그_이름으로_저장된다() throws Exception {
+        // 클라이언트가 보낸 이름을 그대로 믿으면 목록엔 "동네 헬스장", 로고는 넷플릭스가 붙는다.
+        MvcResult result = 구독_등록(session, new SubscriptionCreateRequest(
+                "동네 헬스장", "NETFLIX", SubscriptionCategory.OTT, 17000L,
+                BillingCycle.MONTHLY, LocalDate.of(2026, 1, 15)));
+
+        mockMvc.perform(get("/api/subscriptions/" + 구독_ID_추출(result)).session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.serviceName").value("넷플릭스"))
+                .andExpect(jsonPath("$.data.serviceCode").value("NETFLIX"));
+    }
+
+    @Test
+    void 수정할_때도_serviceName이_카탈로그_이름으로_맞춰진다() throws Exception {
+        MvcResult created = 구독_등록(session, new SubscriptionCreateRequest(
+                "넷플릭스", "NETFLIX", SubscriptionCategory.OTT, 17000L,
+                BillingCycle.MONTHLY, LocalDate.of(2026, 1, 15)));
+        long id = 구독_ID_추출(created);
+
+        SubscriptionUpdateRequest request = new SubscriptionUpdateRequest(
+                "아무렇게나 적은 이름", "TVING", SubscriptionCategory.OTT, 13500L,
+                BillingCycle.MONTHLY, LocalDate.of(2026, 1, 15));
+
+        mockMvc.perform(put("/api/subscriptions/" + id)
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.serviceName").value("티빙"))
+                .andExpect(jsonPath("$.data.serviceCode").value("TVING"));
+    }
+
+    @Test
+    void 신규_등록_불가_서비스_code는_400() throws Exception {
+        // 종료됐거나(클로바X) 독립 구독 상품이 아닌(쿠팡이츠) 서비스는 서버가 막는다.
+        for (String code : new String[]{"CLOVA_X", "COUPANG_EATS"}) {
+            SubscriptionCreateRequest request = new SubscriptionCreateRequest(
+                    "무언가", code, SubscriptionCategory.ETC, 7890L,
+                    BillingCycle.MONTHLY, LocalDate.of(2026, 1, 15));
+
+            mockMvc.perform(post("/api/subscriptions")
+                            .session(session)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.success").value(false));
+        }
+    }
+
+    @Test
+    void 중복_확인은_code가_있으면_code로_판정한다() throws Exception {
+        구독_등록(session, new SubscriptionCreateRequest(
+                "넷플릭스", "NETFLIX", SubscriptionCategory.OTT, 17000L,
+                BillingCycle.MONTHLY, LocalDate.of(2026, 1, 15)));
+
+        // 이름을 다르게 적어도 같은 서비스면 중복이다.
+        mockMvc.perform(get("/api/subscriptions/check-name")
+                        .param("name", "Netflix 프리미엄")
+                        .param("code", "NETFLIX")
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(true));
+
+        // code 를 안 보내면 기존대로 이름으로 판정한다(직접 입력 서비스).
+        mockMvc.perform(get("/api/subscriptions/check-name")
+                        .param("name", "동네 헬스장")
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(false));
     }
 
     @Test

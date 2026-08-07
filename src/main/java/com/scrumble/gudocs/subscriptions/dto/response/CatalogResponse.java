@@ -31,9 +31,10 @@ public record CatalogResponse(
             @Schema(description = "카테고리", example = "OTT")
             SubscriptionCategory category,
 
-            @Schema(description = "종료된 서비스 여부. true면 등록 화면 선택지에서 제외한다(과거 영수증 OCR 인식용으로만 남아 있음).",
-                    example = "false")
-            boolean discontinued,
+            @Schema(description = "신규 등록 선택 가능 여부. false면 등록 화면 선택지에서 제외한다 "
+                    + "(종료됐거나 독립 구독 상품이 아닌 서비스 — 과거 영수증 OCR 인식용으로만 남아 있다).",
+                    example = "true")
+            boolean selectable,
 
             @Schema(description = "요금제 목록. 원화 정가를 확인하지 못한 서비스는 빈 배열이며 사용자가 직접 입력한다.")
             List<CatalogPlanResponse> plans
@@ -65,7 +66,7 @@ public record CatalogResponse(
                 service.code(),
                 service.canonicalName(),
                 service.category(),
-                service.discontinued(),
+                service.selectable(),
                 service.plans().stream()
                         .map(plan -> new CatalogPlanResponse(plan.name(), plan.price(), plan.billingCycle()))
                         .toList());

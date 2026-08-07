@@ -113,11 +113,57 @@ class ServiceCatalogTest {
     }
 
     @Test
-    void 종료된_서비스는_요금제_없이_OCR_매칭_대상으로만_남는다() {
+    void 신규_등록_불가_서비스는_요금제_없이_OCR_매칭_대상으로만_남는다() {
+        // 종료된 서비스
         ServiceCatalog.CatalogService clovaX = ServiceCatalog.match("클로바X 결제").orElseThrow();
-
-        assertThat(clovaX.discontinued()).isTrue();
+        assertThat(clovaX.selectable()).isFalse();
         assertThat(clovaX.plans()).isEmpty();
+
+        ServiceCatalog.CatalogService ssg = ServiceCatalog.match("SSG 유니버스클럽 연회비").orElseThrow();
+        assertThat(ssg.selectable()).isFalse();
+
+        // 살아 있지만 독립 구독 상품이 아닌 서비스
+        ServiceCatalog.CatalogService eats = ServiceCatalog.match("쿠팡이츠 결제 안내").orElseThrow();
+        assertThat(eats.selectable()).isFalse();
+        assertThat(eats.plans()).isEmpty();
+    }
+
+    @Test
+    void 스포티파이_요금제가_실제_가격과_일치한다() {
+        ServiceCatalog.CatalogService spotify = ServiceCatalog.match("스포티파이").orElseThrow();
+
+        assertThat(spotify.planByPrice(8690L)).map(ServiceCatalog.Plan::name).contains("베이직");
+        assertThat(spotify.planByPrice(11990L)).map(ServiceCatalog.Plan::name).contains("개인");
+        assertThat(spotify.planByPrice(17985L)).map(ServiceCatalog.Plan::name).contains("듀오");
+        assertThat(spotify.planByPrice(6600L)).map(ServiceCatalog.Plan::name).contains("학생");
+        // 잘못 적혀 있던 개인 10,900원은 제거됐다.
+        assertThat(spotify.planByPrice(10900L)).isEmpty();
+    }
+
+    @Test
+    void 쿠팡_계열은_와우_멤버십_금액을_한_곳에만_둔다() {
+        // 와우 멤버십 금액의 주인은 COUPANG_WOW 하나다. 플레이·이츠에도 같은 금액을 두면
+        // 사용자가 둘 다 등록해 실제로 한 번 내는 돈이 지출에 두 번 잡힌다.
+        ServiceCatalog.CatalogService wow = ServiceCatalog.findByCode("COUPANG_WOW").orElseThrow();
+        assertThat(wow.planByPrice(7890L)).map(ServiceCatalog.Plan::name).contains("와우 멤버십");
+
+        ServiceCatalog.CatalogService play = ServiceCatalog.findByCode("COUPANG_PLAY").orElseThrow();
+        assertThat(play.planByPrice(7890L)).isEmpty();
+        assertThat(play.planByPrice(12400L)).map(ServiceCatalog.Plan::name)
+                .contains("스포츠 패스 (와우회원)");
+        assertThat(play.planByPrice(19300L)).map(ServiceCatalog.Plan::name)
+                .contains("스포츠 패스 (일반회원)");
+
+        ServiceCatalog.CatalogService eats = ServiceCatalog.findByCode("COUPANG_EATS").orElseThrow();
+        assertThat(eats.plans()).isEmpty();
+    }
+
+    @Test
+    void 신규_등록_불가_서비스는_요금제를_갖지_않는다() {
+        assertThat(ServiceCatalog.services())
+                .filteredOn(service -> !service.selectable())
+                .isNotEmpty()
+                .allSatisfy(service -> assertThat(service.plans()).isEmpty());
     }
 
     @Test

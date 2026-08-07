@@ -18,6 +18,7 @@ public enum ErrorCode {
     SAME_AS_OLD_PASSWORD(HttpStatus.BAD_REQUEST, "새 비밀번호는 현재 비밀번호와 달라야 합니다."),
     INVALID_IMAGE_FILE(HttpStatus.BAD_REQUEST, "이미지 파일만 업로드할 수 있습니다. (jpg, png, 최대 10MB)"),
     UNKNOWN_SERVICE_CODE(HttpStatus.BAD_REQUEST, "알 수 없는 서비스 코드입니다."),
+    SERVICE_NOT_SELECTABLE(HttpStatus.BAD_REQUEST, "더 이상 신규 등록할 수 없는 서비스입니다."),
     EXTERNAL_API_ERROR(HttpStatus.BAD_GATEWAY, "OCR 처리 중 오류가 발생했습니다."),
     PUSH_REGISTRATION_NOT_FOUND(HttpStatus.NOT_FOUND, "푸시 등록 정보를 찾을 수 없습니다."),
     PUSH_REGISTRATION_FORBIDDEN(HttpStatus.FORBIDDEN, "해당 푸시 등록 정보에 접근할 권한이 없습니다.");

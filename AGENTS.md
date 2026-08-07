@@ -137,17 +137,23 @@ enum:
 ```
 ServiceCatalog.java (BE 단일 소스)
    ├── OCR 매칭 (ServiceCatalog.match)
-   └── GET /api/subscriptions/catalog  ──code──►  FE: assets/logo/<category>/<CODE>.png
+   └── GET /api/subscriptions/catalog  ──code──►  FE: assets/logo/service/<CODE>.png
 ```
 
 **서비스 데이터의 주인은 BE, 로고 이미지의 주인은 FE**이고 둘은 `code`로 연결한다. BE는 OCR 인식 때문에 목록을 못 버리고, FE는 번들링 때문에 PNG를 못 버리므로 이 경계가 최소 접점이다.
 
 - **`code`(UPPER_SNAKE)는 불변이다.** `NETFLIX`, `YOUTUBE_PREMIUM` 처럼. FE 로고 파일명이 code라서 바꾸면 매칭이 깨진다. 형식·중복은 `ServiceCatalogTest`가 검사한다.
 - **`canonicalName`은 순수 표시용**이라 오타 수정·브랜드 변경으로 자유롭게 고쳐도 된다. 예전엔 표시 이름이 조인 키여서 `"디지니플러스"` 오타를 고치자 FE 로고 매칭이 깨졌고, 그래서 `code`를 도입했다. **표시 이름을 키로 쓰지 말 것.**
-- `discontinued=true`인 서비스(클로바X, SSG.COM 유니버스클럽)는 등록 화면 선택지에서 빼되 **OCR 매칭 대상으로는 남긴다** — 과거 영수증을 계속 인식해야 하므로. 종료 서비스는 요금제를 두지 않는다.
+- **`selectable=false`인 서비스는 신규 등록 대상이 아니다.** 등록 화면 선택지에서 빼고 **서버도 그 code 로 들어온 등록을 400(`SERVICE_NOT_SELECTABLE`)으로 거부한다** — FE 필터만으로는 직접 호출을 막을 수 없다. 다만 **OCR 매칭 대상으로는 남긴다**(과거 영수증을 계속 인식해야 하므로). 요금제는 두지 않는다.
+  - 종료된 서비스: 클로바X(2026-04), SSG.COM 유니버스클럽(2026-01)
+  - 살아 있지만 독립 구독 상품이 아닌 서비스: 쿠팡이츠(무료배달은 와우 멤버십 혜택)
+  - 플래그를 `discontinued`가 아니라 `selectable` 로 둔 이유: 소비자가 필요한 정보는 "고를 수 있나" 하나이고, 종료·비독립상품이라는 *이유*는 코드 주석에 남기면 충분하다. 두 플래그를 두면 항상 같이 움직이는 값이 둘이 된다.
+- **같은 금액을 두 서비스에 넣지 않는다.** 와우 멤버십 7,890원의 주인은 `COUPANG_WOW` 하나다. 쿠팡플레이·쿠팡이츠에도 같은 금액을 두면 사용자가 둘 다 등록해 **실제로 한 번 내는 돈이 지출에 두 번 잡힌다.** 쿠팡플레이는 와우와 별개로 결제하는 자기 상품(스포츠 패스)만 갖는다.
 - FE에 로고 PNG가 없으면 `getServiceLogo()`가 `undefined`를 반환할 뿐 기능은 정상이다(자리표시자 처리). 서비스 추가 시 FE 로고는 여전히 수동이지만, 실패가 조용하지 않고 눈에 보인다.
 - **저장된 구독도 code로 연결한다.** 카탈로그에만 code를 두면 `subscriptions`는 여전히 표시 이름만 갖고 있어서, 이름을 바꾸는 순간 기존 구독이 로고를 잃는다(= 애초의 문제 그대로). 그래서 `subscriptions.service_code`에 함께 저장하고 `SubscriptionResponse`로 내려준다. **프론트는 이름을 전혀 보지 않고 로고를 찾는다.**
 - **서비스명을 내려주는 응답은 `serviceCode`도 함께 내려준다** — `SubscriptionResponse`, `SubscriptionExpenseDetail`, `DuplicateSubscriptionItem`, `UnusedSubscriptionCandidate`. 하나라도 빠지면 그 화면만 이름으로 code를 되찾는 폴백이 생겨 결국 이름 결합이 되살아난다. 서비스명을 노출하는 DTO를 새로 만들 때도 code를 같이 실을 것.
+- **`serviceCode`가 있으면 `serviceName`은 서버가 카탈로그의 `canonicalName`으로 덮어쓴다.** 클라이언트 이름을 그대로 믿으면 `serviceCode=NETFLIX` + `serviceName="동네 헬스장"` 같은 모순된 행이 저장돼 목록엔 헬스장, 로고는 넷플릭스가 붙는다. 등록·수정이 같은 `resolveService()`를 쓴다. `category`는 덮어쓰지 않는다 — 이름·코드가 서비스의 *정체성*인 것과 달리 카테고리는 사용자가 자기 기준으로 분류하는 값이고, 기존 API도 임의 카테고리를 허용해 왔다.
+- **중복 확인(`/check-name`)은 code 우선.** `code` 쿼리 파라미터를 주면 code 로, 없으면 기존대로 이름을 대소문자 무시 비교한다(직접 입력 서비스). 이름만 비교하면 같은 넷플릭스를 "Netflix"/"넷플릭스"로 두 번 등록해도 통과한다. `code`는 선택값이라 기존 호출은 그대로 동작한다.
 - 등록/수정 요청의 `serviceCode`는 선택값이다 — 카탈로그에서 고른 서비스면 code를 그대로 전달하고, 직접 입력한 서비스면 생략한다. OCR 스캔 응답(`OcrSubscriptionResult.serviceCode`)도 code를 실어주므로 스캔 → 등록 흐름에서 그대로 넘기면 된다.
 
 ### 매칭 규칙 (OCR)
