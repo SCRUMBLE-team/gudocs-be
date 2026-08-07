@@ -30,8 +30,9 @@ src/main/java/com/scrumble/gudocs/
 ├── global/         # BaseEntity, ErrorCode, BusinessException, ApiResponse, security/(CurrentUserId)
 └── config/         # SecurityConfig, WebConfig, CorsConfig, LocalSecurityConfig, DataInitializer, FirebaseConfig
 
+src/main/resources/db/migration/  # Flyway 마이그레이션 (V1 baseline, V2 알림 dedup, V3 세션) — 앱 기동 시 자동 적용
 deploy/             # EC2 배포 리소스 (setup.sh, systemd, Caddyfile, mysql-init.sql)
-  migrations/       # 스키마 마이그레이션 버전 파일 + 적용 이력 (README.md 참고)
+  migrations/       # (아카이브) Flyway 승격 이전 수동 실행 SQL — 신규 추가 금지 (README.md 참고)
 .github/workflows/  # ci.yml (PR 테스트), deploy.yml (develop → EC2 배포)
 ```
 
@@ -61,7 +62,9 @@ deploy/             # EC2 배포 리소스 (setup.sh, systemd, Caddyfile, mysql-
 - 발송 이력 + 중복 방지. `UNIQUE(user_id, type, target_date, remind_offset)` — 같은 발송 단계 중복 발송 차단(다중 서버 대비 DB 제약으로 멱등). `sent_at`은 1건 이상 발송 성공 시 기록. userId/subscriptionId는 연관관계 아닌 값 컬럼
 - `subscription_id`는 **nullable**: 결제 알림은 같은 결제일 구독을 묶어 1건 발송(특정 구독 없음), 검사 유도는 유저 단위라 둘 다 null
 - `remind_offset`: 발송 단계 discriminator. 결제 알림의 결제 며칠 전(3=D-3, 0=당일)을 구분해 dedup 키에 포함(같은 결제일에 D-3/당일 두 번 발송을 서로 다른 건으로 취급). 단계 개념 없는 검사 유도는 0
-- dedup 키 변경은 마이그레이션 `V20260804__notification_dedup_userlevel.sql` (deploy/migrations)
+- dedup 키 변경은 Flyway `V2__notification_dedup_userlevel.sql` (구 수동 `V20260804` 승계)
+
+**spring_session / spring_session_attributes** — Spring Session JDBC 관리 테이블(직접 다루지 않음). 세션을 DB에 저장해 재배포/재기동에도 로그인 유지. `V3__spring_session.sql`로 생성. (아래 "세션 장기 유지" 참고)
 
 enum:
 - `provider`: GOOGLE, KAKAO, NAVER
@@ -116,6 +119,19 @@ enum:
 
 ---
 
+## 세션 장기 유지 (Spring Session JDBC) + Flyway
+
+- **세션 저장소 = DB**(`spring-session-jdbc`). 세션이 `SPRING_SESSION`/`SPRING_SESSION_ATTRIBUTES` 테이블에 저장돼 **재배포·재기동·다중 서버에도 로그인 유지**된다(기존 in-memory 세션은 재시작 시 소실됐음).
+- TTL: `SESSION_TIMEOUT`(idle 만료, 기본 30d) + `SESSION_COOKIE_MAX_AGE`(쿠키 수명 = persistent cookie, 기본 30d). 둘 다 있어야 브라우저 종료 후에도 유지된다. 세션 인증 방식(`HttpSessionSecurityContextRepository`, `@CurrentUserId`)은 그대로 — 저장 위치만 DB로 바뀜.
+- **스키마 = Flyway 단일 소스**. `ddl-auto=update` → **`validate`** 승격. 마이그레이션은 `src/main/resources/db/migration/`:
+  - `V1__baseline.sql` — 승격 시점 운영 DB 스냅샷. 기존 운영 DB는 `flyway.baseline-on-migrate=true`+`baseline-version=1`로 V1을 봉인(미실행)하고 V2부터 적용. 빈 DB는 V1부터 전부 실행.
+  - `V2__notification_dedup_userlevel.sql` — 구 수동 `V20260804` 승계 + `user_notifications.type` enum에 `SUBSCRIPTION_REVIEW` 추가(누락 시 검사 유도 알림 INSERT 실패하던 드리프트 정합화).
+  - `V3__spring_session.sql` — 세션 테이블.
+- **배포**: Flyway가 앱 기동 시 자동 실행 → `systemctl restart gudocs` 만으로 마이그레이션 반영(수동 SSH SQL 불필요).
+- **local/test**: H2라 `flyway.enabled=false` + `ddl-auto=create-drop` 유지(MySQL 방언 마이그레이션 미적용). 세션 테이블은 local은 `session.jdbc.initialize-schema=embedded`로 H2 자동 생성, **test는 `SessionAutoConfiguration` 제외**(테스트는 `MockHttpSession`에 SecurityContext를 직접 심어 인증 → Spring Session 필터가 켜지면 인증 유실). `spring.session.store-type`은 Boot 3.4+에서 제거된 프로퍼티라 무효.
+
+---
+
 ## FCM Web Push (결제 예정 알림 + 구독 검사 유도)
 
 알림 종류 2개. 실제 발송/중복방지/재시도/무효FID처리는 공통 `NotificationSender.send(userId, NotificationDraft)`에 위임(발송 로직 단일 소스). 각 배치 서비스는 "대상 선별 + draft 구성"만 담당한다.
@@ -131,7 +147,7 @@ enum:
 - **FCM payload** — notification: `title`/`body`는 알림 종류·묶음 수에 따라 구성(위 참고) / data(모두 문자열): `type`(BILLING_REMINDER|SUBSCRIPTION_REVIEW), `link`. 클릭 이동 경로는 FE Service Worker가 `data.type`으로 분기(BILLING_REMINDER→`{FRONTEND_BASE_URL}/notifications` 알림함, SUBSCRIPTION_REVIEW→`{FRONTEND_BASE_URL}/subscriptions` 구독 점검). 묶음/유저 단위 알림이라 단일 `subscriptionId`는 싣지 않음
 - **회원 탈퇴**: `UserService.deleteAccount`가 user 삭제 전에 `user_notifications`·`push_registrations`를 먼저 정리
 - **발송 대상**: `fid`는 Firebase Installation ID. `firebase-admin` 9.10.0+의 `Message.Builder.setFid()`로 발송(구 `setToken`은 legacy registration token 호환용으로 deprecated → 미사용)
-- **의존성**: `com.google.firebase:firebase-admin:9.10.0`. 크레덴셜은 `GOOGLE_APPLICATION_CREDENTIALS`(서비스 계정 JSON). 신규 테이블은 `ddl-auto=update`로 생성(Flyway 미도입)
+- **의존성**: `com.google.firebase:firebase-admin:9.10.0`. 크레덴셜은 `GOOGLE_APPLICATION_CREDENTIALS`(서비스 계정 JSON). 스키마는 Flyway 관리(아래 참고)
 - **진단**: `POST /api/push-registrations/test`(`PushTestController` → `PushTestService`)는 스케줄러/중복이력 로직을 건너뛰고 현재 사용자 활성 기기에 `PushSender`로 즉시 테스트 푸시를 쏜다. 응답의 `senderType`(FcmPushSender/NoopPushSender)·기기별 결과(SUCCESS/INVALID_TOKEN/FAILED)로 `setFid` 실기기 도달 여부를 확인한다. `FIREBASE_ENABLED=false`면 Noop이라 항상 SUCCESS(실발송 아님)
 
 ---
@@ -218,4 +234,4 @@ enum:
 - 다른 사용자 데이터 접근 가능한 API 금지 — 현재 로그인 사용자 기준만 (`@CurrentUserId Long userId`)
 - 배포 설정 변경 시 `deploy/env.example`과 `application.yaml` 기본값 동시 점검
 - CORS 도메인 추가는 코드가 아니라 `CORS_ALLOWED_ORIGINS` 환경변수에서 처리
-- 컬럼 삭제·타입/제약 변경(ddl-auto=update가 반영 못 하는 스키마 변경)은 `deploy/migrations/`에 `V<YYYYMMDD>__<설명>.sql`로 남기고 README 이력 갱신
+- 스키마 변경은 Flyway 마이그레이션(`src/main/resources/db/migration/V<n>__<설명>.sql`)으로 작성 — 앱 기동 시 자동 적용. `ddl-auto=validate`라 엔티티와 스키마가 어긋나면 기동 실패로 조기 감지됨. (`deploy/migrations/`는 승격 이전 아카이브, 신규 추가 금지)

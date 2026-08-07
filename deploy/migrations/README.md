@@ -1,38 +1,22 @@
 # DB 마이그레이션
 
-스키마 변경(컬럼 추가/삭제/제약 변경 등)을 **버전 파일로 남기고 적용 이력을 추적**한다.
+> **⚠️ Flyway로 승격됨 (2026-08-07).** 스키마 마이그레이션은 이제 **`src/main/resources/db/migration/`** 의 Flyway 버전 파일로 관리하고, **앱 기동 시 자동 적용**된다(운영 배포 = `systemctl restart` 만으로 반영). `application.yaml` 은 `ddl-auto=validate`(Flyway가 스키마 단일 소스).
+>
+> **이 디렉터리(`deploy/migrations/`)의 `V202608*.sql` 은 승격 이전의 수동 실행용 아카이브**다. 신규 마이그레이션을 여기 추가하지 말 것 → `src/main/resources/db/migration/` 에 작성한다.
 
-현재 앱은 `ddl-auto=update`(application.yaml)로 스키마를 자동 관리하므로, **컬럼 추가는 앱 기동 시 자동 반영**된다. 다만 `update`는 **컬럼 삭제·타입 변경·제약 변경은 하지 않으므로**, 그런 변경만 여기에 스크립트로 남겨 운영 DB에 수동 1회 실행한다.
+## Flyway 운영 방식 (현재)
 
-> 실서비스 전환 시점에 `ddl-auto=validate` + Flyway/Liquibase로 승격하는 걸 전제로, 파일 네이밍을 Flyway 규칙에 맞춰 둔다.
+- 파일 위치: `src/main/resources/db/migration/V<n>__<snake_case>.sql`
+- `V1__baseline.sql` = 승격 시점 운영 DB 스키마 스냅샷. 기존 운영 DB는 `flyway.baseline-on-migrate=true` + `baseline-version=1` 로 **V1을 "이미 적용됨"으로 봉인**하고 V2부터 적용한다. 빈 DB는 V1부터 전부 실행.
+- local/test 프로파일은 `ddl-auto=create-drop` + `flyway.enabled=false`(H2, MySQL 방언 미적용) → Flyway 무관.
+- 세션 테이블(SPRING_SESSION)도 `V3__spring_session.sql` 로 생성된다.
 
-## 네이밍 규칙
+### 아카이브 (수동 실행 시절, 참고용)
 
-```
-V<YYYYMMDD>__<snake_case_설명>.sql
-```
-
-- 예: `V20260730__drop_payment_method.sql`
-- 버전은 날짜(같은 날 여러 개면 뒤에 순번: `V20260730_2__...`)
-- `__`(언더스코어 2개)로 버전과 설명 구분
-
-## 실행 방법
-
-```bash
-ssh <USER>@<EC2_HOST> "mysql -u gudocs -p gudocs" < deploy/migrations/<파일>.sql
-```
-
-- local/test 프로파일은 `ddl-auto=create-drop`이라 자동 반영 → 수동 실행 불필요
-- 운영(EC2 MySQL)에만 1회 실행
-
-## 적용 이력
-
-| 버전 | 설명 | 대상 | 운영 적용일 | 상태 |
-|------|------|------|-------------|------|
-| V20260730 | subscriptions.payment_method 컬럼 제거 (결제수단 기능 폐지) | 운영 MySQL | 2026-07-30 | ✅ 적용 완료 |
-| V20260804 | user_notifications dedup 키를 유저 단위로 재편 (subscription_id nullable, remind_offset 추가, UNIQUE 재정의) | 운영 MySQL | — | ⏳ 미적용 |
-
-> 새 마이그레이션을 추가하면 위 표에 한 줄 기록하고, 운영 적용 후 상태/일자를 채운다.
+| 버전 | 설명 | 상태 |
+|------|------|------|
+| V20260730 | subscriptions.payment_method 컬럼 제거 | ✅ 운영 적용 완료 → V1 baseline에 흡수 |
+| V20260804 | user_notifications dedup 유저 단위 재편 | ⏳ 수동 미적용 → Flyway `V2` 로 승계(배포 시 자동 적용) |
 
 ## 참고 — 여기에 두지 않는 것
 
