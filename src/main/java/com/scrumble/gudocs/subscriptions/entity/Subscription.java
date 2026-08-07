@@ -28,6 +28,13 @@ public class Subscription extends BaseEntity {
     @Column(name = "service_name", nullable = false)
     private String serviceName;
 
+    /**
+     * 카탈로그 서비스의 불변 키({@code ServiceCatalog.code}). 프론트가 로고를 찾는 기준.
+     * 카탈로그에 없는 서비스를 직접 입력해 등록하면 null 이다.
+     */
+    @Column(name = "service_code", length = 64)
+    private String serviceCode;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private SubscriptionCategory category;
@@ -53,9 +60,10 @@ public class Subscription extends BaseEntity {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-    public void update(String serviceName, SubscriptionCategory category, Long price,
+    public void update(String serviceName, String serviceCode, SubscriptionCategory category, Long price,
                        BillingCycle billingCycle, LocalDate firstBillingDate) {
         this.serviceName = serviceName;
+        this.serviceCode = serviceCode;
         this.category = category;
         this.price = price;
         this.billingCycle = billingCycle;

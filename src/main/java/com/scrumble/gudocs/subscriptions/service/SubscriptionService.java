@@ -5,6 +5,7 @@ import com.scrumble.gudocs.global.exception.ErrorCode;
 import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionCreateRequest;
 import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionStatusUpdateRequest;
 import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionUpdateRequest;
+import com.scrumble.gudocs.subscriptions.catalog.ServiceCatalog;
 import com.scrumble.gudocs.subscriptions.dto.response.SubscriptionResponse;
 import com.scrumble.gudocs.subscriptions.entity.*;
 import com.scrumble.gudocs.subscriptions.repository.SubscriptionRepository;
@@ -33,6 +34,7 @@ public class SubscriptionService {
         Subscription subscription = Subscription.builder()
                 .user(user)
                 .serviceName(request.serviceName().strip())
+                .serviceCode(validateServiceCode(request.serviceCode()))
                 .category(request.category())
                 .price(request.price())
                 .billingCycle(request.billingCycle())
@@ -67,7 +69,8 @@ public class SubscriptionService {
         checkOwnership(subscription, user);
 
         subscription.update(
-                request.serviceName().strip(), request.category(), request.price(),
+                request.serviceName().strip(), validateServiceCode(request.serviceCode()),
+                request.category(), request.price(),
                 request.billingCycle(), request.firstBillingDate()
         );
 
@@ -96,6 +99,19 @@ public class SubscriptionService {
         checkOwnership(subscription, user);
         subscription.updateStatus(request.status());
         return toResponse(subscription);
+    }
+
+    /**
+     * 카탈로그에 없는 코드가 저장되면 프론트가 영영 로고를 못 찾으므로 쓰기 시점에 막는다.
+     * 직접 입력한 서비스는 코드가 없으므로(null) 그대로 통과시킨다.
+     */
+    private String validateServiceCode(String serviceCode) {
+        if (serviceCode == null || serviceCode.isBlank()) {
+            return null;
+        }
+        return ServiceCatalog.findByCode(serviceCode)
+                .map(ServiceCatalog.CatalogService::code)
+                .orElseThrow(() -> new BusinessException(ErrorCode.UNKNOWN_SERVICE_CODE));
     }
 
     private SubscriptionResponse toResponse(Subscription subscription) {

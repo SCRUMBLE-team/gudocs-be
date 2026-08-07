@@ -14,6 +14,10 @@ public record SubscriptionExpenseDetail(
         @Schema(description = "서비스명", example = "Netflix")
         String serviceName,
 
+        @Schema(description = "카탈로그 서비스 코드. 프론트는 이 값으로 로고를 찾는다(직접 입력 서비스면 null).",
+                example = "NETFLIX")
+        String serviceCode,
+
         @Schema(description = "카테고리", example = "OTT")
         SubscriptionCategory category,
 

@@ -20,6 +20,7 @@ class SubscriptionTextParserTest {
         OcrSubscriptionResult result = SubscriptionTextParser.parse(text, TODAY);
 
         assertThat(result.serviceName()).isEqualTo("넷플릭스");
+        assertThat(result.serviceCode()).isEqualTo("NETFLIX");
         assertThat(result.category()).isEqualTo(SubscriptionCategory.OTT);
         assertThat(result.price()).isEqualTo(17000L);
         assertThat(result.firstBillingDate()).isEqualTo(LocalDate.of(2026, 7, 15));
@@ -52,6 +53,7 @@ class SubscriptionTextParserTest {
         OcrSubscriptionResult result = SubscriptionTextParser.parse(text, TODAY);
 
         assertThat(result.serviceName()).isEqualTo("이상한서비스 정기결제");
+        assertThat(result.serviceCode()).isNull();
         assertThat(result.category()).isNull();
     }
 
@@ -71,6 +73,33 @@ class SubscriptionTextParserTest {
         OcrSubscriptionResult result = SubscriptionTextParser.parse(text, TODAY);
 
         assertThat(result.price()).isNull();
+    }
+
+    @Test
+    void 금액이_카탈로그_요금제와_일치하면_요금제명을_채운다() {
+        String text = "[카드승인]\n넷플릭스\n17,000원 결제\n2026.07.15";
+
+        OcrSubscriptionResult result = SubscriptionTextParser.parse(text, TODAY);
+
+        assertThat(result.planName()).isEqualTo("프리미엄");
+    }
+
+    @Test
+    void 금액이_어떤_요금제와도_다르면_요금제명은_null이고_인식한_금액을_그대로_유지한다() {
+        // 할인·프로모션가로 결제한 경우 — 카탈로그 정가로 덮어쓰지 않는다.
+        String text = "[카드승인]\n넷플릭스\n9,900원 결제\n2026.07.15";
+
+        OcrSubscriptionResult result = SubscriptionTextParser.parse(text, TODAY);
+
+        assertThat(result.planName()).isNull();
+        assertThat(result.price()).isEqualTo(9900L);
+    }
+
+    @Test
+    void 서비스를_매칭하지_못하면_요금제명은_null이다() {
+        OcrSubscriptionResult result = SubscriptionTextParser.parse("이상한서비스 결제\n17,000원", TODAY);
+
+        assertThat(result.planName()).isNull();
     }
 
     @Test

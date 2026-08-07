@@ -4,6 +4,8 @@ import com.scrumble.gudocs.global.response.ApiResponse;
 import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionCreateRequest;
 import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionStatusUpdateRequest;
 import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionUpdateRequest;
+import com.scrumble.gudocs.subscriptions.catalog.ServiceCatalog;
+import com.scrumble.gudocs.subscriptions.dto.response.CatalogResponse;
 import com.scrumble.gudocs.subscriptions.dto.response.SubscriptionResponse;
 import com.scrumble.gudocs.subscriptions.service.SubscriptionService;
 import jakarta.validation.Valid;
@@ -76,6 +78,14 @@ public class SubscriptionController implements SubscriptionApi {
             @RequestParam String name) {
         boolean isDuplicate = subscriptionService.isDuplicateName(userId, name);
         return ResponseEntity.ok(ApiResponse.success("서비스명 중복 확인", isDuplicate));
+    }
+
+    @Override
+    @GetMapping("/catalog")
+    public ResponseEntity<ApiResponse<CatalogResponse>> getCatalog() {
+        // 정적 데이터라 서비스 계층을 거치지 않는다.
+        CatalogResponse response = CatalogResponse.from(ServiceCatalog.services());
+        return ResponseEntity.ok(ApiResponse.success("구독 서비스 카탈로그 조회 성공", response));
     }
 
     @Override

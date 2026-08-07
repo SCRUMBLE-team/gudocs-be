@@ -58,7 +58,7 @@ class ExpenseControllerTest {
                           BillingCycle cycle, int day, Integer month) throws Exception {
         LocalDate firstBillingDate = LocalDate.of(2025, month != null ? month : 1, day);
         SubscriptionCreateRequest req = new SubscriptionCreateRequest(
-                name, category, price, cycle, firstBillingDate);
+                name, null, category, price, cycle, firstBillingDate);
         MvcResult result = mockMvc.perform(post("/api/subscriptions")
                         .session(session)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -369,6 +369,27 @@ class ExpenseControllerTest {
 
         mockMvc.perform(get("/api/subscriptions/" + deletedId).session(session))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void 지출_상세에_serviceCode가_포함된다() throws Exception {
+        // 프론트가 표시 이름이 아니라 code로 로고를 찾을 수 있어야 한다.
+        YearMonth now = YearMonth.now();
+        mockMvc.perform(post("/api/subscriptions")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new SubscriptionCreateRequest(
+                                "넷플릭스", "NETFLIX", SubscriptionCategory.OTT, 17000L,
+                                BillingCycle.MONTHLY, now.atDay(1)))))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/subscriptions/expenses/monthly/details")
+                        .param("year", String.valueOf(now.getYear()))
+                        .param("month", String.valueOf(now.getMonthValue()))
+                        .session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.subscriptions[0].serviceName").value("넷플릭스"))
+                .andExpect(jsonPath("$.data.subscriptions[0].serviceCode").value("NETFLIX"));
     }
 
     @Test

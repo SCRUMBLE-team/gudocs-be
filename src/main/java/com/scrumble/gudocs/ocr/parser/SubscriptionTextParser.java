@@ -1,6 +1,7 @@
 package com.scrumble.gudocs.ocr.parser;
 
 import com.scrumble.gudocs.ocr.dto.response.OcrSubscriptionResult;
+import com.scrumble.gudocs.subscriptions.catalog.ServiceCatalog;
 import com.scrumble.gudocs.subscriptions.entity.BillingCycle;
 import com.scrumble.gudocs.subscriptions.entity.SubscriptionCategory;
 
@@ -28,17 +29,26 @@ public final class SubscriptionTextParser {
     public static OcrSubscriptionResult parse(String ocrText, LocalDate today) {
         String text = ocrText == null ? "" : ocrText;
 
-        var matched = KnownServiceRegistry.match(text);
+        var matched = ServiceCatalog.match(text);
         String serviceName = matched
                 .map(service -> service.canonicalName())
                 .orElseGet(() -> guessServiceName(text));
+        String serviceCode = matched.map(service -> service.code()).orElse(null);
         SubscriptionCategory category = matched.map(service -> service.category()).orElse(null);
 
         Long price = parsePrice(text);
         LocalDate firstBillingDate = parseDate(text, today);
         BillingCycle billingCycle = parseBillingCycle(text);
 
-        return new OcrSubscriptionResult(serviceName, category, price, billingCycle, firstBillingDate);
+        // 영수증에서 읽은 금액이 항상 우선이다. 카탈로그 값으로 덮어쓰지 않고, 금액이 정확히 일치하는
+        // 요금제가 있을 때만 이름을 덧붙인다 — 할인·프로모션·구 요금제 사용자가 있기 때문.
+        String planName = matched
+                .flatMap(service -> service.planByPrice(price))
+                .map(plan -> plan.name())
+                .orElse(null);
+
+        return new OcrSubscriptionResult(
+                serviceName, serviceCode, category, price, planName, billingCycle, firstBillingDate);
     }
 
     private static String guessServiceName(String text) {

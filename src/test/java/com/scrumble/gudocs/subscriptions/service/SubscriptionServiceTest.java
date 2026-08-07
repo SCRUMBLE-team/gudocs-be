@@ -55,7 +55,7 @@ class SubscriptionServiceTest {
     void 구독_등록_성공() {
         User user = UserFixture.create();
         SubscriptionCreateRequest request = new SubscriptionCreateRequest(
-                "Netflix", SubscriptionCategory.OTT, 17000L,
+                "Netflix", null, SubscriptionCategory.OTT, 17000L,
                 BillingCycle.MONTHLY, LocalDate.of(2025, 1, 15)
         );
         given(userRepository.findById(1L)).willReturn(Optional.of(user));
@@ -72,7 +72,7 @@ class SubscriptionServiceTest {
     void 구독_등록_연간결제_성공() {
         User user = UserFixture.create();
         SubscriptionCreateRequest request = new SubscriptionCreateRequest(
-                "Adobe", SubscriptionCategory.DESIGN, 60000L,
+                "Adobe", null, SubscriptionCategory.DESIGN, 60000L,
                 BillingCycle.YEARLY, LocalDate.of(2025, 3, 1)
         );
         given(userRepository.findById(1L)).willReturn(Optional.of(user));
@@ -88,7 +88,7 @@ class SubscriptionServiceTest {
         User user = UserFixture.create();
         Subscription subscription = testSubscription(user);
         SubscriptionUpdateRequest request = new SubscriptionUpdateRequest(
-                "Netflix Premium", SubscriptionCategory.OTT, 20000L,
+                "Netflix Premium", null, SubscriptionCategory.OTT, 20000L,
                 BillingCycle.MONTHLY, LocalDate.of(2025, 2, 20)
         );
         given(userRepository.findById(1L)).willReturn(Optional.of(user));
