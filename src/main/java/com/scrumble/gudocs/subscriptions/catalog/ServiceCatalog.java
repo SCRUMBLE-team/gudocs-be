@@ -138,7 +138,8 @@ public final class ServiceCatalog {
                             new Plan("음악감상 (PC+모바일)", 9240L, MONTHLY),
                             new Plan("초고음질 무제한", 15400L, MONTHLY))),
             service("BUGS", "벅스", MUSIC, List.of("bugs", "벅스뮤직"),
-                    List.of(new Plan("무제한 듣기", 8690L, MONTHLY))),
+                    List.of(new Plan("무제한 듣기", 8690L, MONTHLY),
+                            new Plan("듣기 + MP3 30곡", 12900L, MONTHLY))),
 
             service("ICLOUD", "iCloud", CLOUD, List.of("아이클라우드"),
                     List.of(new Plan("50GB", 1100L, MONTHLY),
