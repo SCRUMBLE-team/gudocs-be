@@ -175,6 +175,7 @@ ServiceCatalog.java (BE 단일 소스)
   - `V2__notification_dedup_userlevel.sql` — 구 수동 `V20260804` 승계 + `user_notifications.type` enum에 `SUBSCRIPTION_REVIEW` 추가(누락 시 검사 유도 알림 INSERT 실패하던 드리프트 정합화).
   - `V3__spring_session.sql` — 세션 테이블.
   - `V4__subscription_service_code.sql` — `subscriptions.service_code` 추가(nullable). 기존 행 백필 없음 — 승격 시점에 운영 데이터가 없었다.
+  - `V5__nullable_email.sql` — `users.email`·`social_accounts.email`을 nullable로. 엔티티는 이미 nullable이었으나 스키마가 `NOT NULL`로 남아 카카오 이메일 미동의 계정의 최초 로그인이 500으로 실패했다.
 - **배포**: Flyway가 앱 기동 시 자동 실행 → `systemctl restart gudocs` 만으로 마이그레이션 반영(수동 SSH SQL 불필요).
 - **local/test**: H2라 `flyway.enabled=false` + `ddl-auto=create-drop` 유지(MySQL 방언 마이그레이션 미적용). 세션 테이블은 local은 `session.jdbc.initialize-schema=embedded`로 H2 자동 생성, **test는 `SessionAutoConfiguration` 제외**(테스트는 `MockHttpSession`에 SecurityContext를 직접 심어 인증 → Spring Session 필터가 켜지면 인증 유실). `spring.session.store-type`은 Boot 3.4+에서 제거된 프로퍼티라 무효.
 
@@ -282,4 +283,5 @@ ServiceCatalog.java (BE 단일 소스)
 - 다른 사용자 데이터 접근 가능한 API 금지 — 현재 로그인 사용자 기준만 (`@CurrentUserId Long userId`)
 - 배포 설정 변경 시 `deploy/env.example`과 `application.yaml` 기본값 동시 점검
 - CORS 도메인 추가는 코드가 아니라 `CORS_ALLOWED_ORIGINS` 환경변수에서 처리
-- 스키마 변경은 Flyway 마이그레이션(`src/main/resources/db/migration/V<n>__<설명>.sql`)으로 작성 — 앱 기동 시 자동 적용. `ddl-auto=validate`라 엔티티와 스키마가 어긋나면 기동 실패로 조기 감지됨. (`deploy/migrations/`는 승격 이전 아카이브, 신규 추가 금지)
+- 스키마 변경은 Flyway 마이그레이션(`src/main/resources/db/migration/V<n>__<설명>.sql`)으로 작성 — 앱 기동 시 자동 적용. (`deploy/migrations/`는 승격 이전 아카이브, 신규 추가 금지)
+- **엔티티의 nullability 변경(`@Column(nullable=false)` ↔ `@Column`)도 반드시 마이그레이션을 함께 쓴다.** `ddl-auto=validate`는 컬럼 존재·타입만 검사하고 **nullability는 검사하지 않아** 스키마가 어긋난 채로 기동이 성공한다. 테스트도 못 잡는다 — local/test는 H2 + `ddl-auto=create-drop`이라 엔티티에서 스키마를 새로 만들고 MySQL 마이그레이션은 적용되지 않는다(`flyway.enabled=false`). 즉 **이 종류의 드리프트는 운영 INSERT 시점에 500으로만 드러난다.** 실제로 카카오 이메일 미동의 로그인이 이렇게 터졌다(엔티티만 nullable로 바꾸고 스키마는 `NOT NULL` 유지 → `V5__nullable_email.sql`로 정합화)
