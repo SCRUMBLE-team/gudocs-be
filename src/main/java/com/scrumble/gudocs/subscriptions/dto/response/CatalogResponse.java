@@ -50,7 +50,11 @@ public record CatalogResponse(
             Long price,
 
             @Schema(description = "결제 주기", example = "MONTHLY")
-            BillingCycle billingCycle
+            BillingCycle billingCycle,
+
+            @Schema(description = "달러 요금을 환산한 추정치인지. true면 실제 결제액이 환율·해외결제 "
+                    + "수수료에 따라 달라진다는 안내를 함께 보여줄 것.", example = "false")
+            boolean approximate
     ) {
     }
 
@@ -68,7 +72,8 @@ public record CatalogResponse(
                 service.category(),
                 service.selectable(),
                 service.plans().stream()
-                        .map(plan -> new CatalogPlanResponse(plan.name(), plan.price(), plan.billingCycle()))
+                        .map(plan -> new CatalogPlanResponse(
+                                plan.name(), plan.price(), plan.billingCycle(), plan.approximate()))
                         .toList());
     }
 }

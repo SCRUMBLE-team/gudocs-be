@@ -167,6 +167,27 @@ class ServiceCatalogTest {
     }
 
     @Test
+    void 달러_청구_요금제는_추정치로_표시된다() {
+        // 환율 환산값이라 실제 청구액과 다를 수 있다는 안내를 화면이 붙일 수 있어야 한다.
+        ServiceCatalog.CatalogService claude = ServiceCatalog.findByCode("CLAUDE").orElseThrow();
+        assertThat(claude.plans()).isNotEmpty().allSatisfy(plan ->
+                assertThat(plan.approximate()).isTrue());
+
+        // 원화 정가인 요금제에는 붙지 않는다 — 붙이면 오히려 틀린 안내가 된다.
+        ServiceCatalog.CatalogService netflix = ServiceCatalog.findByCode("NETFLIX").orElseThrow();
+        assertThat(netflix.plans()).isNotEmpty().allSatisfy(plan ->
+                assertThat(plan.approximate()).isFalse());
+    }
+
+    @Test
+    void 환산_요금제는_100원_단위로_반올림된다() {
+        assertThat(ServiceCatalog.services()).allSatisfy(service ->
+                service.plans().stream()
+                        .filter(ServiceCatalog.Plan::approximate)
+                        .forEach(plan -> assertThat(plan.price() % 100).isZero()));
+    }
+
+    @Test
     void 카탈로그_데이터가_정합적이다() {
         assertThat(ServiceCatalog.services()).isNotEmpty();
 
