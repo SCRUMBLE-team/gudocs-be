@@ -1,5 +1,6 @@
 package com.scrumble.gudocs.subscriptions.catalog;
 
+import com.scrumble.gudocs.subscriptions.entity.BillingCycle;
 import com.scrumble.gudocs.subscriptions.entity.SubscriptionCategory;
 import org.junit.jupiter.api.Test;
 
@@ -164,6 +165,39 @@ class ServiceCatalogTest {
                 .filteredOn(service -> !service.selectable())
                 .isNotEmpty()
                 .allSatisfy(service -> assertThat(service.plans()).isEmpty());
+    }
+
+    @Test
+    void 새로_채운_서비스의_가격과_주기를_고정한다() {
+        // 데이터 파일이라 오타 한 글자로 조용히 틀린 금액이 나갈 수 있다. 확인한 값을 못 박는다.
+        assertPlan("APPLE_TV", "월간 구독", 6500L, BillingCycle.MONTHLY);
+        assertPlan("GENIE_MUSIC", "스마트 음악감상", 8140L, BillingCycle.MONTHLY);
+        assertPlan("GENIE_MUSIC", "초고음질 무제한", 15400L, BillingCycle.MONTHLY);
+        assertPlan("NAVER_CLOUD", "80GB", 1650L, BillingCycle.MONTHLY);
+        assertPlan("NAVER_CLOUD", "2TB", 11000L, BillingCycle.MONTHLY);
+        assertPlan("ONEDRIVE", "Microsoft 365 Basic (100GB)", 2900L, BillingCycle.MONTHLY);
+        assertPlan("ONEDRIVE", "Microsoft 365 Basic (100GB, 연간)", 29900L, BillingCycle.YEARLY);
+        assertPlan("EA_PLAY", "EA Play", 7000L, BillingCycle.MONTHLY);
+        assertPlan("EA_PLAY", "EA Play (연간)", 54000L, BillingCycle.YEARLY);
+    }
+
+    @Test
+    void PS_Plus_에센셜은_스페셜_가격과_섞이지_않는다() {
+        // 에센셜에 스페셜 가격(16,200)이 들어갔던 적이 있다. 세 티어를 함께 고정한다.
+        assertPlan("PS_PLUS", "에센셜", 12000L, BillingCycle.MONTHLY);
+        assertPlan("PS_PLUS", "스페셜", 16200L, BillingCycle.MONTHLY);
+        assertPlan("PS_PLUS", "디럭스", 19000L, BillingCycle.MONTHLY);
+    }
+
+    private void assertPlan(String code, String planName, Long price, BillingCycle cycle) {
+        ServiceCatalog.CatalogService service = ServiceCatalog.findByCode(code).orElseThrow();
+        assertThat(service.plans())
+                .as("%s / %s", code, planName)
+                .anySatisfy(plan -> {
+                    assertThat(plan.name()).isEqualTo(planName);
+                    assertThat(plan.price()).isEqualTo(price);
+                    assertThat(plan.billingCycle()).isEqualTo(cycle);
+                });
     }
 
     @Test
