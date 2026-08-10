@@ -1,6 +1,7 @@
 package com.scrumble.gudocs.subscriptions.controller;
 
 import com.scrumble.gudocs.global.response.ApiResponse;
+import com.scrumble.gudocs.subscriptions.dto.request.SavingsSelectionRequest;
 import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionCreateRequest;
 import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionStatusUpdateRequest;
 import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionUpdateRequest;
@@ -94,6 +95,31 @@ public interface SubscriptionApi {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "로그인 필요")
     })
     ResponseEntity<ApiResponse<CatalogResponse>> getCatalog();
+
+    @Operation(summary = "절약 후보 구독 조회",
+            description = "절약하기 화면에서 해지 후보로 체크해 둔 구독 목록을 조회합니다. "
+                    + "선택 시각 기준 최신순입니다(한 번에 여러 건을 고르면 시각이 사실상 같으므로 "
+                    + "그 안에서는 id 내림차순 — 사용자가 체크한 순서는 서버가 알 수 없습니다). "
+                    + "알림을 받고 화면에 들어왔을 때 이 API로 최신 목록을 받습니다 "
+                    + "(알림 payload에는 구독 id를 싣지 않습니다 — 발송 시점 스냅샷이라 그 사이 변경과 어긋납니다).")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "로그인 필요")
+    })
+    ResponseEntity<ApiResponse<List<SubscriptionResponse>>> getSavingsSelection(@CurrentUserId Long userId);
+
+    @Operation(summary = "절약 후보 구독 저장",
+            description = "절약하기 화면에서 체크한 구독 id 목록을 저장합니다. 현재 선택을 요청 목록으로 "
+                    + "통째로 대체하므로 빈 배열이면 전체 해제이고, 같은 요청을 반복해도 결과가 같습니다. "
+                    + "본인 구독이 아니거나 없는 id가 섞여 있으면 아무것도 저장하지 않고 404를 반환합니다.")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "저장 성공"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "유효하지 않은 요청"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "로그인 필요"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "구독 없음")
+    })
+    ResponseEntity<ApiResponse<List<SubscriptionResponse>>> replaceSavingsSelection(@CurrentUserId Long userId,
+            @Valid @RequestBody SavingsSelectionRequest request);
 
     @Operation(summary = "구독 상태 변경", description = "구독 상태를 ACTIVE 또는 PAUSED로 변경합니다.")
     @ApiResponses({

@@ -1,6 +1,7 @@
 package com.scrumble.gudocs.subscriptions.controller;
 
 import com.scrumble.gudocs.global.response.ApiResponse;
+import com.scrumble.gudocs.subscriptions.dto.request.SavingsSelectionRequest;
 import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionCreateRequest;
 import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionStatusUpdateRequest;
 import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionUpdateRequest;
@@ -87,6 +88,23 @@ public class SubscriptionController implements SubscriptionApi {
         // 정적 데이터라 서비스 계층을 거치지 않는다.
         CatalogResponse response = CatalogResponse.from(ServiceCatalog.services());
         return ResponseEntity.ok(ApiResponse.success("구독 서비스 카탈로그 조회 성공", response));
+    }
+
+    @Override
+    @GetMapping("/savings-selection")
+    public ResponseEntity<ApiResponse<List<SubscriptionResponse>>> getSavingsSelection(
+            @CurrentUserId Long userId) {
+        List<SubscriptionResponse> response = subscriptionService.getSavingsSelection(userId);
+        return ResponseEntity.ok(ApiResponse.success("절약 후보 구독 조회 성공", response));
+    }
+
+    @Override
+    @PutMapping("/savings-selection")
+    public ResponseEntity<ApiResponse<List<SubscriptionResponse>>> replaceSavingsSelection(
+            @CurrentUserId Long userId,
+            @Valid @RequestBody SavingsSelectionRequest request) {
+        List<SubscriptionResponse> response = subscriptionService.replaceSavingsSelection(userId, request);
+        return ResponseEntity.ok(ApiResponse.success("절약 후보 구독 저장 성공", response));
     }
 
     @Override

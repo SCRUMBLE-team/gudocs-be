@@ -50,8 +50,9 @@ deploy/             # EC2 배포 리소스 (setup.sh, systemd, Caddyfile, mysql-
 - `UNIQUE(provider, provider_id)` — 로그인 조회키
 - `UNIQUE(user_id, provider)` — 같은 provider 중복 연결 금지
 
-**subscriptions** — id, user_id(FK), service_name, service_code(**nullable**), category, price, billing_cycle, first_billing_date(최초 결제일 앵커), status, paused_at, deleted_at(soft delete), created_at, updated_at
+**subscriptions** — id, user_id(FK), service_name, service_code(**nullable**), category, price, billing_cycle, first_billing_date(최초 결제일 앵커), status, paused_at, deleted_at(soft delete), savings_selected_at, created_at, updated_at
 - `service_code`: 카탈로그 서비스의 불변 키(`ServiceCatalog.code`, 예 `NETFLIX`). **프론트가 로고를 찾는 기준**이다. 표시 이름은 오타 수정·브랜드 변경으로 바뀌므로 조인 키로 쓸 수 없다. 카탈로그에 없는 서비스를 직접 입력해 등록하면 null(로고 없음). 쓰기 시점에 카탈로그 존재 여부를 검증해 없는 코드면 400(`UNKNOWN_SERVICE_CODE`) — 저장돼 버리면 영영 로고를 못 찾기 때문. `V4__subscription_service_code.sql`
+- `savings_selected_at`: 절약하기 화면에서 **해지 후보로 체크한 시각**(NULL = 선택 안 함). 나중에 이 목록으로 알림을 보내야 하므로 화면 로컬이 아니라 서버에 남긴다. boolean이 아니라 시각인 이유는 "고른 지 N일 지났다" 같은 알림 문구·주기를 만들 수 있어서다. 이미 선택된 구독을 다시 선택해도 시각을 갱신하지 않는다(화면 저장할 때마다 기준이 초기화되면 안 됨). `V6__subscription_savings_selection.sql`
 - `first_billing_date`: 다음 결제일 계산의 단일 기준 앵커. 기존 `billing_day`+`billing_month`를 통합. 다음 결제일은 저장하지 않고 `NextBillingDateCalculator`가 앵커+주기로 재계산(월말 드리프트 없음)
 
 **push_registrations** — id, user_id(FK), fid, platform, device_name, enabled, last_registered_at, created_at, updated_at
@@ -91,6 +92,7 @@ enum:
 | PUT | `/api/subscriptions/{id}/status` | ○ |
 | GET | `/api/subscriptions/check-name?name=` (활성 구독 서비스명 중복 확인 — 경고 용도) | ○ |
 | GET | `/api/subscriptions/catalog` (등록 화면용 서비스·요금제 목록) | ○ |
+| GET / PUT | `/api/subscriptions/savings-selection` (절약하기 화면에서 체크한 해지 후보 조회/저장) | ○ |
 | GET | `/api/subscriptions/expenses/{monthly,categories,trends,monthly/details}` | ○ |
 | GET | `/api/dashboard` | ○ |
 | POST | `/api/push-registrations` (FCM 기기 등록 upsert) | ○ |
@@ -180,6 +182,7 @@ ServiceCatalog.java (BE 단일 소스)
   - `V2__notification_dedup_userlevel.sql` — 구 수동 `V20260804` 승계 + `user_notifications.type` enum에 `SUBSCRIPTION_REVIEW` 추가(누락 시 검사 유도 알림 INSERT 실패하던 드리프트 정합화).
   - `V3__spring_session.sql` — 세션 테이블.
   - `V4__subscription_service_code.sql` — `subscriptions.service_code` 추가(nullable). 기존 행 백필 없음 — 승격 시점에 운영 데이터가 없었다.
+  - `V6__subscription_savings_selection.sql` — `subscriptions.savings_selected_at` 추가(nullable). 절약하기 화면의 해지 후보 체크를 서버에 보관한다.
   - `V5__nullable_email.sql` — `users.email`·`social_accounts.email`을 nullable로. 엔티티는 이미 nullable이었으나 스키마가 `NOT NULL`로 남아 카카오 이메일 미동의 계정의 최초 로그인이 500으로 실패했다.
 - **배포**: Flyway가 앱 기동 시 자동 실행 → `systemctl restart gudocs` 만으로 마이그레이션 반영(수동 SSH SQL 불필요).
 - **local/test**: H2라 `flyway.enabled=false` + `ddl-auto=create-drop` 유지(MySQL 방언 마이그레이션 미적용). 세션 테이블은 local은 `session.jdbc.initialize-schema=embedded`로 H2 자동 생성, **test는 `SessionAutoConfiguration` 제외**(테스트는 `MockHttpSession`에 SecurityContext를 직접 심어 인증 → Spring Session 필터가 켜지면 인증 유실). `spring.session.store-type`은 Boot 3.4+에서 제거된 프로퍼티라 무효.
@@ -199,6 +202,7 @@ ServiceCatalog.java (BE 단일 소스)
 - **PushSender 추상화**: `FcmPushSender`(firebase enabled=true, Firebase Admin SDK) / `NoopPushSender`(비활성·기본, 실제 발송 안 함) — `@ConditionalOnProperty`로 택1. local/test는 Noop
 - **트랜잭션 경계**: 발송 서비스는 클래스/메서드 `@Transactional` 없음 → repository 저장이 개별 커밋. 특정 기기 발송 실패(캐치)가 알림 이력이나 다른 기기 처리를 롤백하지 않음. 중복은 `user_notifications` UNIQUE 제약 + 삽입 시 `DataIntegrityViolationException` 캐치로 다중 서버 대응
 - **FCM payload** — notification: `title`/`body`는 알림 종류·묶음 수에 따라 구성(위 참고) / data(모두 문자열): `type`(BILLING_REMINDER|SUBSCRIPTION_REVIEW), `link`. 클릭 이동 경로는 FE Service Worker가 `data.type`으로 분기(BILLING_REMINDER→`{FRONTEND_BASE_URL}/notifications` 알림함, SUBSCRIPTION_REVIEW→`{FRONTEND_BASE_URL}/subscriptions` 구독 점검). 묶음/유저 단위 알림이라 단일 `subscriptionId`는 싣지 않음
+- **알림 payload에 구독 id 목록을 싣지 않는다.** 절약 후보처럼 여러 구독을 가리키는 알림도 `type`+`link`만 보내고, FE는 화면 진입 시 `GET /api/subscriptions/savings-selection`으로 최신 목록을 받는다. payload는 **발송 시점 스냅샷**이라 받은 뒤 클릭하기까지 사이에 해지·삭제·선택 변경이 일어나면 어긋난다(D-3처럼 며칠 간격이면 실제로 벌어지는 틈이다). data는 전부 문자열이라 id 목록은 `"1,2,5"` 파싱이 필요하기도 하다. 문구에 쓰는 "3건" 같은 개수는 발송 시점에 계산해 title/body에 넣는다
 - **회원 탈퇴**: `UserService.deleteAccount`가 user 삭제 전에 `user_notifications`·`push_registrations`를 먼저 정리
 - **발송 대상**: `fid`는 Firebase Installation ID. `firebase-admin` 9.10.0+의 `Message.Builder.setFid()`로 발송(구 `setToken`은 legacy registration token 호환용으로 deprecated → 미사용)
 - **의존성**: `com.google.firebase:firebase-admin:9.10.0`. 크레덴셜은 `GOOGLE_APPLICATION_CREDENTIALS`(서비스 계정 JSON). 스키마는 Flyway 관리(아래 참고)
