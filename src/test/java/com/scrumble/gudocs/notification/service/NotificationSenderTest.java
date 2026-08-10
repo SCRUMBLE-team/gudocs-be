@@ -47,7 +47,7 @@ class NotificationSenderTest {
     private NotificationSender notificationSender;
 
     private NotificationDraft draft() {
-        return new NotificationDraft(
+        return NotificationDraft.forUser(
                 NotificationType.BILLING_REMINDER, TODAY, 0, "제목", "본문",
                 Map.of("type", "BILLING_REMINDER", "link", "https://x/notifications"));
     }
@@ -58,8 +58,9 @@ class NotificationSenderTest {
     }
 
     private void givenNoExistingHistory() {
-        given(userNotificationRepository.findByUserIdAndTypeAndTargetDateAndRemindOffset(
-                eq(USER_ID), eq(NotificationType.BILLING_REMINDER), any(), eq(0)))
+        given(userNotificationRepository.findByUserIdAndTypeAndTargetDateAndRemindOffsetAndSubscriptionId(
+                eq(USER_ID), eq(NotificationType.BILLING_REMINDER), any(), eq(0),
+                eq(UserNotification.NO_SUBSCRIPTION)))
                 .willReturn(Optional.empty());
         given(userNotificationRepository.saveAndFlush(any(UserNotification.class)))
                 .willAnswer(inv -> inv.getArgument(0));
@@ -114,8 +115,9 @@ class NotificationSenderTest {
                 .userId(USER_ID).type(NotificationType.BILLING_REMINDER).remindOffset(0)
                 .title("t").body("b").targetDate(TODAY).build();
         alreadySent.markSent(LocalDateTime.of(2026, 5, 10, 9, 0)); // sentAt != null
-        given(userNotificationRepository.findByUserIdAndTypeAndTargetDateAndRemindOffset(
-                eq(USER_ID), eq(NotificationType.BILLING_REMINDER), any(), eq(0)))
+        given(userNotificationRepository.findByUserIdAndTypeAndTargetDateAndRemindOffsetAndSubscriptionId(
+                eq(USER_ID), eq(NotificationType.BILLING_REMINDER), any(), eq(0),
+                eq(UserNotification.NO_SUBSCRIPTION)))
                 .willReturn(Optional.of(alreadySent));
 
         notificationSender.send(USER_ID, draft());
@@ -130,8 +132,9 @@ class NotificationSenderTest {
         UserNotification pending = UserNotification.builder()
                 .userId(USER_ID).type(NotificationType.BILLING_REMINDER).remindOffset(0)
                 .title("t").body("b").targetDate(TODAY).build(); // sentAt == null
-        given(userNotificationRepository.findByUserIdAndTypeAndTargetDateAndRemindOffset(
-                eq(USER_ID), eq(NotificationType.BILLING_REMINDER), any(), eq(0)))
+        given(userNotificationRepository.findByUserIdAndTypeAndTargetDateAndRemindOffsetAndSubscriptionId(
+                eq(USER_ID), eq(NotificationType.BILLING_REMINDER), any(), eq(0),
+                eq(UserNotification.NO_SUBSCRIPTION)))
                 .willReturn(Optional.of(pending));
         given(pushRegistrationRepository.findByUserIdAndEnabledTrue(USER_ID))
                 .willReturn(List.of(registration(1L, "fid-A")));

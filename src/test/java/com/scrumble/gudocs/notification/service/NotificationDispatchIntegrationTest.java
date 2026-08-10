@@ -1,6 +1,7 @@
 package com.scrumble.gudocs.notification.service;
 
 import com.scrumble.gudocs.common.TestSessions;
+import com.scrumble.gudocs.notification.entity.NotificationType;
 import com.scrumble.gudocs.notification.entity.PushPlatform;
 import com.scrumble.gudocs.notification.entity.PushRegistration;
 import com.scrumble.gudocs.notification.push.PushMessage;
@@ -25,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -114,7 +116,9 @@ class NotificationDispatchIntegrationTest {
         assertThat(userNotificationRepository.count()).isEqualTo(1);
         UserNotification saved = userNotificationRepository.findAll().get(0);
         assertThat(saved.getRemindOffset()).isEqualTo(3);
-        assertThat(saved.getSubscriptionId()).isNull(); // 묶음 알림 → 특정 구독 없음
+        // 묶음 알림 → 특정 구독 없음. NULL 이 아니라 sentinel 인 이유는 MySQL UNIQUE 가 NULL 을
+        // 서로 다른 값으로 봐서, dedup 키에 subscription_id 를 넣는 순간 중복 방지가 풀리기 때문이다.
+        assertThat(saved.getSubscriptionId()).isEqualTo(UserNotification.NO_SUBSCRIPTION);
         verify(pushSender, times(1)).send(anyString(), any(PushMessage.class));
     }
 
@@ -143,6 +147,31 @@ class NotificationDispatchIntegrationTest {
         dispatchService.dispatchDueReminders(TODAY);
 
         // 결제일이 다르므로 묶이지 않고 2건
+        assertThat(userNotificationRepository.count()).isEqualTo(2);
+        verify(pushSender, times(2)).send(anyString(), any(PushMessage.class));
+    }
+
+    @Test
+    void 절약_후보_D3는_구독별_해지_알림으로_남고_재실행해도_중복되지_않는다() {
+        Subscription netflix = saveSub("Netflix-D3", SubscriptionStatus.ACTIVE, TODAY.plusDays(3), false);
+        Subscription spotify = saveSub("Spotify-D3", SubscriptionStatus.ACTIVE, TODAY.plusDays(3), false);
+        netflix.updateSavingsSelection(true);
+        spotify.updateSavingsSelection(true);
+        subscriptionRepository.saveAll(List.of(netflix, spotify));
+        saveRegistration("fid-enabled", true);
+
+        dispatchService.dispatchDueReminders(TODAY);
+
+        // 같은 날 같은 단계라도 구독별로 1건씩 — dedup 키에 subscription_id 가 들어가기 때문이다.
+        assertThat(userNotificationRepository.findAll())
+                .hasSize(2)
+                .allSatisfy(n -> assertThat(n.getType()).isEqualTo(NotificationType.CANCEL_REMINDER))
+                .extracting(UserNotification::getSubscriptionId)
+                .containsExactlyInAnyOrder(netflix.getId(), spotify.getId());
+        verify(pushSender, times(2)).send(anyString(), any(PushMessage.class));
+
+        dispatchService.dispatchDueReminders(TODAY); // 재실행
+
         assertThat(userNotificationRepository.count()).isEqualTo(2);
         verify(pushSender, times(2)).send(anyString(), any(PushMessage.class));
     }
