@@ -304,6 +304,8 @@ class SubscriptionControllerTest {
                 .andExpect(jsonPath("$.data.services[?(@.code == 'NETFLIX')].category").value("OTT"))
                 .andExpect(jsonPath("$.data.services[?(@.code == 'NETFLIX')].selectable").value(true))
                 .andExpect(jsonPath("$.data.services[?(@.code == 'NETFLIX')].plans[0].price").value(7000))
+                .andExpect(jsonPath("$.data.services[?(@.code == 'NETFLIX')].cancelUrl")
+                        .value("https://www.netflix.com/cancelplan"))
                 .andExpect(jsonPath("$.data.services[?(@.code == 'CLOVA_X')].selectable").value(false))
                 // aliases 는 OCR 매칭 전용이라 응답에 노출하지 않는다.
                 .andExpect(jsonPath("$.data.services[0].aliases").doesNotExist());
@@ -329,6 +331,29 @@ class SubscriptionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.serviceCode").value("NETFLIX"))
                 .andExpect(jsonPath("$.data.serviceName").value("넷플릭스"));
+    }
+
+    @Test
+    void 구독_상세는_해지_링크를_함께_내려준다() throws Exception {
+        MvcResult result = 구독_등록(session, new SubscriptionCreateRequest(
+                "넷플릭스", "NETFLIX", SubscriptionCategory.OTT, 17000L,
+                BillingCycle.MONTHLY, LocalDate.of(2026, 1, 15)));
+
+        mockMvc.perform(get("/api/subscriptions/" + 구독_ID_추출(result)).session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.cancelUrl").value("https://www.netflix.com/cancelplan"));
+    }
+
+    @Test
+    void 직접_입력한_서비스는_해지_링크가_없다() throws Exception {
+        // 카탈로그에 없는 서비스라 해지 페이지를 알 수 없다 — 화면에서 링크를 감춘다.
+        MvcResult result = 구독_등록(session, new SubscriptionCreateRequest(
+                "동네 헬스장", null, SubscriptionCategory.ETC, 50000L,
+                BillingCycle.MONTHLY, LocalDate.of(2026, 1, 15)));
+
+        mockMvc.perform(get("/api/subscriptions/" + 구독_ID_추출(result)).session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.cancelUrl").doesNotExist());
     }
 
     @Test

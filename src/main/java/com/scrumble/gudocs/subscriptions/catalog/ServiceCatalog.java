@@ -38,6 +38,20 @@ import static com.scrumble.gudocs.subscriptions.entity.SubscriptionCategory.*;
  * 할인·프로모션·구 요금제 적용 사용자도 있으므로 이 값은 어디까지나 기본값(참고값)이다.
  * 신뢰할 만한 원화 가격을 확인하지 못한 서비스는 추측해서 채우지 않고 {@code plans}를 비워 둔다
  * (해외 결제라 원화 정가가 없는 서비스, 종료된 서비스, 구독이 아니라 건별 구매인 서비스 포함).
+ *
+ * <h2>해지 링크({@code cancelUrl})</h2>
+ * 구독 상세 화면의 "해지하러 가기" 링크다. 요금과 마찬가지로 정적 상수이며 다음 규칙으로 채운다.
+ * <ul>
+ *     <li>공개적으로 안정된 <b>해지·구독관리 딥링크</b>가 있으면 그것을 쓴다
+ *         (넷플릭스 {@code /cancelplan}, 애플 구독 관리, Google One 설정 등).</li>
+ *     <li>국내 서비스 상당수는 로그인 후 마이페이지로 들어가는 구조라 딥링크가 공개돼 있지 않다.
+ *         이때는 <b>깨지지 않는 상위 URL(서비스 홈)</b>을 쓴다. 추측한 경로를 넣으면 404로 이어져
+ *         링크가 없는 것보다 나쁘다.</li>
+ *     <li>해지할 결제가 없거나(무료 서비스) 실제 해지 대상이 다른 서비스면 {@code null}로 두고
+ *         화면에서 링크를 감춘다.</li>
+ * </ul>
+ * 이 링크는 <b>웹 결제 기준</b>이다. App Store·Google Play 인앱결제로 가입했다면 각 스토어에서
+ * 해지해야 하며 이 링크로는 해지되지 않는다 — 화면에 그 안내를 함께 노출한다.
  */
 public final class ServiceCatalog {
 
@@ -78,9 +92,12 @@ public final class ServiceCatalog {
      * @param selectable 신규 구독 등록 대상으로 고를 수 있는지. false 면 등록 화면 선택지에서 빠지고
      *                   서버도 이 code 로 들어온 등록을 거부한다. 다만 과거 영수증을 계속 인식해야 하므로
      *                   OCR 매칭 대상으로는 남는다. (종료된 서비스, 독립 구독 상품이 아닌 서비스)
+     * @param cancelUrl  해지를 시작할 수 있는 페이지. {@code null} 이면 화면에 해지 링크를 띄우지 않는다.
+     *                   자세한 규칙은 {@link ServiceCatalog} 클래스 주석 참고.
      */
     public record CatalogService(String code, String canonicalName, SubscriptionCategory category,
-                                 boolean selectable, List<String> aliases, List<Plan> plans) {
+                                 boolean selectable, String cancelUrl,
+                                 List<String> aliases, List<Plan> plans) {
 
         /** OCR로 읽은 금액과 정확히 일치하는 요금제를 찾는다. 없으면 비어 있는 값. */
         public Optional<Plan> planByPrice(Long price) {
@@ -92,211 +109,242 @@ public final class ServiceCatalog {
     }
 
     private static CatalogService service(String code, String name, SubscriptionCategory category,
-                                          List<String> aliases, List<Plan> plans) {
-        return new CatalogService(code, name, category, true, aliases, plans);
+                                          String cancelUrl, List<String> aliases, List<Plan> plans) {
+        return new CatalogService(code, name, category, true, cancelUrl, aliases, plans);
     }
 
     /**
      * OCR 인식 전용 항목. 신규 등록 대상이 아니므로 요금제를 두지 않는다.
      * 서비스가 종료됐거나, 살아 있어도 독립적으로 결제하는 구독 상품이 아닌 경우다.
+     * 해지 링크도 두지 않는다 — 종료된 서비스는 해지할 것이 없고, 독립 상품이 아닌 서비스는
+     * 실제 해지 대상이 다른 서비스(예: 쿠팡이츠 → 와우 멤버십)라 잘못된 안내가 된다.
      */
     private static CatalogService ocrOnly(String code, String name, SubscriptionCategory category,
                                           List<String> aliases) {
-        return new CatalogService(code, name, category, false, aliases, List.of());
+        return new CatalogService(code, name, category, false, null, aliases, List.of());
     }
 
+    /** 애플 구독(iCloud+, 애플뮤직, 애플TV)은 모두 이 한 화면에서 관리·해지한다. */
+    private static final String APPLE_SUBSCRIPTIONS = "https://apps.apple.com/account/subscriptions";
+
+    /** Google One 저장용량과 Google AI 요금제(Gemini)는 같은 화면에서 해지한다. */
+    private static final String GOOGLE_ONE_SETTINGS = "https://one.google.com/settings";
+
+    /** MS 365·Xbox 등 마이크로소프트 구독 공통 관리 화면. */
+    private static final String MICROSOFT_SERVICES = "https://account.microsoft.com/services";
+
     private static final List<CatalogService> SERVICES = List.of(
-            service("YOUTUBE_PREMIUM", "유튜브 프리미엄", OTT, List.of("youtube premium", "유튜브프리미엄"),
+            service("YOUTUBE_PREMIUM", "유튜브 프리미엄", OTT, "https://www.youtube.com/paid_memberships",
+                    List.of("youtube premium", "유튜브프리미엄"),
                     List.of(won("프리미엄 라이트", 8500L, MONTHLY),
                             won("프리미엄", 14900L, MONTHLY),
                             won("프리미엄 (iOS 결제)", 19500L, MONTHLY))),
-            service("NETFLIX", "넷플릭스", OTT, List.of("netflix"),
+            service("NETFLIX", "넷플릭스", OTT, "https://www.netflix.com/cancelplan", List.of("netflix"),
                     List.of(won("광고형 스탠다드", 7000L, MONTHLY),
                             won("스탠다드", 13500L, MONTHLY),
                             won("프리미엄", 17000L, MONTHLY))),
-            service("DISNEY_PLUS", "디즈니플러스", OTT, List.of("disney+", "disney plus", "디지니플러스"),
+            service("DISNEY_PLUS", "디즈니플러스", OTT, "https://www.disneyplus.com/account/subscription",
+                    List.of("disney+", "disney plus", "디지니플러스"),
                     List.of(won("스탠다드", 9900L, MONTHLY),
                             won("프리미엄", 13900L, MONTHLY))),
-            service("TVING", "티빙", OTT, List.of("tving"),
+            service("TVING", "티빙", OTT, "https://www.tving.com/", List.of("tving"),
                     List.of(won("광고형 스탠다드", 5500L, MONTHLY),
                             won("베이직", 9500L, MONTHLY),
                             won("스탠다드", 13500L, MONTHLY),
                             won("프리미엄", 17000L, MONTHLY))),
             // 쿠팡플레이 기본 시청은 와우 멤버십에 포함된다 — 그 금액은 COUPANG_WOW 한 곳에만 둔다.
             // 여기 요금제는 와우와 별개로 결제하는 쿠팡플레이 자체 유료 상품이다.
-            service("COUPANG_PLAY", "쿠팡플레이", OTT, List.of("coupang play"),
+            service("COUPANG_PLAY", "쿠팡플레이", OTT, "https://www.coupangplay.com/", List.of("coupang play"),
                     List.of(won("스포츠 패스 (와우회원)", 12400L, MONTHLY),
                             won("스포츠 패스 (일반회원)", 19300L, MONTHLY))),
-            service("WATCHA", "왓챠", OTT, List.of("watcha"),
+            service("WATCHA", "왓챠", OTT, "https://watcha.com/", List.of("watcha"),
                     List.of(won("베이직", 7900L, MONTHLY),
                             won("프리미엄", 12900L, MONTHLY))),
-            service("WAVVE", "웨이브", OTT, List.of("wavve"),
+            service("WAVVE", "웨이브", OTT, "https://www.wavve.com/", List.of("wavve"),
                     List.of(won("광고형 스탠다드", 5500L, MONTHLY),
                             won("베이직", 7900L, MONTHLY),
                             won("스탠다드", 10900L, MONTHLY),
                             won("프리미엄", 13900L, MONTHLY))),
-            service("AMAZON_PRIME_VIDEO", "아마존프라임비디오", OTT, List.of("amazon prime video", "prime video"),
+            service("AMAZON_PRIME_VIDEO", "아마존프라임비디오", OTT,
+                    "https://www.primevideo.com/settings/account", List.of("amazon prime video", "prime video"),
                     List.of(won("프라임 비디오", 5500L, MONTHLY))),
-            service("APPLE_TV", "애플TV", OTT, List.of("apple tv", "appletv"),
+            service("APPLE_TV", "애플TV", OTT, APPLE_SUBSCRIPTIONS, List.of("apple tv", "appletv"),
                     List.of(won("월간 구독", 6500L, MONTHLY))),
-            service("LAFTEL", "라프텔", OTT, List.of("laftel"),
+            service("LAFTEL", "라프텔", OTT, "https://laftel.net/", List.of("laftel"),
                     List.of(won("베이직", 9900L, MONTHLY),
                             won("프리미엄", 14900L, MONTHLY))),
 
-            service("FLO", "FLO", MUSIC, List.of("플로"),
+            service("FLO", "FLO", MUSIC, "https://www.music-flo.com/", List.of("플로"),
                     List.of(won("무제한 듣기", 7900L, MONTHLY))),
-            service("YOUTUBE_MUSIC", "유튜브뮤직", MUSIC, List.of("youtube music"),
+            service("YOUTUBE_MUSIC", "유튜브뮤직", MUSIC, "https://www.youtube.com/paid_memberships",
+                    List.of("youtube music"),
                     List.of(won("뮤직 프리미엄", 11900L, MONTHLY))),
-            service("SPOTIFY", "스포티파이", MUSIC, List.of("spotify"),
+            service("SPOTIFY", "스포티파이", MUSIC, "https://www.spotify.com/account/subscription/",
+                    List.of("spotify"),
                     List.of(won("베이직", 8690L, MONTHLY),
                             won("개인", 11990L, MONTHLY),
                             won("듀오", 17985L, MONTHLY),
                             won("학생", 6600L, MONTHLY))),
-            service("MELON", "멜론", MUSIC, List.of("melon"),
+            service("MELON", "멜론", MUSIC, "https://www.melon.com/", List.of("melon"),
                     List.of(won("모바일 스트리밍", 7590L, MONTHLY),
                             won("스트리밍 클럽", 8690L, MONTHLY),
                             won("스트리밍 플러스", 11990L, MONTHLY))),
-            service("APPLE_MUSIC", "애플뮤직", MUSIC, List.of("apple music"),
+            service("APPLE_MUSIC", "애플뮤직", MUSIC, APPLE_SUBSCRIPTIONS, List.of("apple music"),
                     List.of(won("개인", 8900L, MONTHLY),
                             won("가족", 13500L, MONTHLY))),
-            service("GENIE_MUSIC", "지니뮤직", MUSIC, List.of("genie music", "지니"),
+            service("GENIE_MUSIC", "지니뮤직", MUSIC, "https://www.genie.co.kr/", List.of("genie music", "지니"),
                     List.of(won("스마트 음악감상", 8140L, MONTHLY),
                             won("음악감상 (PC+모바일)", 9240L, MONTHLY),
                             won("초고음질 무제한", 15400L, MONTHLY))),
-            service("BUGS", "벅스", MUSIC, List.of("bugs", "벅스뮤직"),
+            service("BUGS", "벅스", MUSIC, "https://music.bugs.co.kr/", List.of("bugs", "벅스뮤직"),
                     List.of(won("무제한 듣기", 8690L, MONTHLY),
                             won("듣기 + MP3 30곡", 12900L, MONTHLY))),
 
-            service("ICLOUD", "iCloud", CLOUD, List.of("아이클라우드"),
+            service("ICLOUD", "iCloud", CLOUD, APPLE_SUBSCRIPTIONS, List.of("아이클라우드"),
                     List.of(won("50GB", 1100L, MONTHLY),
                             won("200GB", 4400L, MONTHLY),
                             won("2TB", 14000L, MONTHLY),
                             won("6TB", 44000L, MONTHLY))),
             // Google One 요금제(구글 드라이브 저장용량 = Google One 구독).
-            service("GOOGLE_DRIVE", "Google Drive", CLOUD, List.of("구글드라이브", "구글 드라이브", "google one", "구글 원"),
+            service("GOOGLE_DRIVE", "Google Drive", CLOUD, GOOGLE_ONE_SETTINGS,
+                    List.of("구글드라이브", "구글 드라이브", "google one", "구글 원"),
                     List.of(won("베이직 100GB", 2400L, MONTHLY),
                             won("AI Plus 2TB", 11900L, MONTHLY),
                             won("AI Pro 5TB", 29000L, MONTHLY))),
-            service("DROPBOX", "Dropbox", CLOUD, List.of("드롭박스"),
+            service("DROPBOX", "Dropbox", CLOUD, "https://www.dropbox.com/account/plan", List.of("드롭박스"),
                     List.of(usd("Plus (2TB)", 9.99, MONTHLY),
                             usd("Plus (2TB, 연간)", 119.88, YEARLY))),
-            service("NAVER_CLOUD", "네이버 클라우드", CLOUD, List.of("naver cloud", "마이박스", "mybox"),
+            service("NAVER_CLOUD", "네이버 클라우드", CLOUD, "https://mybox.naver.com/",
+                    List.of("naver cloud", "마이박스", "mybox"),
                     List.of(won("80GB", 1650L, MONTHLY),
                             won("180GB", 3300L, MONTHLY),
                             won("330GB", 5500L, MONTHLY),
                             won("2TB", 11000L, MONTHLY))),
             // OneDrive 100GB 단독 구독은 현재 "Microsoft 365 Basic" 이라는 이름으로 판매된다.
-            service("ONEDRIVE", "OneDrive", CLOUD, List.of("원드라이브"),
+            service("ONEDRIVE", "OneDrive", CLOUD, MICROSOFT_SERVICES, List.of("원드라이브"),
                     List.of(won("Microsoft 365 Basic (100GB)", 2900L, MONTHLY),
                             won("Microsoft 365 Basic (100GB, 연간)", 29900L, YEARLY))),
 
-            service("NOTION", "Notion", PRODUCTIVITY, List.of("노션"),
+            // Notion·Slack·Figma 의 요금제 화면은 워크스페이스별 경로라 공통 딥링크가 없다 → 홈으로 보낸다.
+            service("NOTION", "Notion", PRODUCTIVITY, "https://www.notion.so/", List.of("노션"),
                     List.of(won("플러스", 16800L, MONTHLY),
                             won("비즈니스", 36000L, MONTHLY))),
-            service("MICROSOFT_365", "Microsoft 365", PRODUCTIVITY, List.of("ms365", "office 365"),
+            service("MICROSOFT_365", "Microsoft 365", PRODUCTIVITY, MICROSOFT_SERVICES,
+                    List.of("ms365", "office 365"),
                     List.of(won("Personal", 12500L, MONTHLY),
                             won("Personal (연간)", 125000L, YEARLY),
                             won("Family", 15500L, MONTHLY),
                             won("Family (연간)", 155000L, YEARLY))),
-            service("SLACK", "Slack", PRODUCTIVITY, List.of("슬랙"),
+            service("SLACK", "Slack", PRODUCTIVITY, "https://slack.com/", List.of("슬랙"),
                     List.of(usd("Pro (1인)", 8.75, MONTHLY),
                             usd("Business+ (1인)", 18, MONTHLY))),
-            service("GOOGLE_WORKSPACE", "Google Workspace", PRODUCTIVITY, List.of("구글 워크스페이스"),
+            service("GOOGLE_WORKSPACE", "Google Workspace", PRODUCTIVITY,
+                    "https://admin.google.com/", List.of("구글 워크스페이스"),
                     List.of(usd("Business Starter (1인)", 7, MONTHLY),
                             usd("Business Standard (1인)", 12, MONTHLY))),
 
-            service("CHATGPT", "ChatGPT", AI, List.of("chatgpt plus", "챗지피티", "openai"),
+            service("CHATGPT", "ChatGPT", AI, "https://chatgpt.com/", List.of("chatgpt plus", "챗지피티", "openai"),
                     List.of(won("Go", 15000L, MONTHLY),
                             won("Plus", 29000L, MONTHLY),
                             won("Pro", 159000L, MONTHLY))),
-            service("CLAUDE", "Claude", AI, List.of("클로드", "anthropic"),
+            service("CLAUDE", "Claude", AI, "https://claude.ai/settings/billing", List.of("클로드", "anthropic"),
                     List.of(usd("Pro", 20, MONTHLY),
                             usd("Max 5x", 100, MONTHLY),
                             usd("Max 20x", 200, MONTHLY))),
-            service("PERPLEXITY", "Perplexity", AI, List.of("퍼플렉시티"),
+            service("PERPLEXITY", "Perplexity", AI, "https://www.perplexity.ai/settings/account",
+                    List.of("퍼플렉시티"),
                     List.of(usd("Pro", 20, MONTHLY),
                             usd("Max", 200, MONTHLY))),
-            service("GEMINI", "Gemini", AI, List.of("제미나이"),
+            // Gemini 유료 요금제(Google AI Plus/Pro/Ultra)는 Google One 구독으로 청구된다.
+            service("GEMINI", "Gemini", AI, GOOGLE_ONE_SETTINGS, List.of("제미나이"),
                     List.of(won("Google AI Plus", 11000L, MONTHLY),
                             won("Google AI Pro", 29000L, MONTHLY),
                             won("Google AI Ultra", 119000L, MONTHLY))),
-            // 뤼튼은 개인 사용자 무료 정책이라 유료 요금제가 없다.
-            service("WRTN", "뤼튼", AI, List.of("wrtn"), List.of()),
+            // 뤼튼은 개인 사용자 무료 정책이라 유료 요금제가 없다 — 해지할 결제도 없다.
+            service("WRTN", "뤼튼", AI, null, List.of("wrtn"), List.of()),
             // 클로바X는 2026-04-09 개인 서비스 종료.
             ocrOnly("CLOVA_X", "클로바X", AI, List.of("clova x", "클로바엑스")),
 
             // NYT 는 4주마다 청구해(연 13회) MONTHLY/YEARLY 어느 쪽으로도 정확히 표현되지 않는다.
             // 잘못된 주기로 넣으면 지출 분석이 어긋나므로 비워 둔다.
-            service("NYT", "NYT", NEWS, List.of("new york times", "뉴욕타임스"), List.of()),
-            service("MEDIUM", "Medium", NEWS, List.of("미디엄"),
+            service("NYT", "NYT", NEWS, "https://myaccount.nytimes.com/", List.of("new york times", "뉴욕타임스"),
+                    List.of()),
+            service("MEDIUM", "Medium", NEWS, "https://medium.com/me/settings", List.of("미디엄"),
                     List.of(usd("멤버십", 5, MONTHLY),
                             usd("멤버십 (연간)", 50, YEARLY),
                             usd("Friend of Medium", 15, MONTHLY))),
-            service("PUBLY", "퍼블리", NEWS, List.of("publy"), List.of()),
-            service("LONG_BLACK", "롱블랙", NEWS, List.of("long black"),
+            service("PUBLY", "퍼블리", NEWS, "https://publy.co/", List.of("publy"), List.of()),
+            service("LONG_BLACK", "롱블랙", NEWS, "https://www.longblack.co/", List.of("long black"),
                     List.of(won("오늘의 노트", 5900L, MONTHLY),
                             won("무제한 노트", 9900L, MONTHLY))),
-            service("OUTSTANDING", "아웃스탠딩", NEWS, List.of("outstanding"),
+            service("OUTSTANDING", "아웃스탠딩", NEWS, "https://outstanding.kr/", List.of("outstanding"),
                     List.of(won("멤버십", 13900L, MONTHLY))),
 
-            service("INFLEARN", "인프런", EDUCATION, List.of("inflearn"), List.of()),
-            service("UDEMY", "Udemy", EDUCATION, List.of("유데미"),
+            service("INFLEARN", "인프런", EDUCATION, "https://www.inflearn.com/", List.of("inflearn"), List.of()),
+            service("UDEMY", "Udemy", EDUCATION, "https://www.udemy.com/", List.of("유데미"),
                     List.of(usd("Personal Plan", 35, MONTHLY),
                             usd("Personal Plan (연간)", 156, YEARLY))),
-            service("COURSERA", "Coursera", EDUCATION, List.of("코세라"),
+            service("COURSERA", "Coursera", EDUCATION, "https://www.coursera.org/", List.of("코세라"),
                     List.of(usd("Coursera Plus", 59, MONTHLY),
                             usd("Coursera Plus (연간)", 399, YEARLY))),
             // 클래스101은 2023-02 월간 구독 종료 → 연간 구독만 남았다.
-            service("CLASS101", "클래스101", EDUCATION, List.of("class101"),
+            service("CLASS101", "클래스101", EDUCATION, "https://class101.net/", List.of("class101"),
                     List.of(won("연간 구독", 199000L, YEARLY))),
-            service("TALING", "탈잉", EDUCATION, List.of("taling"), List.of()),
-            service("YANADOO", "야나두", EDUCATION, List.of("yanadoo"), List.of()),
-            service("RINGLE", "링글", EDUCATION, List.of("ringle"), List.of()),
-            service("SPEAK", "스픽", EDUCATION, List.of("speak"),
+            service("TALING", "탈잉", EDUCATION, "https://taling.me/", List.of("taling"), List.of()),
+            service("YANADOO", "야나두", EDUCATION, "https://www.yanadoo.co.kr/", List.of("yanadoo"), List.of()),
+            service("RINGLE", "링글", EDUCATION, "https://www.ringleplus.com/", List.of("ringle"), List.of()),
+            service("SPEAK", "스픽", EDUCATION, "https://www.speak.com/", List.of("speak"),
                     List.of(won("프리미엄", 129000L, YEARLY),
                             won("프리미엄 플러스", 299000L, YEARLY))),
 
-            service("XBOX_GAME_PASS", "Xbox Game Pass", GAME, List.of("엑스박스 게임패스", "game pass"),
+            service("XBOX_GAME_PASS", "Xbox Game Pass", GAME, MICROSOFT_SERVICES,
+                    List.of("엑스박스 게임패스", "game pass"),
                     List.of(won("에센셜", 10800L, MONTHLY),
                             won("프리미엄", 14900L, MONTHLY),
                             won("PC Game Pass", 18000L, MONTHLY),
                             won("얼티밋", 29000L, MONTHLY))),
-            service("PS_PLUS", "PS Plus", GAME, List.of("playstation plus", "플레이스테이션 플러스"),
+            service("PS_PLUS", "PS Plus", GAME, "https://www.playstation.com/",
+                    List.of("playstation plus", "플레이스테이션 플러스"),
                     List.of(won("에센셜", 12000L, MONTHLY),
                             won("스페셜", 16200L, MONTHLY),
                             won("디럭스", 19000L, MONTHLY))),
-            service("NINTENDO_SWITCH_ONLINE", "Nintendo Switch Online", GAME, List.of("닌텐도 스위치 온라인"),
+            service("NINTENDO_SWITCH_ONLINE", "Nintendo Switch Online", GAME, "https://accounts.nintendo.com/",
+                    List.of("닌텐도 스위치 온라인"),
                     List.of(won("개인 플랜", 24900L, YEARLY),
                             won("패밀리 플랜", 47900L, YEARLY))),
-            service("EA_PLAY", "EA Play", GAME, List.of("ea play"),
+            service("EA_PLAY", "EA Play", GAME, "https://www.ea.com/ea-play", List.of("ea play"),
                     List.of(won("EA Play", 7000L, MONTHLY),
                             won("EA Play (연간)", 54000L, YEARLY),
                             won("EA Play Pro", 22350L, MONTHLY),
                             won("EA Play Pro (연간)", 133000L, YEARLY))),
 
-            service("COUPANG_WOW", "쿠팡 와우", SHOPPING, List.of("coupang wow", "쿠팡와우"),
+            service("COUPANG_WOW", "쿠팡 와우", SHOPPING, "https://www.coupang.com/",
+                    List.of("coupang wow", "쿠팡와우"),
                     List.of(won("와우 멤버십", 7890L, MONTHLY))),
             // 쿠팡이츠는 독립적으로 결제하는 구독 상품이 아니다(무료배달은 와우 멤버십 혜택).
             // 요금제를 주면 와우와 별개 지출로 이중 등록되므로 신규 등록 선택지에서 뺀다.
             // 다만 영수증에 "쿠팡이츠" 표기가 들어오므로 OCR 매칭 대상으로는 남긴다 —
             // 최장 매칭 덕분에 와우/플레이/이츠가 서로 뭉개지지 않는다.
             ocrOnly("COUPANG_EATS", "쿠팡이츠", SHOPPING, List.of("coupang eats", "쿠팡 이츠")),
-            service("NAVER_PLUS", "네이버플러스", SHOPPING, List.of("naver plus", "네이버 플러스"),
+            service("NAVER_PLUS", "네이버플러스", SHOPPING, "https://nid.naver.com/membership/my",
+                    List.of("naver plus", "네이버 플러스"),
                     List.of(won("멤버십", 4900L, MONTHLY))),
             // 신세계 유니버스 클럽은 2026-01-01 신규 가입·연장 종료.
             ocrOnly("SSG_UNIVERSE_CLUB", "SSG.COM 유니버스클럽", SHOPPING, List.of("ssg 유니버스클럽")),
-            service("BAEMIN_CLUB", "배민클럽", SHOPPING, List.of("우아한형제들", "배달의민족", "baemin club"),
+            service("BAEMIN_CLUB", "배민클럽", SHOPPING, "https://www.baemin.com/",
+                    List.of("우아한형제들", "배달의민족", "baemin club"),
                     List.of(won("배민클럽", 3990L, MONTHLY))),
-            service("YOGIPASS", "요기패스", SHOPPING, List.of("yogiyo", "요기요"),
+            service("YOGIPASS", "요기패스", SHOPPING, "https://www.yogiyo.co.kr/", List.of("yogiyo", "요기요"),
                     List.of(won("요기패스X", 2900L, MONTHLY))),
 
-            service("FIGMA", "Figma", DESIGN, List.of("피그마"),
+            service("FIGMA", "Figma", DESIGN, "https://www.figma.com/", List.of("피그마"),
                     List.of(usd("Professional", 15, MONTHLY),
                             usd("Organization", 55, MONTHLY))),
-            service("ADOBE_CC", "Adobe CC", DESIGN, List.of("adobe creative cloud", "어도비"),
+            service("ADOBE_CC", "Adobe CC", DESIGN, "https://account.adobe.com/plans",
+                    List.of("adobe creative cloud", "어도비"),
                     List.of(won("포토그래피 플랜", 26400L, MONTHLY),
                             won("모든 앱", 70100L, MONTHLY))),
-            service("CANVA", "Canva", DESIGN, List.of("캔바"),
+            service("CANVA", "Canva", DESIGN, "https://www.canva.com/settings", List.of("캔바"),
                     List.of(usd("Pro", 15, MONTHLY),
                             usd("Pro (연간)", 120, YEARLY)))
     );
@@ -314,6 +362,11 @@ public final class ServiceCatalog {
 
     public static List<CatalogService> services() {
         return SERVICES;
+    }
+
+    /** 저장된 구독의 service_code 로 해지 링크를 찾는다. 직접 입력한 서비스거나 링크가 없으면 null. */
+    public static String cancelUrlOf(String code) {
+        return findByCode(code).map(CatalogService::cancelUrl).orElse(null);
     }
 
     public static Optional<CatalogService> findByCode(String code) {

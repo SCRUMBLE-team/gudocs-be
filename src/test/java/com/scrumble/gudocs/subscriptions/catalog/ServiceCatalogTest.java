@@ -242,6 +242,57 @@ class ServiceCatalogTest {
     }
 
     @Test
+    void 해지_링크는_https_절대주소다() {
+        // 상세 화면이 그대로 여는 링크라 상대경로·http 가 섞이면 잘못된 곳으로 보낸다.
+        assertThat(ServiceCatalog.services()).allSatisfy(service -> {
+            String cancelUrl = service.cancelUrl();
+            if (cancelUrl != null) {
+                assertThat(cancelUrl).as("서비스 %s", service.code()).startsWith("https://");
+            }
+        });
+    }
+
+    @Test
+    void 신규_등록_가능한_서비스는_해지_링크를_가진다() {
+        // 해지할 결제가 없는 무료 서비스(뤼튼)만 예외다.
+        assertThat(ServiceCatalog.services())
+                .filteredOn(ServiceCatalog.CatalogService::selectable)
+                .filteredOn(service -> !service.code().equals("WRTN"))
+                .isNotEmpty()
+                .allSatisfy(service -> assertThat(service.cancelUrl())
+                        .as("서비스 %s", service.code())
+                        .isNotBlank());
+    }
+
+    @Test
+    void 신규_등록_불가_서비스는_해지_링크를_두지_않는다() {
+        // 종료된 서비스는 해지할 것이 없고, 쿠팡이츠처럼 독립 상품이 아닌 서비스는
+        // 실제 해지 대상이 다른 서비스(와우 멤버십)라 링크가 잘못된 안내가 된다.
+        assertThat(ServiceCatalog.services())
+                .filteredOn(service -> !service.selectable())
+                .isNotEmpty()
+                .allSatisfy(service -> assertThat(service.cancelUrl()).isNull());
+    }
+
+    @Test
+    void 알려진_서비스의_해지_링크를_고정한다() {
+        assertThat(ServiceCatalog.cancelUrlOf("NETFLIX")).isEqualTo("https://www.netflix.com/cancelplan");
+        // 애플 구독은 서비스별 페이지가 없고 한 화면에서 모두 관리한다.
+        assertThat(ServiceCatalog.cancelUrlOf("ICLOUD"))
+                .isEqualTo(ServiceCatalog.cancelUrlOf("APPLE_MUSIC"))
+                .isEqualTo(ServiceCatalog.cancelUrlOf("APPLE_TV"));
+        // Gemini 유료 요금제는 Google One 으로 청구된다.
+        assertThat(ServiceCatalog.cancelUrlOf("GEMINI")).isEqualTo(ServiceCatalog.cancelUrlOf("GOOGLE_DRIVE"));
+    }
+
+    @Test
+    void 카탈로그에_없는_코드의_해지_링크는_null이다() {
+        // 사용자가 직접 입력한 서비스는 service_code 자체가 null 이다.
+        assertThat(ServiceCatalog.cancelUrlOf(null)).isNull();
+        assertThat(ServiceCatalog.cancelUrlOf("동네_헬스장")).isNull();
+    }
+
+    @Test
     void 등록된_모든_서비스는_자기_이름으로_매칭된다() {
         assertThat(ServiceCatalog.services()).allSatisfy(service ->
                 assertThat(ServiceCatalog.match(service.canonicalName()))
