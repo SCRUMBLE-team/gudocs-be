@@ -31,6 +31,11 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
             "AND s.user.id IN :userIds")
     List<Subscription> findActiveByUserIds(@Param("userIds") List<Long> userIds);
 
+    // 절약하기 화면에서 해지 후보로 체크한 구독. 선택한 순서(체크한 시각)대로 보여준다.
+    @Query("SELECT s FROM Subscription s WHERE s.user = :user AND s.deletedAt IS NULL " +
+            "AND s.savingsSelectedAt IS NOT NULL ORDER BY s.savingsSelectedAt DESC")
+    List<Subscription> findSavingsSelectedByUser(@Param("user") User user);
+
     boolean existsByUserAndServiceNameIgnoreCaseAndDeletedAtIsNull(User user, String serviceName);
 
     /**

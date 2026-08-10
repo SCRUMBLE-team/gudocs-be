@@ -1,6 +1,7 @@
 package com.scrumble.gudocs.subscriptions.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.scrumble.gudocs.subscriptions.dto.request.SavingsSelectionRequest;
 import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionCreateRequest;
 import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionStatusUpdateRequest;
 import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionUpdateRequest;
@@ -20,6 +21,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.List;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -437,6 +439,115 @@ class SubscriptionControllerTest {
                         .session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").value(false));
+    }
+
+    private long 구독_등록_후_ID(String name, long price) throws Exception {
+        return 구독_ID_추출(구독_등록(session, new SubscriptionCreateRequest(
+                name, null, SubscriptionCategory.OTT, price,
+                BillingCycle.MONTHLY, LocalDate.of(2026, 1, 15))));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions 절약_후보_저장(
+            MockHttpSession s, List<Long> ids) throws Exception {
+        return mockMvc.perform(put("/api/subscriptions/savings-selection")
+                .session(s)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(new SavingsSelectionRequest(ids))));
+    }
+
+    @Test
+    void 절약_후보로_체크한_구독_id를_저장하고_다시_조회한다() throws Exception {
+        long netflix = 구독_등록_후_ID("Netflix", 17000L);
+        long spotify = 구독_등록_후_ID("Spotify", 11990L);
+        구독_등록_후_ID("Watcha", 7900L);
+
+        절약_후보_저장(session, List.of(netflix, spotify))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2));
+
+        // 알림을 받고 화면에 다시 들어와도 체크 상태가 남아 있어야 한다.
+        mockMvc.perform(get("/api/subscriptions/savings-selection").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[*].id",
+                        org.hamcrest.Matchers.containsInAnyOrder((int) netflix, (int) spotify)));
+    }
+
+    @Test
+    void 절약_후보_저장은_기존_선택을_통째로_대체한다() throws Exception {
+        long netflix = 구독_등록_후_ID("Netflix", 17000L);
+        long spotify = 구독_등록_후_ID("Spotify", 11990L);
+
+        절약_후보_저장(session, List.of(netflix, spotify)).andExpect(status().isOk());
+        절약_후보_저장(session, List.of(spotify)).andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/subscriptions/savings-selection").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value(spotify));
+    }
+
+    @Test
+    void 절약_후보_빈_배열이면_전체_해제된다() throws Exception {
+        long netflix = 구독_등록_후_ID("Netflix", 17000L);
+        절약_후보_저장(session, List.of(netflix)).andExpect(status().isOk());
+
+        절약_후보_저장(session, List.of())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(0));
+
+        mockMvc.perform(get("/api/subscriptions/" + netflix).session(session))
+                .andExpect(jsonPath("$.data.savingsSelected").value(false));
+    }
+
+    @Test
+    void 구독_응답에_절약_후보_체크_여부가_실린다() throws Exception {
+        long netflix = 구독_등록_후_ID("Netflix", 17000L);
+
+        mockMvc.perform(get("/api/subscriptions/" + netflix).session(session))
+                .andExpect(jsonPath("$.data.savingsSelected").value(false));
+
+        절약_후보_저장(session, List.of(netflix)).andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/subscriptions/" + netflix).session(session))
+                .andExpect(jsonPath("$.data.savingsSelected").value(true));
+    }
+
+    @Test
+    void 남의_구독_id가_섞이면_404이고_아무것도_저장되지_않는다() throws Exception {
+        long mine = 구독_등록_후_ID("Netflix", 17000L);
+
+        MockHttpSession other = TestSessions.loginNew(
+                userRepository, socialAccountRepository, "남", "other-savings@example.com");
+        long others = 구독_ID_추출(구독_등록(other, new SubscriptionCreateRequest(
+                "Spotify", null, SubscriptionCategory.MUSIC, 11990L,
+                BillingCycle.MONTHLY, LocalDate.of(2026, 1, 15))));
+
+        절약_후보_저장(session, List.of(mine, others))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false));
+
+        // 일부만 저장되면 프론트는 성공으로 믿는데 알림은 그만큼 빠진다 — 전부 롤백돼야 한다.
+        mockMvc.perform(get("/api/subscriptions/savings-selection").session(session))
+                .andExpect(jsonPath("$.data.length()").value(0));
+    }
+
+    @Test
+    void 절약_후보_저장_미인증_401() throws Exception {
+        mockMvc.perform(put("/api/subscriptions/savings-selection")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new SavingsSelectionRequest(List.of()))))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void 절약_후보_subscriptionIds_누락_400() throws Exception {
+        mockMvc.perform(put("/api/subscriptions/savings-selection")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
     }
 
     @Test

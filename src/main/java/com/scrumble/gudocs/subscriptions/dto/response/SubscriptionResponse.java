@@ -42,6 +42,10 @@ public record SubscriptionResponse(
                 example = "https://www.netflix.com/cancelplan")
         String cancelUrl,
 
+        @Schema(description = "절약하기 화면에서 해지 후보로 체크한 구독인지. "
+                + "화면 재진입·다른 기기에서도 체크 상태가 유지된다.", example = "false")
+        boolean savingsSelected,
+
         @Schema(description = "생성 일시", example = "2026-07-01T12:00:00")
         LocalDateTime createdAt,
 
@@ -62,6 +66,7 @@ public record SubscriptionResponse(
                 // 해지 링크는 저장하지 않고 code 로 카탈로그에서 그때그때 찾는다 —
                 // 링크가 바뀌면 카탈로그만 고치면 되고, 이미 저장된 구독도 함께 최신 링크를 받는다.
                 ServiceCatalog.cancelUrlOf(subscription.getServiceCode()),
+                subscription.isSavingsSelected(),
                 subscription.getCreatedAt(),
                 subscription.getUpdatedAt()
         );

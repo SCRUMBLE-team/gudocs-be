@@ -2,6 +2,7 @@ package com.scrumble.gudocs.subscriptions.service;
 
 import com.scrumble.gudocs.global.exception.BusinessException;
 import com.scrumble.gudocs.global.exception.ErrorCode;
+import com.scrumble.gudocs.subscriptions.dto.request.SavingsSelectionRequest;
 import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionCreateRequest;
 import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionStatusUpdateRequest;
 import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionUpdateRequest;
@@ -19,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -111,6 +114,46 @@ public class SubscriptionService {
         checkOwnership(subscription, user);
         subscription.updateStatus(request.status());
         return toResponse(subscription);
+    }
+
+    /**
+     * 절약하기 화면에서 체크한 구독을 저장한다. 요청 목록으로 현재 선택을 <b>통째로 대체</b>하므로
+     * 빈 배열이면 전체 해제이고, 같은 요청을 두 번 보내도 결과가 같다(멱등).
+     *
+     * <p>선택을 화면 로컬이 아니라 서버에 남기는 이유는 나중에 이 목록으로 알림을 보내야 하기 때문이다.
+     * 그래서 알림 payload 에 구독 id 를 실어 보내지 않고, FE 가 화면 진입 시 이 API 로 최신 목록을 받는다
+     * — payload 는 발송 시점 스냅샷이라 그 사이 해지·삭제된 구독과 어긋난다.
+     *
+     * <p>남의 구독이나 없는 구독 id 가 섞여 있으면 조용히 무시하지 않고 예외를 던진다. 무시하면
+     * 프론트는 저장에 성공했다고 믿는데 실제로는 일부만 저장돼, 알림도 그만큼 빠진다.
+     */
+    @Transactional
+    public List<SubscriptionResponse> replaceSavingsSelection(Long userId, SavingsSelectionRequest request) {
+        User user = findUser(userId);
+        Set<Long> selectedIds = Set.copyOf(request.subscriptionIds());
+
+        List<Subscription> mine = subscriptionRepository.findAllByUserOrderByCreatedAtDesc(user);
+        Set<Long> myIds = mine.stream().map(Subscription::getId).collect(Collectors.toSet());
+        if (!myIds.containsAll(selectedIds)) {
+            throw new BusinessException(ErrorCode.SUBSCRIPTION_NOT_FOUND);
+        }
+
+        mine.forEach(s -> s.updateSavingsSelection(selectedIds.contains(s.getId())));
+
+        return getSavingsSelection(user);
+    }
+
+    /** 현재 선택된 절약 후보 목록. 알림을 받고 화면에 들어왔을 때 최신 상태를 그린다. */
+    @Transactional(readOnly = true)
+    public List<SubscriptionResponse> getSavingsSelection(Long userId) {
+        return getSavingsSelection(findUser(userId));
+    }
+
+    private List<SubscriptionResponse> getSavingsSelection(User user) {
+        LocalDate today = LocalDate.now();
+        return subscriptionRepository.findSavingsSelectedByUser(user).stream()
+                .map(s -> SubscriptionResponse.from(s, NextBillingDateCalculator.calculate(s, today)))
+                .toList();
     }
 
     /** 저장할 서비스 이름과 코드. 등록·수정이 같은 규칙을 쓰도록 한 곳에서 만든다. */

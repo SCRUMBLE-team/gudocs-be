@@ -60,6 +60,13 @@ public class Subscription extends BaseEntity {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    /**
+     * 절약하기 화면에서 "해지 후보"로 체크한 시각. null 이면 선택하지 않은 상태다.
+     * 알림 배치가 이 값으로 대상을 찾으므로 화면 로컬 상태가 아니라 서버에 남긴다.
+     */
+    @Column(name = "savings_selected_at")
+    private LocalDateTime savingsSelectedAt;
+
     public void update(String serviceName, String serviceCode, SubscriptionCategory category, Long price,
                        BillingCycle billingCycle, LocalDate firstBillingDate) {
         this.serviceName = serviceName;
@@ -90,5 +97,21 @@ public class Subscription extends BaseEntity {
 
     public boolean isDeleted() {
         return this.deletedAt != null;
+    }
+
+    /**
+     * 절약 후보 선택 여부를 바꾼다. 이미 선택된 구독을 다시 선택해도 시각을 갱신하지 않는다 —
+     * "언제 골랐는지"가 알림 주기의 기준이라, 화면을 다시 저장할 때마다 초기화되면 안 된다.
+     */
+    public void updateSavingsSelection(boolean selected) {
+        if (!selected) {
+            this.savingsSelectedAt = null;
+        } else if (this.savingsSelectedAt == null) {
+            this.savingsSelectedAt = LocalDateTime.now();
+        }
+    }
+
+    public boolean isSavingsSelected() {
+        return this.savingsSelectedAt != null;
     }
 }
