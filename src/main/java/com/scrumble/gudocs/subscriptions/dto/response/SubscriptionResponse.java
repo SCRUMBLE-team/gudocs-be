@@ -1,5 +1,6 @@
 package com.scrumble.gudocs.subscriptions.dto.response;
 
+import com.scrumble.gudocs.subscriptions.catalog.ServiceCatalog;
 import com.scrumble.gudocs.subscriptions.entity.*;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -35,6 +36,12 @@ public record SubscriptionResponse(
         @Schema(description = "다음 결제일", example = "2026-07-31")
         LocalDate nextBillingDate,
 
+        @Schema(description = "해지 페이지 URL. 상세 화면의 '해지하러 가기' 링크로 쓴다. "
+                + "직접 입력한 서비스이거나 해지할 결제가 없는 서비스면 null(링크 숨김). "
+                + "웹 결제 기준이라 App Store·Google Play 인앱결제로 가입했다면 각 스토어에서 해지해야 한다.",
+                example = "https://www.netflix.com/cancelplan")
+        String cancelUrl,
+
         @Schema(description = "생성 일시", example = "2026-07-01T12:00:00")
         LocalDateTime createdAt,
 
@@ -52,6 +59,9 @@ public record SubscriptionResponse(
                 subscription.getFirstBillingDate(),
                 subscription.getStatus(),
                 nextBillingDate,
+                // 해지 링크는 저장하지 않고 code 로 카탈로그에서 그때그때 찾는다 —
+                // 링크가 바뀌면 카탈로그만 고치면 되고, 이미 저장된 구독도 함께 최신 링크를 받는다.
+                ServiceCatalog.cancelUrlOf(subscription.getServiceCode()),
                 subscription.getCreatedAt(),
                 subscription.getUpdatedAt()
         );

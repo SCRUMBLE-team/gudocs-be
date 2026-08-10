@@ -36,6 +36,11 @@ public record CatalogResponse(
                     example = "true")
             boolean selectable,
 
+            @Schema(description = "해지 페이지 URL. 해지할 결제가 없거나 링크를 확인하지 못한 서비스는 null. "
+                    + "웹 결제 기준이라 인앱결제로 가입했다면 App Store·Google Play에서 해지해야 한다.",
+                    example = "https://www.netflix.com/cancelplan")
+            String cancelUrl,
+
             @Schema(description = "요금제 목록. 원화 정가를 확인하지 못한 서비스는 빈 배열이며 사용자가 직접 입력한다.")
             List<CatalogPlanResponse> plans
     ) {
@@ -71,6 +76,7 @@ public record CatalogResponse(
                 service.canonicalName(),
                 service.category(),
                 service.selectable(),
+                service.cancelUrl(),
                 service.plans().stream()
                         .map(plan -> new CatalogPlanResponse(
                                 plan.name(), plan.price(), plan.billingCycle(), plan.approximate()))

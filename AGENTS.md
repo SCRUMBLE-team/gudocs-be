@@ -130,6 +130,11 @@ enum:
 - 요금은 `PRICES_CHECKED_ON` 시점에 공개 자료로 확인한 **국내 원화 정가**이고, API 응답에 이 날짜를 함께 내린다. 어디까지나 **기본값(참고값)** — 할인·프로모션·구 요금제 사용자가 있어 등록 화면에서 수정 가능하다.
 - **신뢰할 만한 원화 가격을 못 찾으면 추측해 채우지 않고 `plans`를 빈 배열로 둔다** (해외 USD 결제라 원화 정가가 없는 서비스, 종료된 서비스, 구독이 아니라 건별 구매인 서비스). 프론트는 빈 배열이면 직접 입력 fallback.
 - `aliases`는 OCR 매칭 전용 — `GET /api/subscriptions/catalog` 응답에는 내보내지 않는다.
+- **`cancelUrl`(해지 링크)도 이 파일이 단일 소스**다. 구독 상세의 "해지하러 가기" 링크로 쓰며 `SubscriptionResponse`·카탈로그 응답 양쪽에 실린다. 구독 행에 저장하지 않고 `service_code`로 매번 `ServiceCatalog.cancelUrlOf()`에서 찾는다 — 링크가 바뀌어도 이 파일만 고치면 이미 등록된 구독까지 최신 링크를 받는다. 채우는 규칙:
+  - 공개적으로 안정된 **해지·구독관리 딥링크**가 있으면 그것 (`netflix.com/cancelplan`, 애플 구독 관리, Google One 설정 등). 애플(iCloud·애플뮤직·애플TV)·MS(365·게임패스)·Google One(드라이브·Gemini)처럼 한 화면에서 관리하는 묶음은 상수를 공유한다.
+  - 국내 서비스 상당수는 로그인 후 마이페이지 구조라 딥링크가 공개돼 있지 않다 → **깨지지 않는 상위 URL(서비스 홈)**. 추측한 경로는 404로 이어져 링크가 없는 것보다 나쁘다.
+  - 해지할 결제가 없거나(무료 — 뤼튼) 실제 해지 대상이 다른 서비스면(`selectable=false`) `null` → FE는 링크를 감춘다.
+  - 링크는 **웹 결제 기준**. 인앱결제(App Store/Google Play) 가입자는 스토어에서 해지해야 하므로 FE가 그 안내를 함께 노출한다.
 - 이 카탈로그는 OCR(`ocr/parser/SubscriptionTextParser`)과 공유한다. 그래서 `ocr`이 아니라 `subscriptions` 하위에 둔다(`ocr` → `subscriptions` 단방향 의존).
 
 ### 데이터 주인과 FE 연결 (`code`)
