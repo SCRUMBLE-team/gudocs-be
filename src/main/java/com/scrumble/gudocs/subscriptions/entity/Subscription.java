@@ -4,13 +4,21 @@ import com.scrumble.gudocs.global.entity.BaseEntity;
 import com.scrumble.gudocs.users.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.DynamicUpdate;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
+/**
+ * {@code @DynamicUpdate}: 변경된 컬럼만 UPDATE 한다. 기본값(전 컬럼 UPDATE)이면 구독 수정과
+ * 절약 후보 저장이 동시에 들어올 때 나중에 커밋되는 쪽이 자기 스냅샷으로 남의 컬럼까지 덮어써
+ * {@code savings_selected_at} 이 유실될 수 있다. (같은 컬럼끼리 부딪히는 절약 후보 동시 저장은
+ * {@code findAllByUserForUpdate} 의 쓰기 잠금으로 막는다.)
+ */
 @Entity
 @Table(name = "subscriptions")
+@DynamicUpdate
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
