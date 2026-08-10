@@ -126,13 +126,16 @@ public class SubscriptionService {
      *
      * <p>남의 구독이나 없는 구독 id 가 섞여 있으면 조용히 무시하지 않고 예외를 던진다. 무시하면
      * 프론트는 저장에 성공했다고 믿는데 실제로는 일부만 저장돼, 알림도 그만큼 빠진다.
+     *
+     * <p>구독 행을 쓰기 잠금으로 읽어 같은 사용자의 동시 요청을 직렬화한다 — 두 기기가 동시에 보내면
+     * 각자 자기 것만 갱신해 합집합이 남을 수 있고, 그러면 어느 쪽 요청도 아닌 상태가 된다.
      */
     @Transactional
     public List<SubscriptionResponse> replaceSavingsSelection(Long userId, SavingsSelectionRequest request) {
         User user = findUser(userId);
         Set<Long> selectedIds = Set.copyOf(request.subscriptionIds());
 
-        List<Subscription> mine = subscriptionRepository.findAllByUserOrderByCreatedAtDesc(user);
+        List<Subscription> mine = subscriptionRepository.findAllByUserForUpdate(user);
         Set<Long> myIds = mine.stream().map(Subscription::getId).collect(Collectors.toSet());
         if (!myIds.containsAll(selectedIds)) {
             throw new BusinessException(ErrorCode.SUBSCRIPTION_NOT_FOUND);

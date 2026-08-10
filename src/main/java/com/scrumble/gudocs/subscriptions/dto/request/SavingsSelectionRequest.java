@@ -12,6 +12,7 @@ public record SavingsSelectionRequest(
                 + "빈 배열이면 전체 선택 해제. 모두 로그인한 사용자의 구독이어야 한다.",
                 example = "[1, 2, 5]")
         @NotNull(message = "subscriptionIds는 필수입니다.")
-        List<Long> subscriptionIds
+        // 원소의 @NotNull 이 없으면 [null] 요청이 서비스의 Set.copyOf 에서 NPE 로 터져 500 이 된다.
+        List<@NotNull(message = "subscriptionIds에 null은 넣을 수 없습니다.") Long> subscriptionIds
 ) {
 }

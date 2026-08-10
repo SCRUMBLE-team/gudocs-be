@@ -541,6 +541,17 @@ class SubscriptionControllerTest {
     }
 
     @Test
+    void 절약_후보_id에_null이_섞이면_400() throws Exception {
+        // 원소 검증이 없으면 서비스의 Set.copyOf 에서 NPE 로 터져 500 이 된다.
+        mockMvc.perform(put("/api/subscriptions/savings-selection")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"subscriptionIds\":[null]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
     void 절약_후보_subscriptionIds_누락_400() throws Exception {
         mockMvc.perform(put("/api/subscriptions/savings-selection")
                         .session(session)

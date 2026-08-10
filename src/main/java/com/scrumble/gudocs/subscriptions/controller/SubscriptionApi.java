@@ -98,7 +98,9 @@ public interface SubscriptionApi {
 
     @Operation(summary = "절약 후보 구독 조회",
             description = "절약하기 화면에서 해지 후보로 체크해 둔 구독 목록을 조회합니다. "
-                    + "체크한 시각 최신순입니다. 알림을 받고 화면에 들어왔을 때 이 API로 최신 목록을 받습니다 "
+                    + "선택 시각 기준 최신순입니다(한 번에 여러 건을 고르면 시각이 사실상 같으므로 "
+                    + "그 안에서는 id 내림차순 — 사용자가 체크한 순서는 서버가 알 수 없습니다). "
+                    + "알림을 받고 화면에 들어왔을 때 이 API로 최신 목록을 받습니다 "
                     + "(알림 payload에는 구독 id를 싣지 않습니다 — 발송 시점 스냅샷이라 그 사이 변경과 어긋납니다).")
     @ApiResponses({
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
