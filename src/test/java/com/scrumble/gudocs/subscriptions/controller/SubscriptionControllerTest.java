@@ -474,6 +474,17 @@ class SubscriptionControllerTest {
     }
 
     @Test
+    void 구독_id_자리에_숫자가_아닌_경로가_오면_500이_아니라_400이다() throws Exception {
+        // /savings-selection 을 /saving-selection 으로 오타 낸 요청은 {subscriptionId} 에 매칭된다.
+        // 클라이언트 잘못이므로 400 이어야 하고, catch-all 에 걸려 500 으로 뭉개지면 안 된다.
+        mockMvc.perform(put("/api/subscriptions/saving-selection")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"subscriptionIds\":[1]}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void 절약_후보_저장은_기존_선택을_통째로_대체한다() throws Exception {
         long netflix = 구독_등록_후_ID("Netflix", 17000L);
         long spotify = 구독_등록_후_ID("Spotify", 11990L);

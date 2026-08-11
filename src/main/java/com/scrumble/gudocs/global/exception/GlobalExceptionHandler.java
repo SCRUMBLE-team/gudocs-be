@@ -10,6 +10,7 @@ import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.util.stream.Collectors;
@@ -40,6 +41,20 @@ public class GlobalExceptionHandler {
                 .map(v -> v.getPropertyPath() + ": " + v.getMessage())
                 .collect(Collectors.joining(", "));
         return ResponseEntity.badRequest().body(ApiResponse.error(message));
+    }
+
+    /**
+     * 경로 변수·쿼리 파라미터 타입 불일치는 클라이언트 잘못이므로 400이다.
+     *
+     * <p>{@code MethodArgumentTypeMismatchException}은 {@link ErrorResponse}가 아니라서
+     * 아래 catch-all의 재던지기 가드에 걸리지 않는다 — 핸들러가 없으면 조용히 500으로 뭉개진다.
+     * 실제로 프론트가 {@code /api/subscriptions/saving-selection}(오타)로 PUT 했을 때
+     * {@code /api/subscriptions/{subscriptionId}}에 매칭돼 500이 나갔다.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTypeMismatchException(MethodArgumentTypeMismatchException e) {
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error(e.getName() + ": 값의 형식이 올바르지 않습니다."));
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
