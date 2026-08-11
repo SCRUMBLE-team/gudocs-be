@@ -309,11 +309,15 @@ class ServiceCatalogTest {
             ServiceCatalog.PriceChange change = declared.change();
             String label = declared.service().code() + " / " + declared.plan().name();
 
+            assertThat(change.oldPrice()).as("%s 변경 전 금액", label).isPositive();
             assertThat(change.newPrice()).as("%s 변경 후 금액", label).isPositive();
-            // 같은 금액이면 알릴 것이 없다. 카탈로그 price 를 이미 새 가격으로 올려놓고
-            // 예고만 남긴 상태(= 대상이 아무도 잡히지 않는 유령 예고)를 잡아낸다.
+            // 같은 금액이면 알릴 것이 없다(= 대상이 아무도 잡히지 않는 유령 예고).
             assertThat(change.newPrice()).as("%s 는 구가격과 달라야 한다", label)
-                    .isNotEqualTo(declared.plan().price());
+                    .isNotEqualTo(change.oldPrice());
+            // 요금제의 price 는 "지금의 공식가"다. 적용 전이면 구가격, 적용 후면 새 가격이어야 하고,
+            // 둘 다 아니면 유지보수자가 적용일에 숫자를 잘못 바꿨다는 뜻이다.
+            assertThat(declared.plan().price()).as("%s 의 현재가는 구가격이거나 새 가격이어야 한다", label)
+                    .isIn(change.oldPrice(), change.newPrice());
             assertThat(change.announcedOn()).as("%s 발표일", label).isNotNull();
             assertThat(change.effectiveOn()).as("%s 적용일", label).isNotNull();
             assertThat(change.announcedOn()).as("%s 는 발표 후에 적용된다", label)
@@ -338,12 +342,13 @@ class ServiceCatalogTest {
     @Test
     void 가격_변경_예고는_금액과_주기가_일치하는_요금제에서만_찾아진다() {
         ServiceCatalog.Plan premium = new ServiceCatalog.Plan("프리미엄", 17000L, BillingCycle.MONTHLY, false, null)
-                .changingTo(19000L, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 8, 5),
+                .withPriceChange(17000L, 19000L, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 8, 5),
                         "https://help.netflix.com/ko/node/example");
 
         assertThat(premium.change()).isNotNull();
+        assertThat(premium.change().oldPrice()).isEqualTo(17000L);
         assertThat(premium.change().newPrice()).isEqualTo(19000L);
-        // 원본 요금제의 가격은 그대로다 — 구가격이 곧 plan.price 라는 전제가 깨지면 대상 선별이 틀린다.
+        // 적용 전이라 현재가는 아직 구가격이다(적용일에 유지보수자가 19,000으로 올린다).
         assertThat(premium.price()).isEqualTo(17000L);
     }
 

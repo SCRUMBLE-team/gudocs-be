@@ -36,7 +36,7 @@ class PriceChangeResponseTest {
     private ServiceCatalog.CatalogService serviceWithDeclaredChange() {
         ServiceCatalog.Plan premium =
                 new ServiceCatalog.Plan("프리미엄", 17000L, BillingCycle.MONTHLY, false, null)
-                        .changingTo(19000L, EFFECTIVE_ON, ANNOUNCED_ON, SOURCE_URL);
+                        .withPriceChange(17000L, 19000L, EFFECTIVE_ON, ANNOUNCED_ON, SOURCE_URL);
         ServiceCatalog.Plan standard =
                 new ServiceCatalog.Plan("스탠다드", 13500L, BillingCycle.MONTHLY, false, null);
         return new ServiceCatalog.CatalogService("NETFLIX", "넷플릭스", SubscriptionCategory.OTT,
@@ -50,11 +50,12 @@ class PriceChangeResponseTest {
         List<CatalogResponse.CatalogPlanResponse> plans = response.services().get(0).plans();
         CatalogResponse.CatalogPlanResponse premium = plans.get(0);
         assertThat(premium.priceChange()).isNotNull();
+        assertThat(premium.priceChange().oldPrice()).isEqualTo(17000L);
         assertThat(premium.priceChange().newPrice()).isEqualTo(19000L);
         assertThat(premium.priceChange().effectiveOn()).isEqualTo(EFFECTIVE_ON);
         assertThat(premium.priceChange().announcedOn()).isEqualTo(ANNOUNCED_ON);
         assertThat(premium.priceChange().sourceUrl()).isEqualTo(SOURCE_URL);
-        // 변경 전 금액은 따로 싣지 않는다 — 그 요금제의 price 가 곧 구가격이다.
+        // 적용 전이라 현재가는 아직 구가격이다.
         assertThat(premium.price()).isEqualTo(17000L);
 
         assertThat(plans.get(1).priceChange()).isNull();
@@ -64,9 +65,10 @@ class PriceChangeResponseTest {
     void 프론트가_받는_필드명과_날짜_표기를_고정한다() throws Exception {
         String json = objectMapper.writeValueAsString(
                 PriceChangeResponse.from(new ServiceCatalog.PriceChange(
-                        19000L, EFFECTIVE_ON, ANNOUNCED_ON, SOURCE_URL)));
+                        17000L, 19000L, EFFECTIVE_ON, ANNOUNCED_ON, SOURCE_URL)));
 
-        assertThat(json).contains("\"newPrice\":19000")
+        assertThat(json).contains("\"oldPrice\":17000")
+                .contains("\"newPrice\":19000")
                 .contains("\"effectiveOn\":\"2026-09-01\"")
                 .contains("\"announcedOn\":\"2026-08-05\"")
                 .contains("\"sourceUrl\":\"" + SOURCE_URL + "\"");

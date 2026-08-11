@@ -74,7 +74,7 @@ class PriceChangeDispatchIntegrationTest {
         ServiceCatalog.CatalogService netflix = ServiceCatalog.findByCode("NETFLIX").orElseThrow();
         ServiceCatalog.Plan premium =
                 new ServiceCatalog.Plan("프리미엄", 17000L, BillingCycle.MONTHLY, false, null)
-                        .changingTo(19000L, EFFECTIVE_ON, LocalDate.of(2026, 8, 5),
+                        .withPriceChange(17000L, 19000L, EFFECTIVE_ON, LocalDate.of(2026, 8, 5),
                                 "https://help.netflix.com/ko/node/example");
         return new DeclaredPriceChange(netflix, premium, premium.change());
     }
@@ -151,6 +151,50 @@ class PriceChangeDispatchIntegrationTest {
                 .extracting(UserNotification::getSubscriptionId)
                 .contains(added.getId());
         verify(pushSender, times(2)).send(anyString(), any(PushMessage.class));
+    }
+
+    @Test
+    void 발표와_금액_확인은_각각_한_번씩_나간다() {
+        // 결제일 매달 5일. 9월 1일 적용 → 9월 5일 결제 → 그 뒤부터 "확인하셨나요".
+        Subscription premium = subscriptionRepository.save(Subscription.builder()
+                .user(user).serviceName("넷플릭스").serviceCode("NETFLIX")
+                .category(SubscriptionCategory.OTT).price(17000L)
+                .billingCycle(BillingCycle.MONTHLY).firstBillingDate(LocalDate.of(2026, 5, 5))
+                .status(SubscriptionStatus.ACTIVE).build());
+        saveRegistration("fid-enabled");
+
+        dispatchService.dispatch(List.of(netflixPremium()), TODAY);                        // 발표
+        dispatchService.dispatch(List.of(netflixPremium()), TODAY.plusDays(1));            // 발표(중복)
+        dispatchService.dispatch(List.of(netflixPremium()), LocalDate.of(2026, 9, 3));     // 아직 결제 전
+        dispatchService.dispatch(List.of(netflixPremium()), LocalDate.of(2026, 9, 6));     // 결제 후 → 확인
+        dispatchService.dispatch(List.of(netflixPremium()), LocalDate.of(2026, 9, 7));     // 확인(중복)
+
+        // 같은 변경 건·같은 구독이지만 remind_offset 이 달라 두 단계가 서로를 막지 않는다.
+        assertThat(userNotificationRepository.findAll())
+                .hasSize(2)
+                .allSatisfy(n -> assertThat(n.getSubscriptionId()).isEqualTo(premium.getId()))
+                .extracting(UserNotification::getRemindOffset)
+                .containsExactlyInAnyOrder(0, 1);
+        verify(pushSender, times(2)).send(anyString(), any(PushMessage.class));
+    }
+
+    @Test
+    void 금액을_반영한_사용자에게는_더_묻지_않는다() {
+        Subscription premium = saveSub("NETFLIX", 17000L, SubscriptionStatus.ACTIVE, false);
+        saveRegistration("fid-enabled");
+        dispatchService.dispatch(List.of(netflixPremium()), TODAY);
+        assertThat(userNotificationRepository.count()).isEqualTo(1);
+
+        // 사용자가 안내를 보고 19,000원으로 수정 → 더 이상 구가격과 일치하지 않는다.
+        premium.update("넷플릭스", "NETFLIX", SubscriptionCategory.OTT, 19000L,
+                BillingCycle.MONTHLY, premium.getFirstBillingDate());
+        subscriptionRepository.saveAndFlush(premium);
+
+        dispatchService.dispatch(List.of(netflixPremium()), LocalDate.of(2026, 9, 20));
+
+        // "확인했음" 상태를 저장하지 않아도 대상에서 저절로 빠진다.
+        assertThat(userNotificationRepository.count()).isEqualTo(1);
+        verify(pushSender, times(1)).send(anyString(), any(PushMessage.class));
     }
 
     @Test

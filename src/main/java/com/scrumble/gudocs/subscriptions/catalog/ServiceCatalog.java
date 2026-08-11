@@ -79,18 +79,25 @@ public final class ServiceCatalog {
      * <b>이 파일에 선언돼 있다는 것 자체가 "공식 출처로 검증됨"을 뜻한다.</b> 블로그·기사만 있는
      * 소문은 적지 않는다.
      *
-     * <p>변경 <b>전</b> 금액은 따로 적지 않는다. 이 요금제의 {@link Plan#price()}가 곧 구가격이다.
-     * 두 값을 따로 두면 어긋날 수 있고, 어긋나는 순간 알림 대상 선별이 조용히 틀린다.
+     * <p><b>선언은 적용일이 지나도 지우지 않는다.</b> 사용자마다 결제일이 달라서, 실제로 새 금액이
+     * 빠져나가는 시점이 적용일보다 최대 한 달(연간 결제면 최대 1년) 늦다. 그때 "금액 확인하셨나요"를
+     * 물어야 하므로 그동안 선언이 살아 있어야 한다. 적용일이 한참 지나 모든 구독이 한 바퀴 돌았을 때
+     * (연간 결제까지 고려하면 13개월) 지운다.
      *
-     * <p>적용일이 지나면 {@code price}를 새 가격으로 올리고 이 선언을 지운다(= 상태 전이가 파일 편집
-     * 하나로 끝난다). 지우는 것을 잊어도 발송 배치가 적용일이 지난 선언을 건너뛴다.
+     * <p>그래서 <b>구가격을 명시적으로 적는다.</b> {@link Plan#price()}는 "지금의 공식가"라
+     * 적용일에 새 가격으로 올라가고, 그 뒤에는 구가격을 알 방법이 없기 때문이다. 유지보수자가 하는 일은
+     * 적용일에 {@code price} 숫자 하나를 바꾸는 것뿐이고 이 선언은 그대로 둔다 —
+     * 적용 전에는 {@code price == oldPrice}, 적용 후에는 {@code price == newPrice}가 된다
+     * (둘 중 하나와도 일치하지 않으면 {@code ServiceCatalogTest}가 잡는다).
      *
+     * @param oldPrice    변경 전 금액. 이 금액을 쓰고 있는 사용자가 알림 대상이다
      * @param newPrice    변경 후 금액
      * @param effectiveOn 실제 적용 예정일
      * @param announcedOn 공식 발표일
      * @param sourceUrl   공식 출처 URL (공식 공지·요금제 페이지·고객센터 문서)
      */
-    public record PriceChange(Long newPrice, LocalDate effectiveOn, LocalDate announcedOn, String sourceUrl) {
+    public record PriceChange(Long oldPrice, Long newPrice, LocalDate effectiveOn, LocalDate announcedOn,
+                              String sourceUrl) {
     }
 
     /**
@@ -102,12 +109,17 @@ public final class ServiceCatalog {
                        PriceChange change) {
 
         /**
-         * 이 요금제에 공식 가격 변경 예고를 붙인다.
-         * <pre>won("프리미엄", 17000L, MONTHLY).changingTo(19000L, ...)</pre>
+         * 이 요금제에 공식 가격 변경을 붙인다. 적용 전·후 모두 같은 선언을 쓰고, 적용일에는
+         * {@code price} 숫자만 새 금액으로 바꾼다.
+         * <pre>
+         * 적용 전: won("프리미엄", 17000L, MONTHLY).withPriceChange(17000L, 19000L, ...)
+         * 적용 후: won("프리미엄", 19000L, MONTHLY).withPriceChange(17000L, 19000L, ...)
+         * </pre>
          */
-        public Plan changingTo(long newPrice, LocalDate effectiveOn, LocalDate announcedOn, String sourceUrl) {
+        public Plan withPriceChange(long oldPrice, long newPrice, LocalDate effectiveOn, LocalDate announcedOn,
+                                    String sourceUrl) {
             return new Plan(name, price, billingCycle, approximate,
-                    new PriceChange(newPrice, effectiveOn, announcedOn, sourceUrl));
+                    new PriceChange(oldPrice, newPrice, effectiveOn, announcedOn, sourceUrl));
         }
     }
 
@@ -411,24 +423,21 @@ public final class ServiceCatalog {
      * 저장된 구독 1건에 해당하는 가격 변경 예고. 해지 링크와 마찬가지로 구독 행에 저장하지 않고
      * 매번 카탈로그에서 찾는다 — 예고를 고치거나 지우면 이미 등록된 구독도 즉시 따라간다.
      *
-     * <p>구독에는 요금제명이 없으므로 <b>금액과 결제주기가 정확히 일치하는 요금제</b>를 그 사용자의
+     * <p>구독에는 요금제명이 없으므로 <b>구가격·결제주기가 정확히 일치하는 요금제</b>를 그 사용자의
      * 요금제로 본다. 프로모션가·구요금제로 다른 금액을 넣어 둔 사용자는 애초에 이번 변경 대상이
-     * 아니므로 자연히 제외된다.
+     * 아니므로 자연히 제외되고, <b>이미 새 금액으로 반영한 사용자도 더 이상 일치하지 않아 빠진다</b>
+     * (그래서 "확인했음"을 따로 저장하지 않아도 안내가 반복되지 않는다).
      */
     public static Optional<PriceChange> priceChangeOf(String code, Long price, BillingCycle cycle) {
-        return findPlan(code, price, cycle).map(Plan::change);
-    }
-
-    /** 구독의 금액·주기와 정확히 일치하고 <b>가격 변경 예고가 붙어 있는</b> 요금제. */
-    private static Optional<Plan> findPlan(String code, Long price, BillingCycle cycle) {
         if (price == null || cycle == null) {
             return Optional.empty();
         }
         return findByCode(code).stream()
                 .flatMap(service -> service.plans().stream())
                 .filter(plan -> plan.change() != null
-                        && price.equals(plan.price())
+                        && price.equals(plan.change().oldPrice())
                         && cycle == plan.billingCycle())
+                .map(Plan::change)
                 .findFirst();
     }
 

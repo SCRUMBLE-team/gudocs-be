@@ -8,8 +8,8 @@ import java.time.LocalDate;
 /**
  * 공식 발표된 가격 변경 예고. 구독 상세와 등록 화면 요금제에 함께 실린다.
  *
- * <p>변경 전 금액은 싣지 않는다 — 구독 응답에서는 그 구독의 {@code price}가, 카탈로그 응답에서는
- * 그 요금제의 {@code price}가 곧 변경 전 금액이다.
+ * <p>{@code oldPrice}를 함께 싣는다. 적용일이 지나면 요금제의 {@code price}가 새 금액으로 올라가
+ * 구가격을 알 방법이 없어지는데, 배너는 그 뒤에도 "17,000원 → 19,000원"을 보여줘야 하기 때문이다.
  *
  * <p><b>서버는 사용자의 결제 금액을 자동으로 바꾸지 않는다.</b> 기존가 유지·프로모션·제휴결합·인앱결제로
  * 사람마다 실제 청구액이 달라서다. 프론트는 구독 상세 진입 시 이 정보로 "내 구독료에 반영할까요?"를
@@ -20,6 +20,9 @@ import java.time.LocalDate;
  */
 @Schema(description = "공식 가격 변경 예고")
 public record PriceChangeResponse(
+        @Schema(description = "변경 전 금액(원). 이 금액을 쓰는 구독이 안내 대상이다.", example = "17000")
+        Long oldPrice,
+
         @Schema(description = "변경 후 금액(원)", example = "19000")
         Long newPrice,
 
@@ -34,7 +37,7 @@ public record PriceChangeResponse(
         String sourceUrl
 ) {
     public static PriceChangeResponse from(ServiceCatalog.PriceChange change) {
-        return new PriceChangeResponse(
-                change.newPrice(), change.effectiveOn(), change.announcedOn(), change.sourceUrl());
+        return new PriceChangeResponse(change.oldPrice(), change.newPrice(),
+                change.effectiveOn(), change.announcedOn(), change.sourceUrl());
     }
 }
