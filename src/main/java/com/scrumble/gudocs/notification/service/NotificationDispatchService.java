@@ -93,8 +93,8 @@ public class NotificationDispatchService {
                 due.targetDate(),
                 due.daysUntil(),
                 subscription.getId(),
-                subscription.getServiceName() + " 해지하실 건가요?",
-                String.format(Locale.KOREA, "해지하려고 담아두신 구독이에요. %d일 후 %,d원이 결제돼요.",
+                subscription.getServiceName() + ", 계속 이용하시나요?",
+                String.format(Locale.KOREA, "해지 후보로 저장한 구독이에요. %d일 후 %,d원이 결제될 예정이에요.",
                         due.daysUntil(), subscription.getPrice()),
                 data);
     }
