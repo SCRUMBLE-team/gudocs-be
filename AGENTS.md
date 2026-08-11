@@ -23,6 +23,7 @@ src/main/java/com/scrumble/gudocs/
 ├── auth/           # 소셜 로그인(oauth/), 로그아웃, 내 정보
 ├── users/          # User·SocialAccount 엔티티, 마이페이지 (이름 수정, 탈퇴)
 ├── subscriptions/  # 구독 CRUD (entity/controller/service/repository/dto/util) + catalog/(서비스·요금제 카탈로그)
+├── billing/        # 등록정보 기반 청구 스냅샷 (billing_records) — 일일 배치 + 등록 시 추정 백필. 지출 분석의 데이터 원천
 ├── expense/        # 지출 분석 (월별, 카테고리별, 추이)
 ├── dashboard/      # 메인 대시보드 집계
 ├── notification/   # FCM Web Push (기기 등록 + 결제 예정 알림 스케줄러/발송)
@@ -50,10 +51,21 @@ deploy/             # EC2 배포 리소스 (setup.sh, systemd, Caddyfile, mysql-
 - `UNIQUE(provider, provider_id)` — 로그인 조회키
 - `UNIQUE(user_id, provider)` — 같은 provider 중복 연결 금지
 
-**subscriptions** — id, user_id(FK), service_name, service_code(**nullable**), category, price, billing_cycle, first_billing_date(최초 결제일 앵커), status, paused_at, deleted_at(soft delete), savings_selected_at, created_at, updated_at
+**subscriptions** — id, user_id(FK), service_name, service_code(**nullable**), category, price, billing_cycle, first_billing_date(최초 결제일 앵커), status, deleted_at(soft delete), savings_selected_at, created_at, updated_at
 - `service_code`: 카탈로그 서비스의 불변 키(`ServiceCatalog.code`, 예 `NETFLIX`). **프론트가 로고를 찾는 기준**이다. 표시 이름은 오타 수정·브랜드 변경으로 바뀌므로 조인 키로 쓸 수 없다. 카탈로그에 없는 서비스를 직접 입력해 등록하면 null(로고 없음). 쓰기 시점에 카탈로그 존재 여부를 검증해 없는 코드면 400(`UNKNOWN_SERVICE_CODE`) — 저장돼 버리면 영영 로고를 못 찾기 때문. `V4__subscription_service_code.sql`
 - `savings_selected_at`: 절약하기 화면에서 **해지 후보로 체크한 시각**(NULL = 선택 안 함). 나중에 이 목록으로 알림을 보내야 하므로 화면 로컬이 아니라 서버에 남긴다. boolean이 아니라 시각인 이유는 "고른 지 N일 지났다" 같은 알림 문구·주기를 만들 수 있어서다. 이미 선택된 구독을 다시 선택해도 시각을 갱신하지 않는다(화면 저장할 때마다 기준이 초기화되면 안 됨). `V6__subscription_savings_selection.sql`
 - `first_billing_date`: 다음 결제일 계산의 단일 기준 앵커. 기존 `billing_day`+`billing_month`를 통합. 다음 결제일은 저장하지 않고 `NextBillingDateCalculator`가 앵커+주기로 재계산(월말 드리프트 없음)
+- `status`·`price`·`category`는 **현재 값**이다. 과거 지출은 이 값들로 계산하지 않는다 → `billing_records` 참고. `paused_at`은 "언제 정지했나"라는 현재 상태 정보로만 남아 있고, **지출 판정에 쓰지 말 것**(마지막 정지 시각 하나뿐이라 재개하면 지워진다)
+
+**billing_records** — id, user_id(값 컬럼), subscription_id(값 컬럼), billing_date, amount, service_name, service_code, category, billing_cycle, created_at, updated_at
+- **지출 분석의 단일 소스.** 청구 예정일이 도래할 때 그 시점의 구독 등록정보를 통째로 얼려 한 줄 남긴다. 만들고 나면 **수정하지 않는다**
+- **카드·은행의 실제 결제 증빙이 아니다.** `billing_date`는 앵커+주기로 계산하고 `amount`는 당시 `Subscription.price`를 복사한다. 실제 승인 여부·승인 금액 판단이나 가격 변경 배너 판정에 사용하지 않는다
+- 신규 등록 시 과거 백필은 현재 입력값으로 최대 24개월의 청구 일정을 추정한 값이다. 과거 카드 승인 내역을 복원한 것이 아니다
+- **왜 스냅샷인가**: 과거 지출을 subscriptions 에서 매번 계산하면 사용자가 나중에 가격·카테고리를 바꾸거나 정지·삭제할 때 **과거가 따라 움직인다.** 필드마다 변경 이력 테이블을 두는 방법도 있지만(가격 이력·카테고리 이력·상태 이력 …) 가변 필드가 늘 때마다 이력이 늘고 조회는 시점 조인이 된다. 결제 시점 값을 얼려 두면 그게 전부 필요 없어진다
+- **일시정지는 행의 부재로 표현된다.** 정지 중인 달은 배치가 도는 시점에 ACTIVE 가 아니라 행이 생기지 않고, 그래서 그 달 지출이 0이다. 정지/재개를 몇 번 반복해도 저절로 맞는다 — **상태 이력 테이블이 필요 없는 이유**
+- `UNIQUE(subscription_id, billing_date)` — 배치가 지난 며칠치를 다시 훑어도 중복이 생기지 않는 멱등 키
+- `user_id`가 값 컬럼이라 지출 조회가 구독 조인 없이 사용자+기간만으로 끝난다. FK cascade 가 없으므로 **회원 탈퇴 시 `UserService.deleteAccount`가 구독보다 먼저 명시적으로 정리**한다
+- 쓰는 쪽은 `BillingRecordService`(배치 + 등록 시 백필), 읽는 쪽은 `ExpenseService`. `V8__billing_records.sql`
 
 **push_registrations** — id, user_id(FK), fid, platform, device_name, enabled, last_registered_at, created_at, updated_at
 - users 1:N. `UNIQUE(fid)` — 동일 fid 재등록 시 새 행 없이 소유자/상태 갱신. 해제는 hard delete가 아니라 `enabled=false`
@@ -184,6 +196,7 @@ ServiceCatalog.java (BE 단일 소스)
   - `V4__subscription_service_code.sql` — `subscriptions.service_code` 추가(nullable). 기존 행 백필 없음 — 승격 시점에 운영 데이터가 없었다.
   - `V6__subscription_savings_selection.sql` — `subscriptions.savings_selected_at` 추가(nullable). 절약하기 화면의 해지 후보 체크를 서버에 보관한다.
   - `V7__cancel_reminder.sql` — `type` enum에 `CANCEL_REMINDER` 추가 + dedup 키에 `subscription_id` 포함(NULL→`0` 백필 후 NOT NULL). 해지 알림은 구독별 발송이라 같은 날 같은 단계의 서로 다른 구독을 구분해야 한다.
+  - `V8__billing_records.sql` — `billing_records` 생성. 지출 분석을 "구독에서 매번 계산" → "등록정보 기반 청구 스냅샷 조회"로 전환. 기존 구독의 과거 기록은 **백필하지 않는다**(과거 변경 이력이 없어 현재 값으로 채우면 추정치가 되기 때문). 신규 등록 시 백필은 사용자가 입력한 현재값 기반 추정이며, 배치 행도 카드 승인 증빙이 아니다.
   - `V5__nullable_email.sql` — `users.email`·`social_accounts.email`을 nullable로. 엔티티는 이미 nullable이었으나 스키마가 `NOT NULL`로 남아 카카오 이메일 미동의 계정의 최초 로그인이 500으로 실패했다.
 - **배포**: Flyway가 앱 기동 시 자동 실행 → `systemctl restart gudocs` 만으로 마이그레이션 반영(수동 SSH SQL 불필요).
 - **local/test**: H2라 `flyway.enabled=false` + `ddl-auto=create-drop` 유지(MySQL 방언 마이그레이션 미적용). 세션 테이블은 local은 `session.jdbc.initialize-schema=embedded`로 H2 자동 생성, **test는 `SessionAutoConfiguration` 제외**(테스트는 `MockHttpSession`에 SecurityContext를 직접 심어 인증 → Spring Session 필터가 켜지면 인증 유실). `spring.session.store-type`은 Boot 3.4+에서 제거된 프로퍼티라 무효.
@@ -218,14 +231,33 @@ ServiceCatalog.java (BE 단일 소스)
 
 ## 지출 분석 규칙
 
-- `MONTHLY`: price 그대로, `YEARLY`: `price / 12` (Long, 소수 버림)
-- 해당 월 결제 간주 조건 (모두 충족):
-  1. `createdAt ≤ 해당월 말일`
-  2. `deletedAt IS NULL OR deletedAt ≥ 해당월 1일`
-  3. `status == ACTIVE OR (PAUSED AND pausedAt ≥ 해당월 1일)`
+**모든 금액은 `billing_records`(등록정보 기반 청구 스냅샷)에서 나온다.** 구독 테이블에서 과거 지출을 계산하지 말 것 — 나중의 가격 수정·카테고리 변경·정지·삭제가 과거를 바꿔 버린다. 다만 이 기록은 카드·은행의 실제 결제 증빙이 아니므로, 화면과 로직에서 실제 승인 금액으로 단정하지 않는다.
+
+### 두 가지 금액 (섞지 말 것)
+
+| 지표 | 계산 | 성격 |
+|---|---|---|
+| **월평균 부담** (`totalAmount`, 카테고리별, 추이, 상세) | 결제액 ÷ 커버 개월수를 결제월부터 그만큼의 달에 분산 | 매달 평탄. "이 달 구독 부담" |
+| **기록 청구액** (`recordedBillingAmount`, JSON 호환명 `actualAmount`) | 그 달 `billing_records`의 `amount` 합 | 연간 구독은 청구월에 전액 스파이크. 등록정보 기준이며 실제 승인 금액 아님 |
+
+- 연간 120,000원의 청구일이 3월이면 부담은 3월~다음해 2월 각 10,000원, 기록 청구액은 3월에만 120,000원
+- 나눗셈은 소수 버림(Long). 월평균 부담은 체감 지표이고, 기록 청구액은 등록정보상 청구가 어느 달에 집중되는지를 보여준다
+- **부담을 기록 청구액 ÷ 12로 만들면 안 된다** — 연간은 청구월에 한 줄뿐이라 그 달만 잡힌다. 반드시 커버 기간에 분산해야 평탄해진다
+- 어떤 달의 부담을 계산하려면 **최대 12개월 앞선 결제까지 읽어야 한다**(작년 결제한 연간 구독이 아직 커버 중). `ExpenseService.MAX_COVERAGE_MONTHS`
+
+### 진행 중인 달의 예정 결제
+
+- **이번 달에 한해**, 아직 결제일이 오지 않은 활성 구독의 예정 결제를 부담에 얹는다(`withCurrentMonthProjection`). 15일 결제 구독이 14일까지 "이번 달 0원"으로 보이는 것을 막는다
+- **지난 달·미래 달은 손대지 않는다.** 지난 달은 이미 저장된 청구 스냅샷만 사용한다
+- 예정분은 **DB에 저장하지 않는 임시 객체**다. 미리 넣으면 그 뒤 정지·해지·가격변경 시 일어나지 않은 결제가 이력으로 굳는다
+- 기록 청구액(JSON `actualAmount`)에는 아직 저장되지 않은 예정분을 넣지 않는다
+
+### 기타
+
 - `changeRate = (현재월 - 전월) / 전월 * 100`, 전월 0이면 0.0
 - 비율: `Math.round(x * 100.0) / 100.0`
-- 가격·카테고리·결제주기 변경 이력은 추적하지 않음 (과거 월 조회 시 현재 값 표시)
+- 상세 응답의 `status`·`deleted`는 **현재 구독 상태**를 표시용으로 붙인 것이다(스냅샷에 없음). 금액에는 관여하지 않는다
+- 이미 기록된 스냅샷은 **수정하지 않는다.** 사용자가 가격을 고쳐도 과거 행은 당시 등록값을 보존한다. 이는 실제 결제를 확정한다는 뜻이 아니라, 사후 변경으로 과거 분석이 따라 움직이지 않게 하려는 정책이다
 
 ---
 
@@ -237,9 +269,9 @@ ServiceCatalog.java (BE 단일 소스)
 
 ---
 
-## 배포 (시연용)
+## 배포
 
-5주 팀프로젝트 발표용 1회성 배포. 운영 안 함 → 최소 스펙.
+**계속 운영·유지보수하는 서비스다.** 현재 인프라가 최소 스펙(t3.micro 단일 인스턴스)인 것은 비용 때문이지 수명이 짧아서가 아니다 — "어차피 1회성이니까"를 근거로 정확성·데이터 보존을 타협하지 말 것. 스펙 제약(단일 인스턴스 전제 등)은 그 사실을 명시한 자리에서만 근거로 쓴다.
 
 ```
 [브라우저] ─HTTPS─► Vercel (gudocs-fe-v2.vercel.app)
@@ -270,6 +302,7 @@ ServiceCatalog.java (BE 단일 소스)
 | `FIREBASE_ENABLED` | `true`면 Firebase Admin 초기화 + FCM 발송 + 알림 스케줄러 활성화 (기본 false) |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Firebase 서비스 계정 JSON 경로 (예: `/etc/gudocs/firebase-service-account.json`) |
 | `FRONTEND_BASE_URL` | 알림 클릭 이동 URL 기준 (예: `https://gudocs-fe-v2.vercel.app`) |
+| `BILLING_RECORD_CRON` | 청구 스냅샷 배치 cron (Asia/Seoul, 기본 `0 5 0 * * *`). **기능 플래그로 끄지 않는다** — 멈추면 그 기간 기록이 빈다 |
 | `FCM_NOTIFICATION_CRON` | 결제 예정 알림 스케줄러 cron (Asia/Seoul, 기본 `0 0 9 * * *`) |
 | `FCM_REVIEW_CRON` | 구독 검사 유도 알림 스케줄러 cron (Asia/Seoul, 기본 `0 10 9 * * *`) |
 
@@ -294,7 +327,10 @@ ServiceCatalog.java (BE 단일 소스)
 - 새 API 추가 시 테스트 작성 필수
 - `application.yaml`, `.env` 내용을 응답에 포함 금지
 - 삭제는 hard delete 금지 — `deleted_at` soft delete 사용
-- 지출 분석 조회는 `findAllByUserIncludingDeleted` 사용
+- **지출 금액은 `billing_records`에서만 읽는다.** 구독 테이블로 과거 지출을 계산하는 코드를 다시 만들지 말 것
+- **`billing_records`를 실제 카드 결제내역으로 간주하지 않는다.** 외부 결제 연동·OCR 증빙이 추가되기 전에는 실제 승인 여부나 금액을 판정할 수 없다
+- **과거 기록은 사후 변경에 오염되지 않아야 한다.** "그때 어땠나"를 답해야 하는 데이터는 현재 값 컬럼(`status`, `price` 등)으로 되짚지 말고 **사건이 일어난 시점에 스냅샷을 남긴다.** 값 컬럼 하나로 최신 상태만 덮어쓰는 설계는 되돌릴 수 있는 사건(정지↔재개)에서 반드시 과거를 잃는다. 필드마다 변경 이력을 두는 것보다 사건 스냅샷 한 줄이 대개 더 단순하다
+- 이 프로젝트는 **계속 운영·유지보수한다.** 정확성·데이터 무결성 결함을 "규모에 비해 과하다"는 이유로 문서화만 하고 넘기지 말 것
 - 다른 사용자 데이터 접근 가능한 API 금지 — 현재 로그인 사용자 기준만 (`@CurrentUserId Long userId`)
 - 배포 설정 변경 시 `deploy/env.example`과 `application.yaml` 기본값 동시 점검
 - CORS 도메인 추가는 코드가 아니라 `CORS_ALLOWED_ORIGINS` 환경변수에서 처리

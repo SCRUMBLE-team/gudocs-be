@@ -1,5 +1,6 @@
 package com.scrumble.gudocs.expense.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 public record MonthlyExpenseResponse(
@@ -27,7 +28,10 @@ public record MonthlyExpenseResponse(
         @Schema(description = "연간 구독의 월 환산 합계(원)", example = "30000")
         long annualSubscriptionMonthlyConvertedAmount,
 
-        @Schema(description = "조회 월 실제 결제 금액(연간 구독은 결제월에만 전액 반영, 원)", example = "137000")
-        long actualAmount
+        @JsonProperty("actualAmount")
+        @Schema(description = "조회 월에 청구 예정일이 도래해 기록된 금액(원). " +
+                "Subscription 등록정보 기반이며 카드·은행의 실제 승인 금액이 아님. " +
+                "JSON 필드명 actualAmount는 기존 프론트 호환을 위해 유지", example = "137000")
+        long recordedBillingAmount
 ) {
 }
