@@ -8,14 +8,12 @@ import com.scrumble.gudocs.subscriptions.entity.Subscription;
 import com.scrumble.gudocs.subscriptions.entity.SubscriptionCategory;
 import com.scrumble.gudocs.subscriptions.repository.SubscriptionRepository;
 import com.scrumble.gudocs.users.entity.User;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -48,17 +46,16 @@ class PriceChangeDispatchServiceTest {
     @InjectMocks
     private PriceChangeDispatchService dispatchService;
 
-    @BeforeEach
-    void setUp() {
-        ReflectionTestUtils.setField(dispatchService, "frontendBaseUrl", "https://gudocs-fe-v2.vercel.app");
+    /** 넷플릭스 프리미엄 17,000 → 19,000원 인상, 9월 1일 적용. */
+    private DeclaredPriceChange netflixPremium(LocalDate effectiveOn) {
+        return netflixPremium(19000L, effectiveOn);
     }
 
-    /** 넷플릭스 프리미엄 17,000 → 19,000원, 9월 1일 적용. */
-    private DeclaredPriceChange netflixPremium(LocalDate effectiveOn) {
+    private DeclaredPriceChange netflixPremium(long newPrice, LocalDate effectiveOn) {
         ServiceCatalog.CatalogService netflix = ServiceCatalog.findByCode("NETFLIX").orElseThrow();
         ServiceCatalog.Plan premium =
                 new ServiceCatalog.Plan("프리미엄", 17000L, BillingCycle.MONTHLY, false, null)
-                        .changingTo(19000L, effectiveOn, LocalDate.of(2026, 8, 5),
+                        .changingTo(newPrice, effectiveOn, LocalDate.of(2026, 8, 5),
                                 "https://help.netflix.com/ko/node/example");
         return new DeclaredPriceChange(netflix, premium, premium.change());
     }
@@ -87,13 +84,29 @@ class PriceChangeDispatchServiceTest {
         // dedup 키의 targetDate 가 적용 예정일 = "이 인상 건"의 식별자 역할을 겸한다.
         assertThat(draft.targetDate()).isEqualTo(EFFECTIVE_ON);
         assertThat(draft.remindOffset()).isZero();
-        assertThat(draft.title()).isEqualTo("넷플릭스 프리미엄 가격이 바뀌어요");
+        assertThat(draft.title()).isEqualTo("넷플릭스 요금이 변경될 예정이에요");
         assertThat(draft.body())
-                .isEqualTo("17,000원 → 19,000원, 9월 1일부터 적용돼요. 실제 결제 금액은 다를 수 있어요.");
-        // 클릭하면 그 구독 상세로 랜딩해 "내 구독료에 반영"까지 이어져야 한다.
+                .isEqualTo("프리미엄 요금제가 17,000원 → 19,000원으로 인상될 예정이에요. 공식 안내를 확인해보세요.");
         assertThat(draft.subscriptionId()).isEqualTo(100L);
+        // 클릭하면 서비스의 공식 안내로 나간다 — 원문 확인이 가장 확실한 정보라서다.
         assertThat(draft.pushData()).containsEntry("subscriptionId", "100")
-                .containsEntry("link", "https://gudocs-fe-v2.vercel.app/subscriptions/100");
+                .containsEntry("link", "https://help.netflix.com/ko/node/example");
+    }
+
+    @Test
+    void 인하는_인상과_다른_문구로_나간다() {
+        given(subscriptionRepository.findActiveByServiceCodeAndPriceAndBillingCycle(
+                "NETFLIX", 17000L, BillingCycle.MONTHLY))
+                .willReturn(List.of(sub(100L, 17000L)));
+
+        dispatchService.dispatch(List.of(netflixPremium(15000L, EFFECTIVE_ON)), TODAY);
+
+        ArgumentCaptor<NotificationDraft> captor = ArgumentCaptor.forClass(NotificationDraft.class);
+        verify(notificationSender).send(eq(USER_ID), captor.capture());
+        // 제목은 인상·인하 공통이고(어느 쪽인지는 열어보면 안다), 본문이 갈린다.
+        assertThat(captor.getValue().title()).isEqualTo("넷플릭스 요금이 변경될 예정이에요");
+        assertThat(captor.getValue().body())
+                .isEqualTo("프리미엄 요금제가 17,000원 → 15,000원으로 인하될 예정이에요. 공식 안내를 확인해보세요.");
     }
 
     @Test
