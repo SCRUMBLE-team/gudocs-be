@@ -124,8 +124,8 @@ class NotificationDispatchServiceTest {
         NotificationDraft draft = captor.getValue();
         assertThat(draft.type()).isEqualTo(NotificationType.CANCEL_REMINDER);
         assertThat(draft.remindOffset()).isEqualTo(3);
-        assertThat(draft.title()).isEqualTo("Netflix 해지하실 건가요?");
-        assertThat(draft.body()).contains("3일 후").contains("17,000원");
+        assertThat(draft.title()).isEqualTo("Netflix, 계속 이용하시나요?");
+        assertThat(draft.body()).isEqualTo("해지 후보로 저장한 구독이에요. 3일 후 17,000원이 결제될 예정이에요.");
         // 클릭하면 그 구독 상세로 랜딩해야 하므로 구독 id 를 싣는다.
         assertThat(draft.subscriptionId()).isEqualTo(100L);
         assertThat(draft.pushData()).containsEntry("subscriptionId", "100")
