@@ -9,19 +9,21 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * 결제 예정 알림 발송 배치.
  * <p>
- * D-3(결제 3일 전)과 결제일 당일 두 시점에만 발송하며, <b>같은 유저의 같은 결제일 구독은 하나로 묶어</b>
- * 알림 1건으로 보낸다(같은 결제일 = 같은 발송 단계이므로 유저+결제일 단위로 묶인다).
+ * D-3(결제 3일 전)과 결제일 당일 두 시점에만 발송하며, <b>구독별로 알림 1건</b>을 보낸다.
  * 실제 발송/중복방지/재시도는 공통 {@link NotificationSender}에 위임한다.
+ * <p>
+ * 예전에는 같은 결제일 구독을 하나로 묶어 보냈다. 묶음을 버린 이유는 <b>알림이 특정 구독을 가리키지
+ * 못해 클릭해도 구독 상세로 갈 수 없기 때문</b>이다. 묶임이 실제로 일어나는 경우도 대부분 2건이라
+ * (결제일은 구독 시작일에 걸려 한 달에 흩어진다) 묶어서 얻는 알림 수 절감이 크지 않다.
+ * dedup 키에 subscription_id 가 포함돼 있어(V7) 구독별 발송도 같은 날 중복 없이 멱등하다.
  * <p>
  * <b>절약 후보로 체크한 구독의 D-3은 결제 예정이 아니라 해지 알림으로 대체한다.</b> 사용자가 이미
  * "해지하겠다"고 표시한 구독에 결제 예정만 알리는 것은 아무 행동으로 이어지지 않기 때문이다. 해지 알림은
@@ -36,9 +38,7 @@ public class NotificationDispatchService {
     private static final Set<Integer> REMINDER_OFFSETS = Set.of(3, 0);
     /** 해지 알림으로 대체하는 발송 단계. 당일은 대체하지 않는다. */
     private static final int CANCEL_REMINDER_OFFSET = 3;
-    /** 알림 클릭 시 이동할 프론트 알림함 경로. */
-    private static final String NOTIFICATIONS_PATH = "/notifications";
-    /** 해지 알림 클릭 시 이동할 구독 상세 경로. 뒤에 구독 id 가 붙는다. */
+    /** 알림 클릭 시 이동할 구독 상세 경로. 뒤에 구독 id 가 붙는다. */
     private static final String SUBSCRIPTION_DETAIL_PATH = "/subscriptions/";
 
     private final SubscriptionRepository subscriptionRepository;
@@ -47,31 +47,17 @@ public class NotificationDispatchService {
     @Value("${app.firebase.frontend-base-url}")
     private String frontendBaseUrl;
 
-    /** 유저+결제일(=발송 단계) 단위 묶음 알림 대상. */
-    private record BillingGroup(Long userId, LocalDate targetDate, int daysUntil, List<Subscription> subscriptions) {
-    }
-
-    /** 묶음 그룹 키: 같은 유저의 같은 결제일. */
-    private record GroupKey(Long userId, LocalDate targetDate) {
-    }
-
     /**
-     * 오늘 기준 D-3·당일 결제 예정 구독을 찾아 아직 보내지 않은 대상에게 푸시를 발송한다.
-     * 절약 후보로 체크한 구독의 D-3은 해지 알림으로 대체하고(구독별 1건), 나머지는 기존대로
-     * 유저·결제일 단위로 묶어 결제 예정 알림 1건을 보낸다.
+     * 오늘 기준 D-3·당일 결제 예정 구독을 찾아 아직 보내지 않은 대상에게 구독별로 푸시를 발송한다.
+     * 절약 후보로 체크한 구독의 D-3은 결제 예정 대신 해지 알림으로 대체한다.
      */
     public void dispatchDueReminders(LocalDate today) {
         List<Subscription> active = subscriptionRepository.findActiveForBillingReminder();
         List<DueBilling> dueList = BillingReminderCalculator.findDue(active, today, REMINDER_OFFSETS);
 
-        Map<Boolean, List<DueBilling>> split = dueList.stream()
-                .collect(Collectors.partitioningBy(this::isCancelReminderTarget));
-
-        for (DueBilling due : split.get(true)) {
-            notificationSender.send(due.subscription().getUser().getId(), toCancelDraft(due));
-        }
-        for (BillingGroup group : groupByUserAndBillingDate(split.get(false))) {
-            notificationSender.send(group.userId(), toDraft(group));
+        for (DueBilling due : dueList) {
+            NotificationDraft draft = isCancelReminderTarget(due) ? toCancelDraft(due) : toBillingDraft(due);
+            notificationSender.send(due.subscription().getUser().getId(), draft);
         }
     }
 
@@ -99,55 +85,21 @@ public class NotificationDispatchService {
                 data);
     }
 
-    /**
-     * 같은 유저의 같은 결제일 구독을 하나의 묶음으로 만든다. dueList가 결제일 오름차순이라 그룹 순서도 유지된다.
-     */
-    private List<BillingGroup> groupByUserAndBillingDate(List<DueBilling> dueList) {
-        // key: (userId, targetDate) — 같은 결제일이면 daysUntil도 동일
-        Map<GroupKey, List<DueBilling>> grouped = dueList.stream()
-                .collect(Collectors.groupingBy(
-                        d -> new GroupKey(d.subscription().getUser().getId(), d.targetDate()),
-                        LinkedHashMap::new, Collectors.toList()));
-
-        return grouped.values().stream()
-                .map(members -> new BillingGroup(
-                        members.get(0).subscription().getUser().getId(),
-                        members.get(0).targetDate(),
-                        members.get(0).daysUntil(),
-                        members.stream().map(DueBilling::subscription).toList()))
-                .toList();
-    }
-
-    private NotificationDraft toDraft(BillingGroup group) {
+    private NotificationDraft toBillingDraft(DueBilling due) {
+        Subscription subscription = due.subscription();
         Map<String, String> data = Map.of(
                 "type", NotificationType.BILLING_REMINDER.name(),
-                "link", frontendBaseUrl + NOTIFICATIONS_PATH
+                "subscriptionId", String.valueOf(subscription.getId()),
+                "link", frontendBaseUrl + SUBSCRIPTION_DETAIL_PATH + subscription.getId()
         );
-        return NotificationDraft.forUser(
+        String when = due.daysUntil() == 0 ? "오늘" : due.daysUntil() + "일 후";
+        return new NotificationDraft(
                 NotificationType.BILLING_REMINDER,
-                group.targetDate(),
-                group.daysUntil(),
-                buildTitle(group),
-                buildBody(group),
+                due.targetDate(),
+                due.daysUntil(),
+                subscription.getId(),
+                subscription.getServiceName() + " 결제 예정",
+                String.format(Locale.KOREA, "%s %,d원이 결제될 예정이에요.", when, subscription.getPrice()),
                 data);
-    }
-
-    private String buildTitle(BillingGroup group) {
-        String firstName = group.subscriptions().get(0).getServiceName();
-        int count = group.subscriptions().size();
-        if (count == 1) {
-            return firstName + " 결제 예정";
-        }
-        return firstName + " 외 " + (count - 1) + "건 결제 예정";
-    }
-
-    private String buildBody(BillingGroup group) {
-        String when = group.daysUntil() == 0 ? "오늘" : group.daysUntil() + "일 후";
-        long total = group.subscriptions().stream().mapToLong(Subscription::getPrice).sum();
-        int count = group.subscriptions().size();
-        if (count == 1) {
-            return String.format(Locale.KOREA, "%s %,d원이 결제될 예정이에요.", when, total);
-        }
-        return String.format(Locale.KOREA, "%s %d건 %,d원이 결제될 예정이에요.", when, count, total);
     }
 }
