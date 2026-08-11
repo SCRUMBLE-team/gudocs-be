@@ -116,14 +116,13 @@ class NotificationDispatchIntegrationTest {
         assertThat(userNotificationRepository.count()).isEqualTo(1);
         UserNotification saved = userNotificationRepository.findAll().get(0);
         assertThat(saved.getRemindOffset()).isEqualTo(3);
-        // 묶음 알림 → 특정 구독 없음. NULL 이 아니라 sentinel 인 이유는 MySQL UNIQUE 가 NULL 을
-        // 서로 다른 값으로 봐서, dedup 키에 subscription_id 를 넣는 순간 중복 방지가 풀리기 때문이다.
-        assertThat(saved.getSubscriptionId()).isEqualTo(UserNotification.NO_SUBSCRIPTION);
+        // 구독별 발송이라 이력에도 그 구독 id 가 남는다(검사 유도처럼 유저 단위인 알림만 NO_SUBSCRIPTION).
+        assertThat(saved.getSubscriptionId()).isNotEqualTo(UserNotification.NO_SUBSCRIPTION);
         verify(pushSender, times(1)).send(anyString(), any(PushMessage.class));
     }
 
     @Test
-    void 같은_결제일_여러_구독은_한건으로_묶여_발송() {
+    void 같은_결제일_여러_구독은_구독별로_발송() {
         saveSub("Netflix", SubscriptionStatus.ACTIVE, TODAY, false);
         saveSub("Spotify", SubscriptionStatus.ACTIVE, TODAY, false);
         saveSub("YouTube", SubscriptionStatus.ACTIVE, TODAY, false);
@@ -131,11 +130,13 @@ class NotificationDispatchIntegrationTest {
 
         dispatchService.dispatchDueReminders(TODAY);
 
-        // 3개 구독이 같은 결제일 → 알림 1건, 발송 1회
-        assertThat(userNotificationRepository.count()).isEqualTo(1);
-        UserNotification saved = userNotificationRepository.findAll().get(0);
-        assertThat(saved.getBody()).contains("3건");
-        verify(pushSender, times(1)).send(anyString(), any(PushMessage.class));
+        // 같은 날이라도 구독별 1건 — dedup 키에 subscription_id 가 들어가 서로 다른 알림으로 취급된다.
+        assertThat(userNotificationRepository.findAll())
+                .hasSize(3)
+                .extracting(UserNotification::getSubscriptionId)
+                .doesNotHaveDuplicates()
+                .doesNotContain(UserNotification.NO_SUBSCRIPTION);
+        verify(pushSender, times(3)).send(anyString(), any(PushMessage.class));
     }
 
     @Test

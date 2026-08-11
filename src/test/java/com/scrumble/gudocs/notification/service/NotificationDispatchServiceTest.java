@@ -71,16 +71,16 @@ class NotificationDispatchServiceTest {
         assertThat(draft.targetDate()).isEqualTo(TODAY);
         assertThat(draft.remindOffset()).isZero();          // 당일 = D-0
         assertThat(draft.title()).isEqualTo("Netflix 결제 예정");
-        assertThat(draft.body()).contains("오늘").contains("17,000원");
-        // 단건이면 그 구독 상세로 보낸다.
+        assertThat(draft.body()).isEqualTo("오늘 17,000원이 결제될 예정이에요.");
+        // 알림이 가리키는 구독이 하나뿐이라 클릭하면 그 상세로 바로 간다.
+        assertThat(draft.subscriptionId()).isEqualTo(100L);
         assertThat(draft.pushData()).containsEntry("subscriptionId", "100")
                 .containsEntry("link", "https://gudocs-fe-v2.vercel.app/subscriptions/100");
-        // 다만 dedup 키는 묶음 그대로다 — 키에 넣으면 나중에 구독이 추가돼 묶음이 되는 순간 중복 발송된다.
-        assertThat(draft.subscriptionId()).isEqualTo(0L);
     }
 
     @Test
-    void 결제_예정_묶음은_알림함으로_보낸다() {
+    void 같은_결제일이라도_구독별로_발송된다() {
+        // 묶으면 알림이 특정 구독을 가리키지 못해 클릭해도 상세로 갈 수 없다.
         given(subscriptionRepository.findActiveForBillingReminder())
                 .willReturn(List.of(
                         sub(100L, "Netflix", 17000L, TODAY),
@@ -89,27 +89,12 @@ class NotificationDispatchServiceTest {
         dispatchService.dispatchDueReminders(TODAY);
 
         ArgumentCaptor<NotificationDraft> captor = ArgumentCaptor.forClass(NotificationDraft.class);
-        verify(notificationSender).send(eq(USER_ID), captor.capture());
-        // 여러 건 중 어느 하나를 고를 수 없으므로 상세로 보내지 않는다.
-        assertThat(captor.getValue().pushData())
-                .doesNotContainKey("subscriptionId")
-                .containsEntry("link", "https://gudocs-fe-v2.vercel.app/notifications");
-    }
-
-    @Test
-    void 같은_결제일_여러_구독은_한_draft로_묶임() {
-        given(subscriptionRepository.findActiveForBillingReminder())
-                .willReturn(List.of(
-                        sub(100L, "Netflix", 17000L, TODAY),
-                        sub(101L, "Spotify", 10900L, TODAY)));
-
-        dispatchService.dispatchDueReminders(TODAY);
-
-        ArgumentCaptor<NotificationDraft> captor = ArgumentCaptor.forClass(NotificationDraft.class);
-        verify(notificationSender, times(1)).send(eq(USER_ID), captor.capture());
-        NotificationDraft draft = captor.getValue();
-        assertThat(draft.title()).contains("외 1건");
-        assertThat(draft.body()).contains("2건").contains("27,900원"); // 합산 금액
+        verify(notificationSender, times(2)).send(eq(USER_ID), captor.capture());
+        assertThat(captor.getAllValues())
+                .extracting(NotificationDraft::subscriptionId)
+                .containsExactlyInAnyOrder(100L, 101L);
+        assertThat(captor.getAllValues()).extracting(NotificationDraft::title)
+                .containsExactlyInAnyOrder("Netflix 결제 예정", "Spotify 결제 예정");
     }
 
     @Test
@@ -155,7 +140,7 @@ class NotificationDispatchServiceTest {
     }
 
     @Test
-    void 절약_후보는_결제_예정_묶음에서_빠진다() {
+    void 절약_후보는_결제_예정_알림_대신_해지_알림을_받는다() {
         given(subscriptionRepository.findActiveForBillingReminder())
                 .willReturn(List.of(
                         savingsSelected(100L, "Netflix", 17000L, TODAY.plusDays(3)),
@@ -171,11 +156,12 @@ class NotificationDispatchServiceTest {
         NotificationDraft billing = captor.getAllValues().stream()
                 .filter(d -> d.type() == NotificationType.BILLING_REMINDER).findFirst().orElseThrow();
 
-        assertThat(cancel.title()).contains("Netflix");
-        // 결제 예정 알림은 Spotify 만 남는다 — 묶음에 남으면 같은 구독을 두 번 알리는 셈이 된다.
+        // Netflix 는 해지 알림으로 대체되고, 결제 예정 알림은 Spotify 만 받는다
+        // (둘 다 받으면 같은 구독을 두 번 알리는 셈이 된다).
+        assertThat(cancel.subscriptionId()).isEqualTo(100L);
+        assertThat(billing.subscriptionId()).isEqualTo(101L);
         assertThat(billing.title()).isEqualTo("Spotify 결제 예정");
-        assertThat(billing.body()).contains("10,900원").doesNotContain("27,900원");
-        assertThat(billing.subscriptionId()).isEqualTo(0L);
+        assertThat(billing.body()).contains("10,900원");
     }
 
     @Test
