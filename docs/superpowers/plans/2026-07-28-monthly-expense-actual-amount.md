@@ -1,5 +1,9 @@
 # 월별 지출 실결제금액(actualAmount) Implementation Plan
 
+> **정책 정정(2026-08-11):** 아래 계획의 `actualAmount`는 카드·은행의 실제 승인 금액이 아니다.
+> 구독 등록정보 기준 청구액이며, 현재 구현은 내부 명칭을 `recordedBillingAmount`로 바로잡고 JSON
+> 필드명만 기존 프론트 호환을 위해 `actualAmount`로 유지한다. 이 문서는 당시 구현 계획 기록이다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** `GET /api/subscriptions/expenses/monthly` 응답에 "이번 달에 실제로 결제된 금액"(`actualAmount`) 필드를 추가한다. YEARLY 구독은 결제되는 특정 달에만 전액이 잡히고 나머지 달은 0원으로 계산된다.

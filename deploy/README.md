@@ -1,6 +1,6 @@
 # Deploy
 
-EC2 + Caddy + MySQL 시연용 배포 가이드.
+EC2 + Caddy + MySQL 배포 가이드. 상시 운영 대상이다.
 
 ## 사전 준비
 
@@ -56,9 +56,14 @@ sudo journalctl -u caddy -f
 sudo tail -f /var/log/caddy/gudocs.log
 ```
 
-## 시연 종료 후 정리
+## 인스턴스를 내릴 때
+
+상시 운영이 전제이므로 평소에는 내리지 않는다. 부득이하게 정리해야 한다면 **MySQL 데이터를 먼저 덤프해 둘 것** — 인스턴스를 Terminate 하면 EBS와 함께 DB가 사라지고, 지출 기록은 복구 수단이 없다.
 
 ```bash
-# EC2 인스턴스 종료 (Terminate)
-# Elastic IP 사용했다면 해제 (보관 시 과금됨)
+# 1) 데이터 백업 (필수)
+mysqldump -u root -p gudocs > gudocs-$(date +%F).sql
+
+# 2) 그 다음에야 인스턴스 종료 (Terminate)
+#    Elastic IP 사용했다면 해제 (보관 시 과금됨)
 ```

@@ -1,5 +1,6 @@
 package com.scrumble.gudocs.subscriptions.service;
 
+import com.scrumble.gudocs.billing.service.BillingRecordService;
 import com.scrumble.gudocs.common.fixture.UserFixture;
 import com.scrumble.gudocs.global.exception.BusinessException;
 import com.scrumble.gudocs.global.exception.ErrorCode;
@@ -34,6 +35,9 @@ class SubscriptionServiceTest {
 
     @Mock
     private SubscriptionRepository subscriptionRepository;
+
+    @Mock
+    private BillingRecordService billingRecordService;
 
     @Mock
     private UserRepository userRepository;

@@ -55,12 +55,12 @@ class MonthlyAmountCalculatorTest {
     }
 
     @Test
-    void MONTHLY_구독은_조회월과_무관하게_항상_price_전액() {
+    void MONTHLY_구독의_예정청구액은_조회월과_무관하게_price_전액() {
         Subscription s = monthly(17000L, 15);
 
-        assertThat(MonthlyAmountCalculator.actualAmount(s, YearMonth.of(2026, 1)))
+        assertThat(MonthlyAmountCalculator.scheduledBillingAmount(s, YearMonth.of(2026, 1)))
                 .isEqualTo(17000L);
-        assertThat(MonthlyAmountCalculator.actualAmount(s, YearMonth.of(2026, 7)))
+        assertThat(MonthlyAmountCalculator.scheduledBillingAmount(s, YearMonth.of(2026, 7)))
                 .isEqualTo(17000L);
     }
 
@@ -68,7 +68,7 @@ class MonthlyAmountCalculatorTest {
     void YEARLY_구독은_결제월과_조회월이_같으면_price_전액() {
         Subscription s = yearly(120000L, 3, 1);
 
-        assertThat(MonthlyAmountCalculator.actualAmount(s, YearMonth.of(2026, 3)))
+        assertThat(MonthlyAmountCalculator.scheduledBillingAmount(s, YearMonth.of(2026, 3)))
                 .isEqualTo(120000L);
     }
 
@@ -76,7 +76,7 @@ class MonthlyAmountCalculatorTest {
     void YEARLY_구독은_결제월과_조회월이_다르면_0원() {
         Subscription s = yearly(120000L, 3, 1);
 
-        assertThat(MonthlyAmountCalculator.actualAmount(s, YearMonth.of(2026, 4)))
+        assertThat(MonthlyAmountCalculator.scheduledBillingAmount(s, YearMonth.of(2026, 4)))
                 .isEqualTo(0L);
     }
 
@@ -84,7 +84,7 @@ class MonthlyAmountCalculatorTest {
     void YEARLY_구독은_연도가_달라도_월만_같으면_price_전액() {
         Subscription s = yearly(120000L, 3, 1);
 
-        assertThat(MonthlyAmountCalculator.actualAmount(s, YearMonth.of(2030, 3)))
+        assertThat(MonthlyAmountCalculator.scheduledBillingAmount(s, YearMonth.of(2030, 3)))
                 .isEqualTo(120000L);
     }
 }

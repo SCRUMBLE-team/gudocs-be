@@ -16,7 +16,10 @@ public final class MonthlyAmountCalculator {
                 : subscription.getPrice() / 12;
     }
 
-    public static long actualAmount(Subscription subscription, YearMonth target) {
+    /**
+     * 구독 등록정보상 해당 월에 도래하는 청구 예정액. 카드·은행의 실제 승인 금액이 아니다.
+     */
+    public static long scheduledBillingAmount(Subscription subscription, YearMonth target) {
         if (subscription.getBillingCycle() == BillingCycle.MONTHLY) {
             return subscription.getPrice();
         }

@@ -1,5 +1,6 @@
 package com.scrumble.gudocs.subscriptions.service;
 
+import com.scrumble.gudocs.billing.service.BillingRecordService;
 import com.scrumble.gudocs.global.exception.BusinessException;
 import com.scrumble.gudocs.global.exception.ErrorCode;
 import com.scrumble.gudocs.subscriptions.dto.request.SavingsSelectionRequest;
@@ -28,6 +29,7 @@ import java.util.stream.Collectors;
 public class SubscriptionService {
 
     private final SubscriptionRepository subscriptionRepository;
+    private final BillingRecordService billingRecordService;
     private final UserRepository userRepository;
 
     @Transactional
@@ -45,7 +47,13 @@ public class SubscriptionService {
                 .firstBillingDate(request.firstBillingDate())
                 .build();
 
-        return toResponse(subscriptionRepository.save(subscription));
+        Subscription saved = subscriptionRepository.save(subscription);
+
+        // 과거 최초 결제일부터의 청구 일정을 현재 입력값으로 추정한다. 카드 승인 이력 복원이 아니라
+        // 등록 직후 지출 화면이 비어 보이지 않게 하는 백필이다(미래 날짜면 생성하지 않는다).
+        billingRecordService.backfillPastBillings(saved, LocalDate.now());
+
+        return toResponse(saved);
     }
 
     @Transactional(readOnly = true)

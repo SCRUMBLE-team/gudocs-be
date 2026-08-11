@@ -95,6 +95,10 @@ app:
     clova:
       invoke-url: ${CLOVA_OCR_INVOKE_URL:}
       secret-key: ${CLOVA_OCR_SECRET_KEY:}
+  billing:
+    # 청구 스냅샷 배치 cron (Asia/Seoul). 기본: 매일 00:05 — 그날 예정일이 도래한 구독을 기록한다.
+    # 알림 스케줄러와 달리 기능 플래그로 끄지 않는다. 멈추면 그 기간의 지출 기록이 영영 빈다.
+    record-cron: ${BILLING_RECORD_CRON:0 5 0 * * *}
   firebase:
     # true일 때만 Firebase Admin 초기화 + FcmPushSender + 스케줄러 활성화
     enabled: ${FIREBASE_ENABLED:false}
