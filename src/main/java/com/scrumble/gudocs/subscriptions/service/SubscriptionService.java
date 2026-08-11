@@ -54,7 +54,8 @@ public class SubscriptionService {
         LocalDate today = LocalDate.now();
         return subscriptionRepository.findAllByUserOrderByCreatedAtDesc(user)
                 .stream()
-                .map(s -> SubscriptionResponse.from(s, NextBillingDateCalculator.calculate(s, today)))
+                .map(s -> SubscriptionResponse.from(
+                        s, NextBillingDateCalculator.calculate(s, today), today))
                 .toList();
     }
 
@@ -155,7 +156,8 @@ public class SubscriptionService {
     private List<SubscriptionResponse> getSavingsSelection(User user) {
         LocalDate today = LocalDate.now();
         return subscriptionRepository.findSavingsSelectedByUser(user).stream()
-                .map(s -> SubscriptionResponse.from(s, NextBillingDateCalculator.calculate(s, today)))
+                .map(s -> SubscriptionResponse.from(
+                        s, NextBillingDateCalculator.calculate(s, today), today))
                 .toList();
     }
 
@@ -190,9 +192,11 @@ public class SubscriptionService {
     }
 
     private SubscriptionResponse toResponse(Subscription subscription) {
+        LocalDate today = LocalDate.now();
         return SubscriptionResponse.from(
                 subscription,
-                NextBillingDateCalculator.calculate(subscription, LocalDate.now())
+                NextBillingDateCalculator.calculate(subscription, today),
+                today
         );
     }
 

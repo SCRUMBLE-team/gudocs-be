@@ -52,7 +52,8 @@ public class DashboardService {
         long monthlyTotal = calculateMonthlyTotal(active);
         List<SubscriptionResponse> recent = all.stream()
                 .limit(3)
-                .map(s -> SubscriptionResponse.from(s, NextBillingDateCalculator.calculate(s, today)))
+                .map(s -> SubscriptionResponse.from(
+                        s, NextBillingDateCalculator.calculate(s, today), today))
                 .toList();
         List<CategorySummary> categories = calculateCategorySummaries(active, monthlyTotal);
 

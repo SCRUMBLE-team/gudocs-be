@@ -362,9 +362,11 @@ class SubscriptionControllerTest {
         // 선언은 발표가 있을 때만 들어가므로, 있고 없고에 따라 기대값을 나눈다(선언 추가로 깨지지 않게).
         if (ServiceCatalog.priceChangeOf("NETFLIX", 17000L, BillingCycle.MONTHLY).isPresent()) {
             actions.andExpect(jsonPath("$.data.priceChange.newPrice").isNumber())
-                    .andExpect(jsonPath("$.data.priceChange.sourceUrl").exists());
+                    .andExpect(jsonPath("$.data.priceChange.sourceUrl").exists())
+                    .andExpect(jsonPath("$.data.priceReviewRequired").isBoolean());
         } else {
-            actions.andExpect(jsonPath("$.data.priceChange").doesNotExist());
+            actions.andExpect(jsonPath("$.data.priceChange").doesNotExist())
+                    .andExpect(jsonPath("$.data.priceReviewRequired").value(false));
         }
     }
 

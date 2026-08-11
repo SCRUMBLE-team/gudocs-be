@@ -5,6 +5,7 @@ import com.scrumble.gudocs.subscriptions.entity.SubscriptionCategory;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -305,6 +306,7 @@ class ServiceCatalogTest {
     void 선언된_가격_변경_예고가_정합적이다() {
         // 지금은 선언된 예고가 없어 통과하지만, 앞으로 붙일 예고가 이 조건을 어기면 여기서 잡힌다.
         // 잘못된 예고는 곧바로 사용자 푸시로 나가므로 배포 전에 막아야 한다.
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
         assertThat(ServiceCatalog.declaredPriceChanges()).allSatisfy(declared -> {
             ServiceCatalog.PriceChange change = declared.change();
             String label = declared.service().code() + " / " + declared.plan().name();
@@ -314,16 +316,43 @@ class ServiceCatalogTest {
             // 같은 금액이면 알릴 것이 없다(= 대상이 아무도 잡히지 않는 유령 예고).
             assertThat(change.newPrice()).as("%s 는 구가격과 달라야 한다", label)
                     .isNotEqualTo(change.oldPrice());
-            // 요금제의 price 는 "지금의 공식가"다. 적용 전이면 구가격, 적용 후면 새 가격이어야 하고,
-            // 둘 다 아니면 유지보수자가 적용일에 숫자를 잘못 바꿨다는 뜻이다.
-            assertThat(declared.plan().price()).as("%s 의 현재가는 구가격이거나 새 가격이어야 한다", label)
-                    .isIn(change.oldPrice(), change.newPrice());
+            // 요금제의 price 는 "오늘의 공식가"다. 적용일 전/후 관계까지 검사해야 구가격 갱신을
+            // 빼먹거나 너무 일찍 올린 상태가 old/new 중 하나라는 이유만으로 통과하지 않는다.
+            Long expectedCurrentPrice = today.isBefore(change.effectiveOn())
+                    ? change.oldPrice() : change.newPrice();
+            assertThat(declared.plan().price()).as("%s 의 오늘 공식가", label)
+                    .isEqualTo(expectedCurrentPrice);
             assertThat(change.announcedOn()).as("%s 발표일", label).isNotNull();
             assertThat(change.effectiveOn()).as("%s 적용일", label).isNotNull();
             assertThat(change.announcedOn()).as("%s 는 발표 후에 적용된다", label)
                     .isBeforeOrEqualTo(change.effectiveOn());
+            assertThat(change.announcedOn()).as("%s 는 이미 공식 발표된 변경이다", label)
+                    .isBeforeOrEqualTo(today);
             // 공식 출처 없이는 발송하지 않는다는 정책을 데이터 차원에서 강제한다.
             assertThat(change.sourceUrl()).as("%s 공식 출처", label).startsWith("https://");
+        });
+    }
+
+    @Test
+    void 가격_변경_알림의_실제_조회키는_서로_겹치지_않는다() {
+        // 런타임 조회는 plan.price 가 아니라 change.oldPrice 를 쓴다. 적용 후 plan.price 가 신가격으로
+        // 바뀐 뒤에도 이 키가 겹치면 같은 구독을 서로 다른 요금제 변경 대상으로 잘못 조회한다.
+        assertThat(ServiceCatalog.declaredPriceChanges())
+                .extracting(declared -> declared.service().code() + "/"
+                        + declared.change().oldPrice() + "/" + declared.plan().billingCycle())
+                .doesNotHaveDuplicates();
+
+        assertThat(ServiceCatalog.declaredPriceChanges()).allSatisfy(declared -> {
+            long currentPlansAtOldPrice = declared.service().plans().stream()
+                    .filter(plan -> plan.billingCycle() == declared.plan().billingCycle())
+                    .filter(plan -> plan.price().equals(declared.change().oldPrice()))
+                    .count();
+            long expectedMatches = declared.plan().price().equals(declared.change().oldPrice()) ? 1 : 0;
+
+            assertThat(currentPlansAtOldPrice)
+                    .as("%s / %s 구가격은 다른 현재 요금제와 겹치면 안 된다",
+                            declared.service().code(), declared.plan().name())
+                    .isEqualTo(expectedMatches);
         });
     }
 

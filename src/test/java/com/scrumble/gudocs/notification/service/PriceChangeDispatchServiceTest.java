@@ -8,14 +8,12 @@ import com.scrumble.gudocs.subscriptions.entity.Subscription;
 import com.scrumble.gudocs.subscriptions.entity.SubscriptionCategory;
 import com.scrumble.gudocs.subscriptions.repository.SubscriptionRepository;
 import com.scrumble.gudocs.users.entity.User;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -48,11 +46,6 @@ class PriceChangeDispatchServiceTest {
     @InjectMocks
     private PriceChangeDispatchService dispatchService;
 
-    @BeforeEach
-    void setUp() {
-        ReflectionTestUtils.setField(dispatchService, "frontendBaseUrl", "https://gudocs-fe-v2.vercel.app");
-    }
-
     /** 넷플릭스 프리미엄 17,000 → 19,000원 인상, 9월 1일 적용. */
     private DeclaredPriceChange netflixPremium(LocalDate effectiveOn) {
         return netflixPremium(19000L, effectiveOn);
@@ -68,15 +61,11 @@ class PriceChangeDispatchServiceTest {
     }
 
     private Subscription sub(Long id, long price) {
-        return sub(id, price, TODAY);
-    }
-
-    private Subscription sub(Long id, long price, LocalDate firstBillingDate) {
         User user = User.builder().id(USER_ID).name("테스터").email("t@e.com").build();
         return Subscription.builder()
                 .id(id).user(user).serviceName("넷플릭스").serviceCode("NETFLIX")
                 .category(SubscriptionCategory.OTT).price(price)
-                .billingCycle(BillingCycle.MONTHLY).firstBillingDate(firstBillingDate)
+                .billingCycle(BillingCycle.MONTHLY).firstBillingDate(TODAY)
                 .build();
     }
 
@@ -146,45 +135,23 @@ class PriceChangeDispatchServiceTest {
     }
 
     @Test
-    void 적용일이_지났어도_내_결제일_전이면_아직_묻지_않는다() {
-        // 적용은 9월 1일이지만 이 사용자의 결제일은 매달 25일이라 아직 옛 금액을 내고 있다.
-        // 이때 "확인하셨나요"를 물으면 바뀌지도 않은 금액을 확인하라는 셈이 된다.
-        LocalDate today = LocalDate.of(2026, 9, 10);
-        givenTarget(sub(100L, 17000L, LocalDate.of(2026, 5, 25)));
+    void 적용일이_지난_예고는_푸시_대상을_조회하지_않는다() {
+        // 적용 후 확인은 서비스 재접속 시 배너로 처리한다. 수정 화면으로 보내는 추가 푸시는 없다.
+        dispatchService.dispatch(List.of(netflixPremium(TODAY.minusDays(1))), TODAY);
 
-        dispatchService.dispatch(List.of(netflixPremium(LocalDate.of(2026, 9, 1))), today);
-
-        verify(notificationSender, never()).send(any(), any());
+        verifyNoInteractions(subscriptionRepository, notificationSender);
     }
 
     @Test
-    void 적용_후_내_결제일이_지나면_금액_확인을_요청한다() {
-        // 9월 1일 적용, 결제일은 매달 5일 → 9월 5일에 새 금액이 빠져나갔다. 그 다음 날부터 묻는다.
-        LocalDate today = LocalDate.of(2026, 9, 6);
-        givenTarget(sub(100L, 17000L, LocalDate.of(2026, 5, 5)));
-
-        dispatchService.dispatch(List.of(netflixPremium(LocalDate.of(2026, 9, 1))), today);
-
-        NotificationDraft draft = captureDraft();
-        assertThat(draft.title()).isEqualTo("이번 넷플릭스 결제 금액, 확인하셨나요?");
-        assertThat(draft.body())
-                .isEqualTo("최근 공식 요금이 19,000원으로 변경됐어요. 실제 결제 금액이 달라졌다면 업데이트해주세요.");
-        // 발표 알림과 같은 날짜·구독이지만 단계가 달라 dedup 키가 겹치지 않는다.
-        assertThat(draft.remindOffset()).isEqualTo(1);
-        assertThat(draft.targetDate()).isEqualTo(LocalDate.of(2026, 9, 1));
-        // 실제 결제 금액을 보고 고칠 수 있게 구독 수정 화면으로 보낸다.
-        assertThat(draft.pushData())
-                .containsEntry("link", "https://gudocs-fe-v2.vercel.app/subscriptions/100/edit");
-    }
-
-    @Test
-    void 적용_당일은_아직_발표_알림_단계다() {
-        // 그날부터 적용이지만 결제는 아직 안 지났을 수 있다. 확인 요청은 결제가 지난 뒤에만 나간다.
+    void 적용_당일에는_공식_안내_알림을_한_번_보낸다() {
         givenTarget(sub(100L, 17000L));
 
         dispatchService.dispatch(List.of(netflixPremium(TODAY)), TODAY);
 
-        assertThat(captureDraft().remindOffset()).isZero();
+        NotificationDraft draft = captureDraft();
+        assertThat(draft.remindOffset()).isZero();
+        assertThat(draft.pushData().get("link"))
+                .isEqualTo("https://help.netflix.com/ko/node/example");
     }
 
     @Test
