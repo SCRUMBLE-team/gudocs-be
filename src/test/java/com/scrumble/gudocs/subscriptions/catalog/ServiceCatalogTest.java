@@ -4,6 +4,7 @@ import com.scrumble.gudocs.subscriptions.entity.BillingCycle;
 import com.scrumble.gudocs.subscriptions.entity.SubscriptionCategory;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDate;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -298,5 +299,48 @@ class ServiceCatalogTest {
                 assertThat(ServiceCatalog.match(service.canonicalName()))
                         .as("서비스 %s", service.canonicalName())
                         .isPresent());
+    }
+
+    @Test
+    void 선언된_가격_변경_예고가_정합적이다() {
+        // 지금은 선언된 예고가 없어 통과하지만, 앞으로 붙일 예고가 이 조건을 어기면 여기서 잡힌다.
+        // 잘못된 예고는 곧바로 사용자 푸시로 나가므로 배포 전에 막아야 한다.
+        assertThat(ServiceCatalog.declaredPriceChanges()).allSatisfy(declared -> {
+            ServiceCatalog.PriceChange change = declared.change();
+            String label = declared.service().code() + " / " + declared.plan().name();
+
+            assertThat(change.newPrice()).as("%s 변경 후 금액", label).isPositive();
+            // 같은 금액이면 알릴 것이 없다. 카탈로그 price 를 이미 새 가격으로 올려놓고
+            // 예고만 남긴 상태(= 대상이 아무도 잡히지 않는 유령 예고)를 잡아낸다.
+            assertThat(change.newPrice()).as("%s 는 구가격과 달라야 한다", label)
+                    .isNotEqualTo(declared.plan().price());
+            assertThat(change.announcedOn()).as("%s 발표일", label).isNotNull();
+            assertThat(change.effectiveOn()).as("%s 적용일", label).isNotNull();
+            assertThat(change.announcedOn()).as("%s 는 발표 후에 적용된다", label)
+                    .isBeforeOrEqualTo(change.effectiveOn());
+            // 공식 출처 없이는 발송하지 않는다는 정책을 데이터 차원에서 강제한다.
+            assertThat(change.sourceUrl()).as("%s 공식 출처", label).startsWith("https://");
+        });
+    }
+
+    @Test
+    void 가격_변경_예고는_금액과_주기가_일치하는_요금제에서만_찾아진다() {
+        ServiceCatalog.Plan premium = new ServiceCatalog.Plan("프리미엄", 17000L, BillingCycle.MONTHLY, false, null)
+                .changingTo(19000L, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 8, 5),
+                        "https://help.netflix.com/ko/node/example");
+
+        assertThat(premium.change()).isNotNull();
+        assertThat(premium.change().newPrice()).isEqualTo(19000L);
+        // 원본 요금제의 가격은 그대로다 — 구가격이 곧 plan.price 라는 전제가 깨지면 대상 선별이 틀린다.
+        assertThat(premium.price()).isEqualTo(17000L);
+    }
+
+    @Test
+    void 예고가_없는_요금제는_변경_정보를_반환하지_않는다() {
+        // 실제 카탈로그(예고 없음) 기준: 금액이 맞아도, 코드가 없어도 전부 빈 값이어야 한다.
+        assertThat(ServiceCatalog.priceChangeOf("NETFLIX", 17000L, BillingCycle.MONTHLY)).isEmpty();
+        assertThat(ServiceCatalog.priceChangeOf("NETFLIX", 999L, BillingCycle.MONTHLY)).isEmpty();
+        assertThat(ServiceCatalog.priceChangeOf(null, 17000L, BillingCycle.MONTHLY)).isEmpty();
+        assertThat(ServiceCatalog.priceChangeOf("NETFLIX", null, BillingCycle.MONTHLY)).isEmpty();
     }
 }

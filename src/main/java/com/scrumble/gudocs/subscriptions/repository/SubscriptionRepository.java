@@ -1,5 +1,6 @@
 package com.scrumble.gudocs.subscriptions.repository;
 
+import com.scrumble.gudocs.subscriptions.entity.BillingCycle;
 import com.scrumble.gudocs.subscriptions.entity.Subscription;
 import com.scrumble.gudocs.users.entity.User;
 import jakarta.persistence.LockModeType;
@@ -26,6 +27,18 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
     @Query("SELECT s FROM Subscription s JOIN FETCH s.user " +
             "WHERE s.deletedAt IS NULL AND s.status = com.scrumble.gudocs.subscriptions.entity.SubscriptionStatus.ACTIVE")
     List<Subscription> findActiveForBillingReminder();
+
+    /**
+     * 가격 변경 알림 배치용: 특정 요금제를 쓰고 있는 활성 구독. 구독에는 요금제명이 없으므로
+     * <b>code + 금액 + 결제주기가 정확히 일치</b>하는 것을 그 요금제 사용자로 본다
+     * (프로모션가·구요금제로 다른 금액을 넣어 둔 사용자는 애초에 이번 변경 대상이 아니다).
+     */
+    @Query("SELECT s FROM Subscription s JOIN FETCH s.user " +
+            "WHERE s.deletedAt IS NULL AND s.status = com.scrumble.gudocs.subscriptions.entity.SubscriptionStatus.ACTIVE " +
+            "AND s.serviceCode = :serviceCode AND s.price = :price AND s.billingCycle = :billingCycle")
+    List<Subscription> findActiveByServiceCodeAndPriceAndBillingCycle(@Param("serviceCode") String serviceCode,
+                                                                      @Param("price") Long price,
+                                                                      @Param("billingCycle") BillingCycle billingCycle);
 
     // 검사 유도 배치용: 지정한 유저들의 삭제되지 않은 ACTIVE 구독만 조회(대상=활성 기기 보유 유저로 한정해 불필요한 적재 방지).
     @Query("SELECT s FROM Subscription s JOIN FETCH s.user " +
