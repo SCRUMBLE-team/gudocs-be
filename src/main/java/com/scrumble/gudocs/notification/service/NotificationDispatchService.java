@@ -118,11 +118,29 @@ public class NotificationDispatchService {
                 .toList();
     }
 
-    private NotificationDraft toDraft(BillingGroup group) {
-        Map<String, String> data = Map.of(
+    /**
+     * 결제 예정 알림의 클릭 이동 경로. 묶음 알림이라 클릭 액션은 하나뿐이므로,
+     * <b>단건이면 그 구독 상세로</b> 보내고 여러 건이면 알림함으로 보낸다(어느 하나를 고를 수 없으므로).
+     *
+     * <p>{@code subscriptionId} 는 <b>표시·이동용으로만</b> 싣고 dedup 키에는 넣지 않는다
+     * ({@link NotificationDraft#forUser}). 키에까지 넣으면, 단건으로 한 번 발송한 뒤 같은 결제일에
+     * 구독이 하나 더 추가돼 묶음(키=0)이 되는 순간 같은 날 같은 단계 알림이 한 번 더 나간다.
+     */
+    private Map<String, String> buildBillingData(BillingGroup group) {
+        if (group.subscriptions().size() != 1) {
+            return Map.of(
+                    "type", NotificationType.BILLING_REMINDER.name(),
+                    "link", frontendBaseUrl + NOTIFICATIONS_PATH);
+        }
+        Long subscriptionId = group.subscriptions().get(0).getId();
+        return Map.of(
                 "type", NotificationType.BILLING_REMINDER.name(),
-                "link", frontendBaseUrl + NOTIFICATIONS_PATH
-        );
+                "subscriptionId", String.valueOf(subscriptionId),
+                "link", frontendBaseUrl + SUBSCRIPTION_DETAIL_PATH + subscriptionId);
+    }
+
+    private NotificationDraft toDraft(BillingGroup group) {
+        Map<String, String> data = buildBillingData(group);
         return NotificationDraft.forUser(
                 NotificationType.BILLING_REMINDER,
                 group.targetDate(),

@@ -72,6 +72,28 @@ class NotificationDispatchServiceTest {
         assertThat(draft.remindOffset()).isZero();          // 당일 = D-0
         assertThat(draft.title()).isEqualTo("Netflix 결제 예정");
         assertThat(draft.body()).contains("오늘").contains("17,000원");
+        // 단건이면 그 구독 상세로 보낸다.
+        assertThat(draft.pushData()).containsEntry("subscriptionId", "100")
+                .containsEntry("link", "https://gudocs-fe-v2.vercel.app/subscriptions/100");
+        // 다만 dedup 키는 묶음 그대로다 — 키에 넣으면 나중에 구독이 추가돼 묶음이 되는 순간 중복 발송된다.
+        assertThat(draft.subscriptionId()).isEqualTo(0L);
+    }
+
+    @Test
+    void 결제_예정_묶음은_알림함으로_보낸다() {
+        given(subscriptionRepository.findActiveForBillingReminder())
+                .willReturn(List.of(
+                        sub(100L, "Netflix", 17000L, TODAY),
+                        sub(101L, "Spotify", 10900L, TODAY)));
+
+        dispatchService.dispatchDueReminders(TODAY);
+
+        ArgumentCaptor<NotificationDraft> captor = ArgumentCaptor.forClass(NotificationDraft.class);
+        verify(notificationSender).send(eq(USER_ID), captor.capture());
+        // 여러 건 중 어느 하나를 고를 수 없으므로 상세로 보내지 않는다.
+        assertThat(captor.getValue().pushData())
+                .doesNotContainKey("subscriptionId")
+                .containsEntry("link", "https://gudocs-fe-v2.vercel.app/notifications");
     }
 
     @Test
