@@ -60,11 +60,11 @@ deploy/             # EC2 배포 리소스 (setup.sh, systemd, Caddyfile, mysql-
 - **소유권 이전은 의도된 정책**: fid는 Firebase Installation ID(브라우저 설치 1개)라, 공용 브라우저에서 다른 사용자가 같은 fid를 등록하면 현재 로그인 사용자로 소유권을 옮긴다. (기존 소유자 등록을 남기면 이전 사용자의 알림이 현재 사용자 브라우저로 전달되어 정보 노출 → `(user_id, fid)` 복합키 대신 전역 UNIQUE 유지)
 - `fid` 전체 값은 로그에 남기지 않음(마스킹)
 
-**user_notifications** — id, user_id, subscription_id(**nullable**), type, remind_offset, title, body, target_date, sent_at, created_at, updated_at
-- 발송 이력 + 중복 방지. `UNIQUE(user_id, type, target_date, remind_offset)` — 같은 발송 단계 중복 발송 차단(다중 서버 대비 DB 제약으로 멱등). `sent_at`은 1건 이상 발송 성공 시 기록. userId/subscriptionId는 연관관계 아닌 값 컬럼
-- `subscription_id`는 **nullable**: 결제 알림은 같은 결제일 구독을 묶어 1건 발송(특정 구독 없음), 검사 유도는 유저 단위라 둘 다 null
+**user_notifications** — id, user_id, subscription_id, type, remind_offset, title, body, target_date, sent_at, created_at, updated_at
+- 발송 이력 + 중복 방지. `UNIQUE(user_id, type, target_date, remind_offset, subscription_id)` — 같은 발송 단계 중복 발송 차단(다중 서버 대비 DB 제약으로 멱등). `sent_at`은 1건 이상 발송 성공 시 기록. userId/subscriptionId는 연관관계 아닌 값 컬럼
+- `subscription_id`는 **NOT NULL이고, 특정 구독이 없으면 `0`**(`UserNotification.NO_SUBSCRIPTION`). 결제 알림은 같은 결제일 구독을 묶어 1건 발송, 검사 유도는 유저 단위라 둘 다 0. 해지 알림만 구독별 발송이라 실제 id가 들어간다. **NULL을 쓰지 않는 이유**: MySQL UNIQUE 인덱스는 NULL을 서로 다른 값으로 취급해, dedup 키에 `subscription_id`를 넣는 순간 묶음 알림(NULL)의 중복 방지가 조용히 풀린다. `V7__cancel_reminder.sql`
 - `remind_offset`: 발송 단계 discriminator. 결제 알림의 결제 며칠 전(3=D-3, 0=당일)을 구분해 dedup 키에 포함(같은 결제일에 D-3/당일 두 번 발송을 서로 다른 건으로 취급). 단계 개념 없는 검사 유도는 0
-- dedup 키 변경은 Flyway `V2__notification_dedup_userlevel.sql` (구 수동 `V20260804` 승계)
+- dedup 키 변경은 Flyway `V2__notification_dedup_userlevel.sql` (구 수동 `V20260804` 승계) → `V7__cancel_reminder.sql`에서 `subscription_id` 추가
 
 **spring_session / spring_session_attributes** — Spring Session JDBC 관리 테이블(직접 다루지 않음). 세션을 DB에 저장해 재배포/재기동에도 로그인 유지. `V3__spring_session.sql`로 생성. (아래 "세션 장기 유지" 참고)
 
@@ -74,7 +74,7 @@ enum:
 - `billing_cycle`: MONTHLY, YEARLY
 - `status`: ACTIVE, PAUSED
 - `platform`(push): WEB
-- `notification type`: BILLING_REMINDER(결제 예정), SUBSCRIPTION_REVIEW(구독 검사 유도)
+- `notification type`: BILLING_REMINDER(결제 예정), SUBSCRIPTION_REVIEW(구독 검사 유도), CANCEL_REMINDER(해지 알림 — 절약 후보의 D-3, 결제 예정을 대체)
 
 ---
 
@@ -183,26 +183,30 @@ ServiceCatalog.java (BE 단일 소스)
   - `V3__spring_session.sql` — 세션 테이블.
   - `V4__subscription_service_code.sql` — `subscriptions.service_code` 추가(nullable). 기존 행 백필 없음 — 승격 시점에 운영 데이터가 없었다.
   - `V6__subscription_savings_selection.sql` — `subscriptions.savings_selected_at` 추가(nullable). 절약하기 화면의 해지 후보 체크를 서버에 보관한다.
+  - `V7__cancel_reminder.sql` — `type` enum에 `CANCEL_REMINDER` 추가 + dedup 키에 `subscription_id` 포함(NULL→`0` 백필 후 NOT NULL). 해지 알림은 구독별 발송이라 같은 날 같은 단계의 서로 다른 구독을 구분해야 한다.
   - `V5__nullable_email.sql` — `users.email`·`social_accounts.email`을 nullable로. 엔티티는 이미 nullable이었으나 스키마가 `NOT NULL`로 남아 카카오 이메일 미동의 계정의 최초 로그인이 500으로 실패했다.
 - **배포**: Flyway가 앱 기동 시 자동 실행 → `systemctl restart gudocs` 만으로 마이그레이션 반영(수동 SSH SQL 불필요).
 - **local/test**: H2라 `flyway.enabled=false` + `ddl-auto=create-drop` 유지(MySQL 방언 마이그레이션 미적용). 세션 테이블은 local은 `session.jdbc.initialize-schema=embedded`로 H2 자동 생성, **test는 `SessionAutoConfiguration` 제외**(테스트는 `MockHttpSession`에 SecurityContext를 직접 심어 인증 → Spring Session 필터가 켜지면 인증 유실). `spring.session.store-type`은 Boot 3.4+에서 제거된 프로퍼티라 무효.
 
 ---
 
-## FCM Web Push (결제 예정 알림 + 구독 검사 유도)
+## FCM Web Push (결제 예정 알림 + 구독 검사 유도 + 해지 알림)
 
-알림 종류 2개. 실제 발송/중복방지/재시도/무효FID처리는 공통 `NotificationSender.send(userId, NotificationDraft)`에 위임(발송 로직 단일 소스). 각 배치 서비스는 "대상 선별 + draft 구성"만 담당한다.
+알림 종류 3개. 실제 발송/중복방지/재시도/무효FID처리는 공통 `NotificationSender.send(userId, NotificationDraft)`에 위임(발송 로직 단일 소스). 각 배치 서비스는 "대상 선별 + draft 구성"만 담당한다.
 
 - **① 결제 예정 알림 (`BILLING_REMINDER`)**: 스케줄러 → `NotificationDispatchService.dispatchDueReminders(today)` → 활성·미삭제 구독 조회(`SubscriptionRepository.findActiveForBillingReminder`, `JOIN FETCH user`) → `BillingReminderCalculator`로 **D-3·당일(offset {3,0})** 대상 필터(결제일 계산은 `NextBillingDateCalculator` 재사용) → **같은 유저의 같은 결제일 구독을 묶어** 알림 1건(`remind_offset`=결제 며칠 전)으로 `NotificationSender`에 전달. 제목/본문은 묶음 반영(예: "Netflix 외 1건 결제 예정" / "오늘 2건 27,900원이 결제될 예정이에요.")
+- **③ 해지 알림 (`CANCEL_REMINDER`)**: 별도 배치가 아니라 ①과 같은 D-3 대상에서 갈라진다. **절약 후보로 체크한 구독(`savings_selected_at != null`)의 D-3은 결제 예정 대신 해지 알림으로 대체**한다 — 이미 "해지하겠다"고 표시한 구독에 결제 예정만 알리면 아무 행동으로 이어지지 않는다. 대체된 구독은 결제 예정 묶음에서 빠지므로 같은 구독을 두 번 알리지 않는다.
+  - **구독별 1건씩 발송**(묶지 않음). 클릭 시 해당 구독 상세로 보내야 하기 때문이고, 그래서 dedup 키에 `subscription_id`가 필요하다. payload에 `subscriptionId`와 `link={FRONTEND_BASE_URL}/subscriptions/{id}`를 싣는다 — **단일 구독을 가리키는 알림만 id를 싣는다**(묶음·유저 단위 알림은 여전히 안 싣는다, 아래 참고)
+  - **당일(D-0)은 대체하지 않는다** — 그날은 이미 빠져나가는 돈이라 해지 권유보다 결제 사실 통지가 맞다
 - **② 구독 검사 유도 (`SUBSCRIPTION_REVIEW`)**: 스케줄러(별도 cron `FCM_REVIEW_CRON`) → `SubscriptionReviewDispatchService.dispatchDueReviews(today)` → 활성 기기를 가진 유저(`findDistinctUserIdsWithEnabledRegistration`) 대상으로, **회원 가입일(`User.createdAt`) 경과일**과 현재 구독 상태로 발송일 판정 → `NotificationSender`에 전달. 매일 스케줄러가 **그날의 현재 중복 상태**로 주기를 판정하므로 중복 해소 시 자동으로 4주 주기로 전환된다.
   - 같은 카테고리 활성 구독 2개 이상(중복) → 가입일로부터 **2주(14일)마다** 발송
   - 중복 없음(구독 0개 포함) → 가입일로부터 **4주(28일)마다** 발송
   - dedup: `(user_id, SUBSCRIPTION_REVIEW, target_date=발송일, remind_offset=0)` — 같은 날 재실행 멱등
 - **NotificationSender 공통 처리**: `UserNotification` 저장(dedup 위반이면 skip/재사용) → 사용자 활성 `PushRegistration` 조회 → `PushSender`로 FID별 발송 → 성공 시 `sent_at` 기록, 무효 FID는 `enabled=false`
 - **PushSender 추상화**: `FcmPushSender`(firebase enabled=true, Firebase Admin SDK) / `NoopPushSender`(비활성·기본, 실제 발송 안 함) — `@ConditionalOnProperty`로 택1. local/test는 Noop
-- **트랜잭션 경계**: 발송 서비스는 클래스/메서드 `@Transactional` 없음 → repository 저장이 개별 커밋. 특정 기기 발송 실패(캐치)가 알림 이력이나 다른 기기 처리를 롤백하지 않음. 중복은 `user_notifications` UNIQUE 제약 + 삽입 시 `DataIntegrityViolationException` 캐치로 다중 서버 대응
-- **FCM payload** — notification: `title`/`body`는 알림 종류·묶음 수에 따라 구성(위 참고) / data(모두 문자열): `type`(BILLING_REMINDER|SUBSCRIPTION_REVIEW), `link`. 클릭 이동 경로는 FE Service Worker가 `data.type`으로 분기(BILLING_REMINDER→`{FRONTEND_BASE_URL}/notifications` 알림함, SUBSCRIPTION_REVIEW→`{FRONTEND_BASE_URL}/subscriptions` 구독 점검). 묶음/유저 단위 알림이라 단일 `subscriptionId`는 싣지 않음
-- **알림 payload에 구독 id 목록을 싣지 않는다.** 절약 후보처럼 여러 구독을 가리키는 알림도 `type`+`link`만 보내고, FE는 화면 진입 시 `GET /api/subscriptions/savings-selection`으로 최신 목록을 받는다. payload는 **발송 시점 스냅샷**이라 받은 뒤 클릭하기까지 사이에 해지·삭제·선택 변경이 일어나면 어긋난다(D-3처럼 며칠 간격이면 실제로 벌어지는 틈이다). data는 전부 문자열이라 id 목록은 `"1,2,5"` 파싱이 필요하기도 하다. 문구에 쓰는 "3건" 같은 개수는 발송 시점에 계산해 title/body에 넣는다
+- **트랜잭션 경계**: 발송 서비스는 클래스/메서드 `@Transactional` 없음 → repository 저장이 개별 커밋. 특정 기기 발송 실패(캐치)가 알림 이력이나 다른 기기 처리를 롤백하지 않음. 중복은 `user_notifications` UNIQUE 제약 + 삽입 시 `DataIntegrityViolationException` 캐치로 막는다. **단 이 제약이 막는 것은 이력 행의 중복이지 푸시 발송 자체가 아니다** — `deliver` 후 `markSent` 하는 구조라, 그 사이에 다른 인스턴스가 같은 미발송 행을 읽으면 둘 다 발송할 수 있다. 지금은 **단일 인스턴스 배포라 도달하지 않는 경로**이고, 다중 인스턴스로 갈 때는 발송 전 원자적 claim(또는 만료 가능한 lease)이 필요하다
+- **FCM payload** — notification: `title`/`body`는 알림 종류·묶음 수에 따라 구성(위 참고) / data(모두 문자열): `type`(BILLING_REMINDER|SUBSCRIPTION_REVIEW|CANCEL_REMINDER), `link`, (해지 알림만) `subscriptionId`. 클릭 이동 경로는 FE Service Worker가 `data.type`으로 분기(BILLING_REMINDER→`{FRONTEND_BASE_URL}/notifications` 알림함, SUBSCRIPTION_REVIEW→`{FRONTEND_BASE_URL}/subscriptions` 구독 점검, CANCEL_REMINDER→`{FRONTEND_BASE_URL}/subscriptions/{id}` 구독 상세). 묶음/유저 단위 알림은 가리킬 구독이 없으므로 단일 `subscriptionId`를 싣지 않음
+- **알림 payload에 구독 id "목록"은 싣지 않는다**(단일 구독을 가리키는 해지 알림의 `subscriptionId` 하나는 예외 — 그 알림의 정체 자체가 그 구독이고, 지워졌으면 FE가 목록으로 폴백하면 된다). 절약 후보처럼 여러 구독을 가리키는 알림도 `type`+`link`만 보내고, FE는 화면 진입 시 `GET /api/subscriptions/savings-selection`으로 최신 목록을 받는다. payload는 **발송 시점 스냅샷**이라 받은 뒤 클릭하기까지 사이에 해지·삭제·선택 변경이 일어나면 어긋난다(D-3처럼 며칠 간격이면 실제로 벌어지는 틈이다). data는 전부 문자열이라 id 목록은 `"1,2,5"` 파싱이 필요하기도 하다. 문구에 쓰는 "3건" 같은 개수는 발송 시점에 계산해 title/body에 넣는다
 - **회원 탈퇴**: `UserService.deleteAccount`가 user 삭제 전에 `user_notifications`·`push_registrations`를 먼저 정리
 - **발송 대상**: `fid`는 Firebase Installation ID. `firebase-admin` 9.10.0+의 `Message.Builder.setFid()`로 발송(구 `setToken`은 legacy registration token 호환용으로 deprecated → 미사용)
 - **의존성**: `com.google.firebase:firebase-admin:9.10.0`. 크레덴셜은 `GOOGLE_APPLICATION_CREDENTIALS`(서비스 계정 JSON). 스키마는 Flyway 관리(아래 참고)

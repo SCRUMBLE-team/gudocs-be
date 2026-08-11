@@ -22,6 +22,11 @@ import java.util.stream.Collectors;
  * D-3(결제 3일 전)과 결제일 당일 두 시점에만 발송하며, <b>같은 유저의 같은 결제일 구독은 하나로 묶어</b>
  * 알림 1건으로 보낸다(같은 결제일 = 같은 발송 단계이므로 유저+결제일 단위로 묶인다).
  * 실제 발송/중복방지/재시도는 공통 {@link NotificationSender}에 위임한다.
+ * <p>
+ * <b>절약 후보로 체크한 구독의 D-3은 결제 예정이 아니라 해지 알림으로 대체한다.</b> 사용자가 이미
+ * "해지하겠다"고 표시한 구독에 결제 예정만 알리는 것은 아무 행동으로 이어지지 않기 때문이다. 해지 알림은
+ * 클릭 시 해당 구독 상세로 보내야 하므로 묶지 않고 <b>구독별 1건</b>으로 발송한다. 당일(D-0)은 대체하지
+ * 않는다 — 그날은 이미 빠져나가는 돈이라 해지 권유보다 결제 사실 통지가 맞다.
  */
 @Service
 @RequiredArgsConstructor
@@ -29,8 +34,12 @@ public class NotificationDispatchService {
 
     /** 결제 며칠 전에 알릴지: 3일 전(D-3)과 당일(D-0). */
     private static final Set<Integer> REMINDER_OFFSETS = Set.of(3, 0);
+    /** 해지 알림으로 대체하는 발송 단계. 당일은 대체하지 않는다. */
+    private static final int CANCEL_REMINDER_OFFSET = 3;
     /** 알림 클릭 시 이동할 프론트 알림함 경로. */
     private static final String NOTIFICATIONS_PATH = "/notifications";
+    /** 해지 알림 클릭 시 이동할 구독 상세 경로. 뒤에 구독 id 가 붙는다. */
+    private static final String SUBSCRIPTION_DETAIL_PATH = "/subscriptions/";
 
     private final SubscriptionRepository subscriptionRepository;
     private final NotificationSender notificationSender;
@@ -47,15 +56,47 @@ public class NotificationDispatchService {
     }
 
     /**
-     * 오늘 기준 D-3·당일 결제 예정 구독을 유저·결제일 단위로 묶어, 아직 보내지 않은 대상에게 푸시를 발송한다.
+     * 오늘 기준 D-3·당일 결제 예정 구독을 찾아 아직 보내지 않은 대상에게 푸시를 발송한다.
+     * 절약 후보로 체크한 구독의 D-3은 해지 알림으로 대체하고(구독별 1건), 나머지는 기존대로
+     * 유저·결제일 단위로 묶어 결제 예정 알림 1건을 보낸다.
      */
     public void dispatchDueReminders(LocalDate today) {
         List<Subscription> active = subscriptionRepository.findActiveForBillingReminder();
         List<DueBilling> dueList = BillingReminderCalculator.findDue(active, today, REMINDER_OFFSETS);
 
-        for (BillingGroup group : groupByUserAndBillingDate(dueList)) {
+        Map<Boolean, List<DueBilling>> split = dueList.stream()
+                .collect(Collectors.partitioningBy(this::isCancelReminderTarget));
+
+        for (DueBilling due : split.get(true)) {
+            notificationSender.send(due.subscription().getUser().getId(), toCancelDraft(due));
+        }
+        for (BillingGroup group : groupByUserAndBillingDate(split.get(false))) {
             notificationSender.send(group.userId(), toDraft(group));
         }
+    }
+
+    /** 절약 후보로 체크해 둔 구독의 D-3 — 결제 예정 대신 해지 알림을 보낼 대상. */
+    private boolean isCancelReminderTarget(DueBilling due) {
+        return due.daysUntil() == CANCEL_REMINDER_OFFSET && due.subscription().isSavingsSelected();
+    }
+
+    private NotificationDraft toCancelDraft(DueBilling due) {
+        Subscription subscription = due.subscription();
+        Map<String, String> data = Map.of(
+                "type", NotificationType.CANCEL_REMINDER.name(),
+                // 구독별 발송이라 단일 id 를 실을 수 있다. 클릭하면 그 구독 상세로 바로 이동한다.
+                "subscriptionId", String.valueOf(subscription.getId()),
+                "link", frontendBaseUrl + SUBSCRIPTION_DETAIL_PATH + subscription.getId()
+        );
+        return new NotificationDraft(
+                NotificationType.CANCEL_REMINDER,
+                due.targetDate(),
+                due.daysUntil(),
+                subscription.getId(),
+                subscription.getServiceName() + " 해지하실 건가요?",
+                String.format(Locale.KOREA, "해지하려고 담아두신 구독이에요. %d일 후 %,d원이 결제돼요.",
+                        due.daysUntil(), subscription.getPrice()),
+                data);
     }
 
     /**
@@ -82,7 +123,7 @@ public class NotificationDispatchService {
                 "type", NotificationType.BILLING_REMINDER.name(),
                 "link", frontendBaseUrl + NOTIFICATIONS_PATH
         );
-        return new NotificationDraft(
+        return NotificationDraft.forUser(
                 NotificationType.BILLING_REMINDER,
                 group.targetDate(),
                 group.daysUntil(),

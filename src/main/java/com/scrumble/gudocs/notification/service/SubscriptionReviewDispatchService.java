@@ -96,7 +96,7 @@ public class SubscriptionReviewDispatchService {
                 "type", NotificationType.SUBSCRIPTION_REVIEW.name(),
                 "link", frontendBaseUrl + REVIEW_PATH
         );
-        return new NotificationDraft(
+        return NotificationDraft.forUser(
                 NotificationType.SUBSCRIPTION_REVIEW,
                 // targetDate = 발송일(오늘). 같은 날 재실행 시 dedup 키로 중복 발송 방지.
                 today,
