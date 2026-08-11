@@ -324,6 +324,18 @@ class ServiceCatalogTest {
     }
 
     @Test
+    void 한_서비스_안에서_금액과_주기_조합은_겹치지_않는다() {
+        // 구독에는 요금제명이 없어 "금액+주기"가 요금제 식별자 역할을 한다. 같은 서비스에 같은
+        // 조합이 둘이면 어느 요금제인지 특정할 수 없고, 둘 다 인상 예고가 붙으면 같은 구독에
+        // 알림이 두 번 나간다(적용일이 다르면 dedup 도 못 막는다).
+        assertThat(ServiceCatalog.services()).allSatisfy(service ->
+                assertThat(service.plans())
+                        .as("서비스 %s", service.code())
+                        .extracting(plan -> plan.price() + "/" + plan.billingCycle())
+                        .doesNotHaveDuplicates());
+    }
+
+    @Test
     void 가격_변경_예고는_금액과_주기가_일치하는_요금제에서만_찾아진다() {
         ServiceCatalog.Plan premium = new ServiceCatalog.Plan("프리미엄", 17000L, BillingCycle.MONTHLY, false, null)
                 .changingTo(19000L, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 8, 5),
