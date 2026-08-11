@@ -1,5 +1,6 @@
 package com.scrumble.gudocs.config;
 
+import com.scrumble.gudocs.billing.service.BillingRecordService;
 import com.scrumble.gudocs.subscriptions.entity.*;
 import com.scrumble.gudocs.subscriptions.repository.SubscriptionRepository;
 import com.scrumble.gudocs.users.entity.SocialAccount;
@@ -24,6 +25,7 @@ public class DataInitializer implements ApplicationRunner {
 
     private final UserRepository userRepository;
     private final SubscriptionRepository subscriptionRepository;
+    private final BillingRecordService billingRecordService;
     private final SocialAccountRepository socialAccountRepository;
 
     @Override
@@ -43,7 +45,7 @@ public class DataInitializer implements ApplicationRunner {
                 .emailVerified(true)
                 .build());
 
-        subscriptionRepository.saveAll(List.of(
+        List<Subscription> subscriptions = subscriptionRepository.saveAll(List.of(
                 Subscription.builder()
                         .user(user).serviceName("Netflix")
                         .category(SubscriptionCategory.OTT).price(17000L)
@@ -94,5 +96,12 @@ public class DataInitializer implements ApplicationRunner {
                         .billingCycle(BillingCycle.MONTHLY).firstBillingDate(LocalDate.of(2025, 1, 25))
                         .build()
         ));
+
+        // mock 구독의 과거 청구 일정 스냅샷. 지출 분석은 billing_records 만 읽으므로 이게 없으면 local 에서
+        // 지출 화면이 통째로 비어 보인다. 정지 상태인 Adobe 는 제외 — 정지 구독은 결제되지 않는다.
+        LocalDate today = LocalDate.now();
+        subscriptions.stream()
+                .filter(s -> s.getStatus() == SubscriptionStatus.ACTIVE)
+                .forEach(s -> billingRecordService.backfillPastBillings(s, today));
     }
 }

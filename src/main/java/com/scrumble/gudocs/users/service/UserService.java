@@ -1,5 +1,6 @@
 package com.scrumble.gudocs.users.service;
 
+import com.scrumble.gudocs.billing.repository.BillingRecordRepository;
 import com.scrumble.gudocs.global.exception.BusinessException;
 import com.scrumble.gudocs.global.exception.ErrorCode;
 import com.scrumble.gudocs.notification.repository.PushRegistrationRepository;
@@ -20,6 +21,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final SubscriptionRepository subscriptionRepository;
+    private final BillingRecordRepository billingRecordRepository;
     private final SocialAccountRepository socialAccountRepository;
     private final PushRegistrationRepository pushRegistrationRepository;
     private final UserNotificationRepository userNotificationRepository;
@@ -37,6 +39,7 @@ public class UserService {
         // 사용자 삭제 전에 FK 참조 데이터를 먼저 정리한다.
         userNotificationRepository.deleteAllByUserId(userId);
         pushRegistrationRepository.deleteAllByUser(user);
+        billingRecordRepository.deleteAllByUser(user);   // 구독보다 먼저 — FK cascade가 없는 값 컬럼이라 남으면 고아 행이 된다
         subscriptionRepository.hardDeleteAllByUser(user);
         socialAccountRepository.deleteAllByUser(user);
         userRepository.delete(user);

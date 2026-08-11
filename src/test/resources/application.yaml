@@ -45,6 +45,9 @@ app:
     clova:
       invoke-url: http://localhost/test-clova-ocr
       secret-key: test-secret-key
+  billing:
+    # 테스트에서 실제로 뜰 일이 없는 시각. 결제 기록은 서비스를 직접 호출해 검증한다.
+    record-cron: 0 5 0 * * *
   firebase:
     enabled: false
     frontend-base-url: https://gudocs-fe-v2.vercel.app
