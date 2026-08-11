@@ -209,10 +209,11 @@ ServiceCatalog.java (BE 단일 소스)
   - 같은 카테고리 활성 구독 2개 이상(중복) → 가입일로부터 **2주(14일)마다** 발송
   - 중복 없음(구독 0개 포함) → 가입일로부터 **4주(28일)마다** 발송
   - dedup: `(user_id, SUBSCRIPTION_REVIEW, target_date=발송일, remind_offset=0)` — 같은 날 재실행 멱등
-- **④ 가격 변경 알림 (`PRICE_CHANGE`)**: 스케줄러(별도 cron `FCM_PRICE_CHANGE_CRON`) → `PriceChangeDispatchService.dispatchDeclaredPriceChanges(today)` → `ServiceCatalog.declaredPriceChanges()`(카탈로그에 선언된 공식 인상·인하 예고)를 훑어 **적용일이 지나지 않은 건**만, 그 요금제를 쓰는 활성 구독에 **구독별 1건** 발송. (예: "넷플릭스 요금이 변경될 예정이에요" / "프리미엄 요금제가 17,000원 → 19,000원으로 인상될 예정이에요. 공식 안내를 확인해보세요.") 제목은 인상·인하 공통이고 **본문이 갈린다**(인상/인하)
+- **④ 가격 변경 알림 (`PRICE_CHANGE`)**: 스케줄러(별도 cron `FCM_PRICE_CHANGE_CRON`) → `PriceChangeDispatchService.dispatchDeclaredPriceChanges(today)` → `ServiceCatalog.declaredPriceChanges()`(카탈로그에 선언된 공식 인상·인하 예고)를 훑어 **적용일이 지나지 않은 건**만, 그 요금제를 쓰는 활성 구독에 **구독별 1건** 발송. (예: "넷플릭스 요금이 변경될 예정이에요" / "프리미엄 요금제가 9월 1일부터 19,000원으로 인상될 예정이에요. 공식 안내를 확인해보세요.") 제목은 인상·인하 공통이고 **본문이 갈린다**(인상/인하)
   - **이 알림만 클릭 시 앱이 아니라 서비스의 공식 안내 페이지로 나간다**(`link = PriceChange.sourceUrl`). 가격 변경은 원문 확인이 가장 확실하기 때문이다. 앱 내부로 보내고 싶으면 payload 의 `subscriptionId`로 구독 상세 경로를 만들면 된다
   - **대상 판정은 `service_code` + `price` + `billing_cycle` 정확 일치**(`findActiveByServiceCodeAndPriceAndBillingCycle`). 구독에 요금제명 컬럼이 없지만, 금액·주기가 곧 요금제다. 프로모션가·구요금제로 다른 금액을 넣어 둔 사용자는 애초에 이번 변경 대상이 아니라 자연히 빠진다
   - **사용자의 `price`를 서버가 자동으로 바꾸지 않는다.** 기존가 유지·프로모션·제휴결합·인앱결제로 사람마다 실제 청구액이 달라, 대신 고치면 지출 분석이 사실과 어긋난다. 반영은 상세 화면의 "내 구독료에 반영"에서 사용자가 고르고, **기존 `PUT /api/subscriptions/{id}`를 그대로 쓴다(전용 API 없음)**
+  - **반영 UI**: FE는 구독 상세 진입 시 `priceChange`가 있으면 "내 구독료에 반영할까요?" 팝업을 띄운다. 반영하면 구독 금액이 더 이상 변경 대상 요금제 금액과 일치하지 않아 **`priceChange`가 저절로 사라진다** — "확인했음" 상태를 따로 저장하지 않아도 같은 팝업이 다시 뜨지 않는다(무시하고 닫는 경우의 재노출 억제는 FE 몫)
   - dedup: `target_date = 적용 예정일`이라 키가 곧 `(사용자, 구독, 그 변경 건)` → 매일 배치가 돌아도 구독당 1회. 발표 후 새로 등록한 구독은 새 `subscription_id`라 정상적으로 알림을 받는다
   - **크롤러가 없다.** 수집·검증은 사람이 카탈로그에 선언하는 것으로 끝나므로 이 배치에는 수집 실패라는 실패 모드 자체가 없다
 - **NotificationSender 공통 처리**: `UserNotification` 저장(dedup 위반이면 skip/재사용) → 사용자 활성 `PushRegistration` 조회 → `PushSender`로 FID별 발송 → 성공 시 `sent_at` 기록, 무효 FID는 `enabled=false`

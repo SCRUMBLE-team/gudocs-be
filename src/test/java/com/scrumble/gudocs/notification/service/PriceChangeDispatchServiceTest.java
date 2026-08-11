@@ -86,7 +86,7 @@ class PriceChangeDispatchServiceTest {
         assertThat(draft.remindOffset()).isZero();
         assertThat(draft.title()).isEqualTo("넷플릭스 요금이 변경될 예정이에요");
         assertThat(draft.body())
-                .isEqualTo("프리미엄 요금제가 17,000원 → 19,000원으로 인상될 예정이에요. 공식 안내를 확인해보세요.");
+                .isEqualTo("프리미엄 요금제가 9월 1일부터 19,000원으로 인상될 예정이에요. 공식 안내를 확인해보세요.");
         assertThat(draft.subscriptionId()).isEqualTo(100L);
         // 클릭하면 서비스의 공식 안내로 나간다 — 원문 확인이 가장 확실한 정보라서다.
         assertThat(draft.pushData()).containsEntry("subscriptionId", "100")
@@ -106,7 +106,7 @@ class PriceChangeDispatchServiceTest {
         // 제목은 인상·인하 공통이고(어느 쪽인지는 열어보면 안다), 본문이 갈린다.
         assertThat(captor.getValue().title()).isEqualTo("넷플릭스 요금이 변경될 예정이에요");
         assertThat(captor.getValue().body())
-                .isEqualTo("프리미엄 요금제가 17,000원 → 15,000원으로 인하될 예정이에요. 공식 안내를 확인해보세요.");
+                .isEqualTo("프리미엄 요금제가 9월 1일부터 15,000원으로 인하될 예정이에요. 공식 안내를 확인해보세요.");
     }
 
     @Test

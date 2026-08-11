@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -35,6 +36,10 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class PriceChangeDispatchService {
+
+    /** 본문에 쓰는 적용일 표기. 연도는 붙이지 않는다(가까운 미래라 "9월 1일"로 충분하다). */
+    private static final DateTimeFormatter EFFECTIVE_ON_FORMAT =
+            DateTimeFormatter.ofPattern("M월 d일", Locale.KOREA);
 
     private final SubscriptionRepository subscriptionRepository;
     private final NotificationSender notificationSender;
@@ -104,7 +109,10 @@ public class PriceChangeDispatchService {
     private String body(DeclaredPriceChange declared) {
         long oldPrice = declared.plan().price();
         long newPrice = declared.change().newPrice();
-        return String.format(Locale.KOREA, "%s 요금제가 %,d원 → %,d원으로 %s될 예정이에요. 공식 안내를 확인해보세요.",
-                declared.plan().name(), oldPrice, newPrice, newPrice > oldPrice ? "인상" : "인하");
+        return String.format(Locale.KOREA, "%s 요금제가 %s부터 %,d원으로 %s될 예정이에요. 공식 안내를 확인해보세요.",
+                declared.plan().name(),
+                declared.change().effectiveOn().format(EFFECTIVE_ON_FORMAT),
+                newPrice,
+                newPrice > oldPrice ? "인상" : "인하");
     }
 }
