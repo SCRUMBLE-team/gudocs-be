@@ -2,10 +2,12 @@ package com.scrumble.gudocs.subscriptions.dto.response;
 
 import com.scrumble.gudocs.subscriptions.catalog.ServiceCatalog;
 import com.scrumble.gudocs.subscriptions.entity.*;
+import com.scrumble.gudocs.subscriptions.util.PriceChangeReviewCalculator;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 public record SubscriptionResponse(
         @Schema(description = "구독 ID", example = "1")
@@ -46,13 +48,25 @@ public record SubscriptionResponse(
                 + "화면 재진입·다른 기기에서도 체크 상태가 유지된다.", example = "false")
         boolean savingsSelected,
 
+        @Schema(description = "이 구독이 쓰는 요금제의 공식 가격 변경 예고. 예고가 없거나 "
+                + "현재 금액이 카탈로그 요금제와 다르면(프로모션가 등) null. "
+                + "서버가 구독 금액을 자동으로 바꾸지는 않으며, 반영 여부는 사용자가 고른다.")
+        PriceChangeResponse priceChange,
+
+        @Schema(description = "공식 가격 적용일 이후 첫 예정 결제일이 지나, 서비스 재접속 시 "
+                + "결제 금액 확인 배너를 보여줄지 여부. 실제 카드 결제를 확인한 값은 아니며 "
+                + "이 값으로 푸시를 발송하거나 구독 금액을 자동 수정하지 않는다.", example = "false")
+        boolean priceReviewRequired,
+
         @Schema(description = "생성 일시", example = "2026-07-01T12:00:00")
         LocalDateTime createdAt,
 
         @Schema(description = "수정 일시", example = "2026-07-10T12:00:00")
         LocalDateTime updatedAt
 ) {
-    public static SubscriptionResponse from(Subscription subscription, LocalDate nextBillingDate) {
+    public static SubscriptionResponse from(Subscription subscription, LocalDate nextBillingDate, LocalDate today) {
+        Optional<ServiceCatalog.PriceChange> priceChange = ServiceCatalog.priceChangeOf(
+                subscription.getServiceCode(), subscription.getPrice(), subscription.getBillingCycle());
         return new SubscriptionResponse(
                 subscription.getId(),
                 subscription.getServiceName(),
@@ -67,6 +81,11 @@ public record SubscriptionResponse(
                 // 링크가 바뀌면 카탈로그만 고치면 되고, 이미 저장된 구독도 함께 최신 링크를 받는다.
                 ServiceCatalog.cancelUrlOf(subscription.getServiceCode()),
                 subscription.isSavingsSelected(),
+                // 해지 링크와 같은 이유로 저장하지 않고 매번 카탈로그에서 찾는다 —
+                // 예고를 고치거나 유지 기간이 끝나 지우면 이미 등록된 구독도 즉시 따라간다.
+                priceChange.map(PriceChangeResponse::from).orElse(null),
+                priceChange.filter(change -> PriceChangeReviewCalculator.isRequired(subscription, change, today))
+                        .isPresent(),
                 subscription.getCreatedAt(),
                 subscription.getUpdatedAt()
         );

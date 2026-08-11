@@ -59,7 +59,11 @@ public record CatalogResponse(
 
             @Schema(description = "달러 요금을 환산한 추정치인지. true면 실제 결제액이 환율·해외결제 "
                     + "수수료에 따라 달라진다는 안내를 함께 보여줄 것.", example = "false")
-            boolean approximate
+            boolean approximate,
+
+            @Schema(description = "공식 발표된 가격 변경 예고. 없으면 null. "
+                    + "등록 화면에서 '9월 1일부터 19,000원' 같은 안내를 함께 보여줄 수 있다.")
+            PriceChangeResponse priceChange
     ) {
     }
 
@@ -79,7 +83,8 @@ public record CatalogResponse(
                 service.cancelUrl(),
                 service.plans().stream()
                         .map(plan -> new CatalogPlanResponse(
-                                plan.name(), plan.price(), plan.billingCycle(), plan.approximate()))
+                                plan.name(), plan.price(), plan.billingCycle(), plan.approximate(),
+                                plan.change() == null ? null : PriceChangeResponse.from(plan.change())))
                         .toList());
     }
 }

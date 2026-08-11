@@ -17,7 +17,9 @@ import com.scrumble.gudocs.common.TestSessions;
 import com.scrumble.gudocs.users.repository.SocialAccountRepository;
 import com.scrumble.gudocs.users.repository.UserRepository;
 import org.springframework.test.web.servlet.MockMvc;
+import com.scrumble.gudocs.subscriptions.catalog.ServiceCatalog;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -344,6 +346,28 @@ class SubscriptionControllerTest {
         mockMvc.perform(get("/api/subscriptions/" + 구독_ID_추출(result)).session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.cancelUrl").value("https://www.netflix.com/cancelplan"));
+    }
+
+    @Test
+    void 구독_상세의_가격_변경_예고는_카탈로그_선언을_따른다() throws Exception {
+        // 카탈로그에 인상 예고가 선언돼 있는 동안에만 채워지는 필드다. 평상시엔 없고,
+        // 프론트는 이 필드가 있을 때만 "내 구독료에 반영" 안내를 띄운다.
+        MvcResult result = 구독_등록(session, new SubscriptionCreateRequest(
+                "넷플릭스", "NETFLIX", SubscriptionCategory.OTT, 17000L,
+                BillingCycle.MONTHLY, LocalDate.of(2026, 1, 15)));
+
+        ResultActions actions = mockMvc.perform(get("/api/subscriptions/" + 구독_ID_추출(result)).session(session))
+                .andExpect(status().isOk());
+
+        // 선언은 발표가 있을 때만 들어가므로, 있고 없고에 따라 기대값을 나눈다(선언 추가로 깨지지 않게).
+        if (ServiceCatalog.priceChangeOf("NETFLIX", 17000L, BillingCycle.MONTHLY).isPresent()) {
+            actions.andExpect(jsonPath("$.data.priceChange.newPrice").isNumber())
+                    .andExpect(jsonPath("$.data.priceChange.sourceUrl").exists())
+                    .andExpect(jsonPath("$.data.priceReviewRequired").isBoolean());
+        } else {
+            actions.andExpect(jsonPath("$.data.priceChange").doesNotExist())
+                    .andExpect(jsonPath("$.data.priceReviewRequired").value(false));
+        }
     }
 
     @Test

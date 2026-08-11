@@ -86,7 +86,7 @@ enum:
 - `billing_cycle`: MONTHLY, YEARLY
 - `status`: ACTIVE, PAUSED
 - `platform`(push): WEB
-- `notification type`: BILLING_REMINDER(결제 예정), SUBSCRIPTION_REVIEW(구독 검사 유도), CANCEL_REMINDER(해지 알림 — 절약 후보의 D-3, 결제 예정을 대체)
+- `notification type`: BILLING_REMINDER(결제 예정), SUBSCRIPTION_REVIEW(구독 검사 유도), CANCEL_REMINDER(해지 알림 — 절약 후보의 D-3, 결제 예정을 대체), PRICE_CHANGE(공식 가격 변경 예고)
 
 ---
 
@@ -144,6 +144,13 @@ enum:
 - 요금은 `PRICES_CHECKED_ON` 시점에 공개 자료로 확인한 **국내 원화 정가**이고, API 응답에 이 날짜를 함께 내린다. 어디까지나 **기본값(참고값)** — 할인·프로모션·구 요금제 사용자가 있어 등록 화면에서 수정 가능하다.
 - **신뢰할 만한 원화 가격을 못 찾으면 추측해 채우지 않고 `plans`를 빈 배열로 둔다** (해외 USD 결제라 원화 정가가 없는 서비스, 종료된 서비스, 구독이 아니라 건별 구매인 서비스). 프론트는 빈 배열이면 직접 입력 fallback.
 - `aliases`는 OCR 매칭 전용 — `GET /api/subscriptions/catalog` 응답에는 내보내지 않는다.
+- **가격 변경 예고(`Plan.change`)도 이 파일이 단일 소스**다. 공식 인상·인하 발표가 나오면 해당 요금제에 `withPriceChange(구가격, 신가격, 적용일, 발표일, 공식출처URL)`를 붙인다. **이 파일에 적혀 있다는 것 자체가 "사람이 공식 출처로 검증했다"는 뜻**이고, 그래서 `DETECTED/VERIFIED` 같은 검증 상태나 관리자 화면을 두지 않는다 — 검증 절차는 이 파일을 고치는 PR 리뷰다. 채우는 규칙:
+  - **구가격(`oldPrice`)을 명시적으로 유지한다.** 적용일에는 요금제의 `price`가 새 가격으로 올라가므로, 구가격을 계속 내는 구독을 적용 후에도 식별하려면 별도 값이 필요하다. 이 값은 실제 카드 결제 증빙이 아니라 `service_code + oldPrice + billing_cycle`로 보수적으로 대상을 찾는 기준이다.
+  - 출처는 **공식 공지·요금제 페이지·고객센터 문서**만. 블로그·기사만 있는 소문은 적지 않는다(`ServiceCatalogTest`가 `https://` 여부까지 검사한다).
+  - **가격 변경 푸시는 적용일까지 공식 안내 URL로 1회만 발송하고, 적용 후에는 추가 푸시를 보내지 않는다.** 적용 후 첫 예정 결제일이 지난 사용자가 서비스에 다시 접속하면 `SubscriptionResponse.priceReviewRequired=true`로 프론트가 확인 배너를 띄운다.
+  - 배너 시점 계산은 카드·은행의 실제 결제를 확인하지 않는다. `NextBillingDateCalculator`로 구한 "적용일 이후 첫 예정 결제일이 지났는가"만 판단한다. BillingRecord도 실제 카드 증빙이 아니므로 이 판정에 사용하지 않는다.
+  - 적용일에는 `price`를 새 가격으로 올리되 예고는 바로 지우지 않는다. 월간·연간 구독이 한 바퀴 돌아 배너 대상 판정이 끝날 때까지(연간 결제 고려 13개월) 유지한 뒤 지운다.
+  - 크롤링으로 자동 수집하지 않는다. 요금 자체를 크롤링하지 않는 이유(위 "정적 상수 단일 소스")가 그대로 적용되고, 더구나 잘못 읽은 값이 곧바로 사용자 푸시로 나간다.
 - **`cancelUrl`(해지 링크)도 이 파일이 단일 소스**다. 구독 상세의 "해지하러 가기" 링크로 쓰며 `SubscriptionResponse`·카탈로그 응답 양쪽에 실린다. 구독 행에 저장하지 않고 `service_code`로 매번 `ServiceCatalog.cancelUrlOf()`에서 찾는다 — 링크가 바뀌어도 이 파일만 고치면 이미 등록된 구독까지 최신 링크를 받는다. 채우는 규칙:
   - 공개적으로 안정된 **해지·구독관리 딥링크**가 있으면 그것 (`netflix.com/cancelplan`, 애플 구독 관리, Google One 설정 등). 애플(iCloud·애플뮤직·애플TV)·MS(365·게임패스)·Google One(드라이브·Gemini)처럼 한 화면에서 관리하는 묶음은 상수를 공유한다.
   - 국내 서비스 상당수는 로그인 후 마이페이지 구조라 딥링크가 공개돼 있지 않다 → **깨지지 않는 상위 URL(서비스 홈)**. 추측한 경로는 404로 이어져 링크가 없는 것보다 나쁘다.
@@ -197,15 +204,16 @@ ServiceCatalog.java (BE 단일 소스)
   - `V6__subscription_savings_selection.sql` — `subscriptions.savings_selected_at` 추가(nullable). 절약하기 화면의 해지 후보 체크를 서버에 보관한다.
   - `V7__cancel_reminder.sql` — `type` enum에 `CANCEL_REMINDER` 추가 + dedup 키에 `subscription_id` 포함(NULL→`0` 백필 후 NOT NULL). 해지 알림은 구독별 발송이라 같은 날 같은 단계의 서로 다른 구독을 구분해야 한다.
   - `V8__billing_records.sql` — `billing_records` 생성. 지출 분석을 "구독에서 매번 계산" → "등록정보 기반 청구 스냅샷 조회"로 전환. 기존 구독의 과거 기록은 **백필하지 않는다**(과거 변경 이력이 없어 현재 값으로 채우면 추정치가 되기 때문). 신규 등록 시 백필은 사용자가 입력한 현재값 기반 추정이며, 배치 행도 카드 승인 증빙이 아니다.
+  - `V9__price_change_notification.sql` — `type` enum에 `PRICE_CHANGE` 추가. **가격 변경 기능의 스키마 변경은 이것이 전부다** — 변경 이벤트는 DB가 아니라 `ServiceCatalog`에 선언한다(아래 참고).
   - `V5__nullable_email.sql` — `users.email`·`social_accounts.email`을 nullable로. 엔티티는 이미 nullable이었으나 스키마가 `NOT NULL`로 남아 카카오 이메일 미동의 계정의 최초 로그인이 500으로 실패했다.
 - **배포**: Flyway가 앱 기동 시 자동 실행 → `systemctl restart gudocs` 만으로 마이그레이션 반영(수동 SSH SQL 불필요).
 - **local/test**: H2라 `flyway.enabled=false` + `ddl-auto=create-drop` 유지(MySQL 방언 마이그레이션 미적용). 세션 테이블은 local은 `session.jdbc.initialize-schema=embedded`로 H2 자동 생성, **test는 `SessionAutoConfiguration` 제외**(테스트는 `MockHttpSession`에 SecurityContext를 직접 심어 인증 → Spring Session 필터가 켜지면 인증 유실). `spring.session.store-type`은 Boot 3.4+에서 제거된 프로퍼티라 무효.
 
 ---
 
-## FCM Web Push (결제 예정 알림 + 구독 검사 유도 + 해지 알림)
+## FCM Web Push (결제 예정 알림 + 구독 검사 유도 + 해지 알림 + 가격 변경 알림)
 
-알림 종류 3개. 실제 발송/중복방지/재시도/무효FID처리는 공통 `NotificationSender.send(userId, NotificationDraft)`에 위임(발송 로직 단일 소스). 각 배치 서비스는 "대상 선별 + draft 구성"만 담당한다.
+알림 종류 4개. 실제 발송/중복방지/재시도/무효FID처리는 공통 `NotificationSender.send(userId, NotificationDraft)`에 위임(발송 로직 단일 소스). 각 배치 서비스는 "대상 선별 + draft 구성"만 담당한다.
 
 - **① 결제 예정 알림 (`BILLING_REMINDER`)**: 스케줄러 → `NotificationDispatchService.dispatchDueReminders(today)` → 활성·미삭제 구독 조회(`SubscriptionRepository.findActiveForBillingReminder`, `JOIN FETCH user`) → `BillingReminderCalculator`로 **D-3·당일(offset {3,0})** 대상 필터(결제일 계산은 `NextBillingDateCalculator` 재사용) → **구독별로 알림 1건**(`remind_offset`=결제 며칠 전)씩 `NotificationSender`에 전달(예: "Netflix 결제 예정" / "오늘 17,000원이 결제될 예정이에요.").
   - **묶어 보내지 않는 이유**: 묶음 알림은 특정 구독을 가리키지 못해 클릭해도 구독 상세로 갈 수 없다. 결제일은 구독 시작일에 걸려 한 달에 흩어지므로 실제로 묶이는 경우도 대부분 2건이라 알림 수 절감이 크지 않다. dedup 키에 `subscription_id`가 포함돼(V7) 구독별 발송도 같은 날 중복 없이 멱등하다
@@ -216,10 +224,17 @@ ServiceCatalog.java (BE 단일 소스)
   - 같은 카테고리 활성 구독 2개 이상(중복) → 가입일로부터 **2주(14일)마다** 발송
   - 중복 없음(구독 0개 포함) → 가입일로부터 **4주(28일)마다** 발송
   - dedup: `(user_id, SUBSCRIPTION_REVIEW, target_date=발송일, remind_offset=0)` — 같은 날 재실행 멱등
+- **④ 가격 변경 알림 (`PRICE_CHANGE`)**: 스케줄러(별도 cron `FCM_PRICE_CHANGE_CRON`) → `PriceChangeDispatchService.dispatchDeclaredPriceChanges(today)` → `ServiceCatalog.declaredPriceChanges()`(카탈로그에 선언된 공식 인상·인하 예고)를 훑어 **적용일이 지나지 않은 건**만, 그 요금제를 쓰는 활성 구독에 **구독별 1건** 발송. (예: "넷플릭스 요금이 변경될 예정이에요" / "프리미엄 요금제가 9월 1일부터 19,000원으로 인상될 예정이에요. 공식 안내를 확인해보세요.") 제목은 인상·인하 공통이고 **본문이 갈린다**(인상/인하)
+  - **이 알림만 클릭 시 앱이 아니라 서비스의 공식 안내 페이지로 나간다**(`link = PriceChange.sourceUrl`). 가격 변경은 원문 확인이 가장 확실하기 때문이다. 앱 내부로 보내고 싶으면 payload 의 `subscriptionId`로 구독 상세 경로를 만들면 된다
+  - **대상 판정은 `service_code` + `price` + `billing_cycle` 정확 일치**(`findActiveByServiceCodeAndPriceAndBillingCycle`). 구독에 요금제명 컬럼이 없지만, 금액·주기가 곧 요금제다. 프로모션가·구요금제로 다른 금액을 넣어 둔 사용자는 애초에 이번 변경 대상이 아니라 자연히 빠진다
+  - **사용자의 `price`를 서버가 자동으로 바꾸지 않는다.** 기존가 유지·프로모션·제휴결합·인앱결제로 사람마다 실제 청구액이 달라, 대신 고치면 지출 분석이 사실과 어긋난다. 반영은 상세 화면의 "내 구독료에 반영"에서 사용자가 고르고, **기존 `PUT /api/subscriptions/{id}`를 그대로 쓴다(전용 API 없음)**
+  - dedup: `target_date = 적용 예정일`이라 키가 곧 `(사용자, 구독, 그 변경 건)` → 매일 배치가 돌아도 구독당 1회. 발표 후 새로 등록한 구독은 새 `subscription_id`라 정상적으로 알림을 받는다
+  - **적용 후 확인은 푸시가 아니다.** `SubscriptionResponse.priceReviewRequired`가 true일 때 프론트가 서비스 재접속 화면에서 배너를 띄운다. 이 경로는 `NotificationSender`·`user_notifications`를 사용하지 않으며 수정 화면으로 직접 보내는 FCM도 없다
+  - **크롤러가 없다.** 수집·검증은 사람이 카탈로그에 선언하는 것으로 끝나므로 이 배치에는 수집 실패라는 실패 모드 자체가 없다
 - **NotificationSender 공통 처리**: `UserNotification` 저장(dedup 위반이면 skip/재사용) → 사용자 활성 `PushRegistration` 조회 → `PushSender`로 FID별 발송 → 성공 시 `sent_at` 기록, 무효 FID는 `enabled=false`
 - **PushSender 추상화**: `FcmPushSender`(firebase enabled=true, Firebase Admin SDK) / `NoopPushSender`(비활성·기본, 실제 발송 안 함) — `@ConditionalOnProperty`로 택1. local/test는 Noop
 - **트랜잭션 경계**: 발송 서비스는 클래스/메서드 `@Transactional` 없음 → repository 저장이 개별 커밋. 특정 기기 발송 실패(캐치)가 알림 이력이나 다른 기기 처리를 롤백하지 않음. 중복은 `user_notifications` UNIQUE 제약 + 삽입 시 `DataIntegrityViolationException` 캐치로 막는다. **단 이 제약이 막는 것은 이력 행의 중복이지 푸시 발송 자체가 아니다** — `deliver` 후 `markSent` 하는 구조라, 그 사이에 다른 인스턴스가 같은 미발송 행을 읽으면 둘 다 발송할 수 있다. 지금은 **단일 인스턴스 배포라 도달하지 않는 경로**이고, 다중 인스턴스로 갈 때는 발송 전 원자적 claim(또는 만료 가능한 lease)이 필요하다
-- **FCM payload** — notification: `title`/`body`는 알림 종류에 따라 구성(위 참고) / data(모두 문자열): `type`(BILLING_REMINDER|SUBSCRIPTION_REVIEW|CANCEL_REMINDER), `link`, (구독별 알림만) `subscriptionId`. FE는 `data.link`를 그대로 열면 된다(절대 URL). 이동 경로: BILLING_REMINDER·CANCEL_REMINDER→`/subscriptions/{id}` 구독 상세, SUBSCRIPTION_REVIEW→`/subscriptions` 구독 점검. **`subscriptionId`는 optional** — 유저 단위 알림(검사 유도)에는 없다
+- **FCM payload** — notification: `title`/`body`는 알림 종류에 따라 구성(위 참고) / data(모두 문자열): `type`(BILLING_REMINDER|SUBSCRIPTION_REVIEW|CANCEL_REMINDER|PRICE_CHANGE), `link`, (구독별 알림만) `subscriptionId`. FE는 `data.link`를 그대로 열면 된다(절대 URL). 이동 경로: BILLING_REMINDER·CANCEL_REMINDER→`/subscriptions/{id}` 구독 상세, SUBSCRIPTION_REVIEW→`/subscriptions` 구독 점검, **PRICE_CHANGE→서비스 공식 안내 페이지(외부 URL)**. **`subscriptionId`는 optional** — 유저 단위 알림(검사 유도)에는 없다
 - **결제 예정 단건의 `subscriptionId`는 표시·이동용으로만 싣고 dedup 키에는 넣지 않는다.** 키에까지 넣으면 단건으로 한 번 발송한 뒤 같은 결제일에 구독이 하나 더 추가돼 묶음(키=`0`)이 되는 순간, 같은 날 같은 단계 알림이 한 번 더 나간다
 - **알림 payload에 구독 id "목록"은 싣지 않는다**(구독별 알림이 싣는 단일 `subscriptionId`는 예외 — 그 알림의 정체 자체가 그 구독이고, 지워졌으면 FE가 목록으로 폴백하면 된다). 절약 후보처럼 여러 구독을 가리키는 알림도 `type`+`link`만 보내고, FE는 화면 진입 시 `GET /api/subscriptions/savings-selection`으로 최신 목록을 받는다. payload는 **발송 시점 스냅샷**이라 받은 뒤 클릭하기까지 사이에 해지·삭제·선택 변경이 일어나면 어긋난다(D-3처럼 며칠 간격이면 실제로 벌어지는 틈이다). data는 전부 문자열이라 id 목록은 `"1,2,5"` 파싱이 필요하기도 하다. 문구에 쓰는 "3건" 같은 개수는 발송 시점에 계산해 title/body에 넣는다
 - **회원 탈퇴**: `UserService.deleteAccount`가 user 삭제 전에 `user_notifications`·`push_registrations`를 먼저 정리
@@ -305,6 +320,7 @@ ServiceCatalog.java (BE 단일 소스)
 | `BILLING_RECORD_CRON` | 청구 스냅샷 배치 cron (Asia/Seoul, 기본 `0 5 0 * * *`). **기능 플래그로 끄지 않는다** — 멈추면 그 기간 기록이 빈다 |
 | `FCM_NOTIFICATION_CRON` | 결제 예정 알림 스케줄러 cron (Asia/Seoul, 기본 `0 0 9 * * *`) |
 | `FCM_REVIEW_CRON` | 구독 검사 유도 알림 스케줄러 cron (Asia/Seoul, 기본 `0 10 9 * * *`) |
+| `FCM_PRICE_CHANGE_CRON` | 가격 변경 알림 스케줄러 cron (Asia/Seoul, 기본 `0 20 9 * * *`) |
 
 - Google 콘솔 Authorized redirect URI: `<BE주소>/login/oauth2/code/google` (로컬·배포 각각 등록)
 

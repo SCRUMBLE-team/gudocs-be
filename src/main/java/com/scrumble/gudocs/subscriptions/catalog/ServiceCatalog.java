@@ -52,6 +52,14 @@ import static com.scrumble.gudocs.subscriptions.entity.SubscriptionCategory.*;
  * </ul>
  * 이 링크는 <b>웹 결제 기준</b>이다. App Store·Google Play 인앱결제로 가입했다면 각 스토어에서
  * 해지해야 하며 이 링크로는 해지되지 않는다 — 화면에 그 안내를 함께 노출한다.
+ *
+ * <h2>가격 변경 예고({@link PriceChange})</h2>
+ * 공식 인상·인하 발표가 나오면 해당 {@link Plan}에 {@code withPriceChange(...)}로 예고를 붙인다.
+ * 이 파일에 적혀 있다는 것이 곧 <b>사람이 공식 출처로 검증했다</b>는 뜻이며, 그래서 별도의
+ * 검증 상태(DETECTED/VERIFIED)나 관리자 화면을 두지 않는다 — 검증 절차는 이 파일을 고치는 PR 리뷰다.
+ * 붙여 두면 배치가 해당 요금제를 쓰는 사용자에게 알림을 보내고, 구독 상세·카탈로그 응답에도 함께 실린다.
+ * <b>사용자의 실제 결제 금액은 자동으로 바뀌지 않는다</b>(기존가 유지·프로모션·제휴결합·인앱결제로
+ * 사람마다 실제 청구액이 다르다) — 반영 여부는 사용자가 직접 고른다.
  */
 public final class ServiceCatalog {
 
@@ -67,15 +75,58 @@ public final class ServiceCatalog {
     private static final double USD_TO_KRW = 1420;
 
     /**
+     * 공식 발표된 가격 변경 예고. 유지보수자가 공식 출처를 확인하고 직접 적어 넣는다 —
+     * <b>이 파일에 선언돼 있다는 것 자체가 "공식 출처로 검증됨"을 뜻한다.</b> 블로그·기사만 있는
+     * 소문은 적지 않는다.
+     *
+     * <p><b>선언은 적용일이 지나도 바로 지우지 않는다.</b> 가격 변경 푸시는 적용일까지 공식 안내로
+     * 한 번만 보내지만, 적용 후 첫 예정 결제일이 지난 뒤 사용자가 서비스에 다시 접속하면 프론트가
+     * 결제 금액 확인 배너를 보여줘야 한다. 그 판단에 구가격과 변경 정보가 필요하므로 모든 구독이
+     * 한 바퀴 돌 때까지(연간 결제까지 고려하면 13개월) 선언을 유지한다.
+     *
+     * <p>그래서 <b>구가격을 명시적으로 적는다.</b> {@link Plan#price()}는 "지금의 공식가"라
+     * 적용일에 새 가격으로 올라가고, 그 뒤에는 구가격을 알 방법이 없기 때문이다. 구가격은 알림 대상과
+     * 적용 후 배너 대상의 보수적인 식별 키다. 유지보수자는 적용일에 {@code price}를 새 가격으로 바꾸고
+     * 이 선언은 그대로 둔다 —
+     * 적용 전에는 {@code price == oldPrice}, 적용 후에는 {@code price == newPrice}가 된다
+     * (둘 중 하나와도 일치하지 않으면 {@code ServiceCatalogTest}가 잡는다).
+     *
+     * @param oldPrice    변경 전 금액. 이 금액을 쓰고 있는 사용자가 알림 대상이다
+     * @param newPrice    변경 후 금액
+     * @param effectiveOn 실제 적용 예정일
+     * @param announcedOn 공식 발표일
+     * @param sourceUrl   공식 출처 URL (공식 공지·요금제 페이지·고객센터 문서)
+     */
+    public record PriceChange(Long oldPrice, Long newPrice, LocalDate effectiveOn, LocalDate announcedOn,
+                              String sourceUrl) {
+    }
+
+    /**
      * @param approximate 원화 정가가 아니라 달러 요금을 {@link #USD_TO_KRW}로 환산한 값인지.
      *                    true 면 실제 청구액이 결제 시점 환율·해외결제 수수료에 따라 달라진다.
+     * @param change      공식 발표된 가격 변경 예고. 예고가 없으면 null(대부분의 요금제).
      */
-    public record Plan(String name, Long price, BillingCycle billingCycle, boolean approximate) {
+    public record Plan(String name, Long price, BillingCycle billingCycle, boolean approximate,
+                       PriceChange change) {
+
+        /**
+         * 이 요금제에 공식 가격 변경을 붙인다. 적용 전·후 모두 같은 선언을 쓰고, 적용일에는
+         * {@code price} 숫자만 새 금액으로 바꾼다.
+         * <pre>
+         * 적용 전: won("프리미엄", 17000L, MONTHLY).withPriceChange(17000L, 19000L, ...)
+         * 적용 후: won("프리미엄", 19000L, MONTHLY).withPriceChange(17000L, 19000L, ...)
+         * </pre>
+         */
+        public Plan withPriceChange(long oldPrice, long newPrice, LocalDate effectiveOn, LocalDate announcedOn,
+                                    String sourceUrl) {
+            return new Plan(name, price, billingCycle, approximate,
+                    new PriceChange(oldPrice, newPrice, effectiveOn, announcedOn, sourceUrl));
+        }
     }
 
     /** 국내 원화 정가 요금제. */
     private static Plan won(String name, long price, BillingCycle cycle) {
-        return new Plan(name, price, cycle, false);
+        return new Plan(name, price, cycle, false, null);
     }
 
     /**
@@ -84,7 +135,7 @@ public final class ServiceCatalog {
      */
     private static Plan usd(String name, double dollars, BillingCycle cycle) {
         long won = Math.round(dollars * USD_TO_KRW / 100.0) * 100L;
-        return new Plan(name, won, cycle, true);
+        return new Plan(name, won, cycle, true, null);
     }
 
     /**
@@ -367,6 +418,45 @@ public final class ServiceCatalog {
     /** 저장된 구독의 service_code 로 해지 링크를 찾는다. 직접 입력한 서비스거나 링크가 없으면 null. */
     public static String cancelUrlOf(String code) {
         return findByCode(code).map(CatalogService::cancelUrl).orElse(null);
+    }
+
+    /**
+     * 저장된 구독 1건에 해당하는 가격 변경 예고. 해지 링크와 마찬가지로 구독 행에 저장하지 않고
+     * 매번 카탈로그에서 찾는다 — 예고를 고치거나 지우면 이미 등록된 구독도 즉시 따라간다.
+     *
+     * <p>구독에는 요금제명이 없으므로 <b>구가격·결제주기가 정확히 일치하는 요금제</b>를 그 사용자의
+     * 요금제로 본다. 프로모션가·구요금제로 다른 금액을 넣어 둔 사용자는 애초에 이번 변경 대상이
+     * 아니므로 자연히 제외되고, <b>이미 새 금액으로 반영한 사용자도 더 이상 일치하지 않아 빠진다</b>.
+     * 이 정보는 적용 전 공식 변경 안내와 적용 후 서비스 내 확인 배너에 함께 쓰며, 적용 후 추가 푸시는
+     * 발송하지 않는다.
+     */
+    public static Optional<PriceChange> priceChangeOf(String code, Long price, BillingCycle cycle) {
+        if (price == null || cycle == null) {
+            return Optional.empty();
+        }
+        return findByCode(code).stream()
+                .flatMap(service -> service.plans().stream())
+                .filter(plan -> plan.change() != null
+                        && price.equals(plan.change().oldPrice())
+                        && cycle == plan.billingCycle())
+                .map(Plan::change)
+                .findFirst();
+    }
+
+    /**
+     * 가격 변경 예고가 선언된 요금제 전부. 발송 배치가 이 목록을 훑어 대상 사용자를 찾는다.
+     * 평소에는 비어 있고, 인상 발표가 있는 동안에만 한두 건 들어 있다.
+     */
+    public static List<DeclaredPriceChange> declaredPriceChanges() {
+        return SERVICES.stream()
+                .flatMap(service -> service.plans().stream()
+                        .filter(plan -> plan.change() != null)
+                        .map(plan -> new DeclaredPriceChange(service, plan, plan.change())))
+                .toList();
+    }
+
+    /** 어떤 서비스의 어떤 요금제에 붙은 변경 예고인지 함께 들고 다니기 위한 묶음. */
+    public record DeclaredPriceChange(CatalogService service, Plan plan, PriceChange change) {
     }
 
     public static Optional<CatalogService> findByCode(String code) {
