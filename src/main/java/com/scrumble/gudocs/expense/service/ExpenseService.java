@@ -179,6 +179,8 @@ public class ExpenseService {
                 latest.getBillingCycle(),
                 latest.getAmount(),
                 burden(rows, target),
+                // 앵커는 구독의 현재 값, 청구일은 스냅샷의 값 — 서로 다른 사실이라 필드를 나눠 싣는다.
+                subscription != null ? subscription.getFirstBillingDate() : latest.getBillingDate(),
                 latest.getBillingDate(),
                 subscription != null ? subscription.getStatus() : null,
                 subscription == null || subscription.isDeleted()
