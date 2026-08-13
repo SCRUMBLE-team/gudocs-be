@@ -41,6 +41,14 @@ public record SubscriptionExpenseDetail(
                 example = "17000")
         long billedAmount,
 
+        @Schema(description = "그 달에 아직 결제일이 오지 않은 예정 금액(원). <b>진행 중인 달에만</b> "
+                + "값이 있고 지난 달·미래 달은 0이다. 정지 중인 구독도 0(결제가 나가지 않는다). "
+                + "'이번 달에 N원 더 결제 예정이에요' 문구를 이 값의 합으로 만들면 된다. "
+                + "billedAmount와 더해도 그 달 부담(appliedMonthlyAmount)과 같지 않다 — "
+                + "연간 구독은 청구액을 12개월에 나눠 싣기 때문이다.",
+                example = "0")
+        long scheduledAmount,
+
         @Schema(description = "최초 결제일(다음 결제일 계산의 기준 앵커). 구독의 현재 값이며, "
                 + "그 달의 청구일은 billingDate", example = "2026-01-15")
         LocalDate firstBillingDate,

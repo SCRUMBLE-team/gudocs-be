@@ -492,6 +492,8 @@ class ExpenseControllerTest {
                         .value(0))
                 .andExpect(jsonPath("$.data.subscriptions[?(@.subscriptionId == " + netflixId + ")].appliedMonthlyAmount")
                         .value(0))
+                .andExpect(jsonPath("$.data.subscriptions[?(@.subscriptionId == " + netflixId + ")].scheduledAmount")
+                        .value(0))
                 .andExpect(jsonPath("$.data.subscriptions[?(@.subscriptionId == " + netflixId + ")].statusInMonth")
                         .value("PAUSED"))
                 .andExpect(jsonPath("$.data.subscriptions[?(@.subscriptionId == " + netflixId + ")].billingDate")
@@ -540,8 +542,10 @@ class ExpenseControllerTest {
                 .andExpect(status().isOk())
                 // 부담에는 잡히고
                 .andExpect(jsonPath("$.data.subscriptions[0].appliedMonthlyAmount").value(17000))
-                // 청구액에는 잡히지 않는다
-                .andExpect(jsonPath("$.data.subscriptions[0].billedAmount").value(0));
+                // 청구액에는 잡히지 않으며
+                .andExpect(jsonPath("$.data.subscriptions[0].billedAmount").value(0))
+                // "앞으로 나갈 돈"으로 따로 내려간다
+                .andExpect(jsonPath("$.data.subscriptions[0].scheduledAmount").value(17000));
     }
 
     /** billedAmount 는 그 달에 청구가 도래한 금액이다. 연간 구독이 커버만 하는 달은 0. */
