@@ -7,6 +7,8 @@ import com.scrumble.gudocs.subscriptions.entity.BillingCycle;
 import com.scrumble.gudocs.subscriptions.entity.Subscription;
 import com.scrumble.gudocs.subscriptions.entity.SubscriptionCategory;
 import com.scrumble.gudocs.subscriptions.entity.SubscriptionStatus;
+import com.scrumble.gudocs.subscriptions.entity.SubscriptionPausePeriod;
+import com.scrumble.gudocs.subscriptions.repository.SubscriptionPausePeriodRepository;
 import com.scrumble.gudocs.subscriptions.repository.SubscriptionRepository;
 import com.scrumble.gudocs.users.entity.User;
 import com.scrumble.gudocs.users.repository.SocialAccountRepository;
@@ -18,6 +20,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -29,6 +32,7 @@ class BillingRecordServiceTest {
     @Autowired private BillingRecordService billingRecordService;
     @Autowired private BillingRecordRepository billingRecordRepository;
     @Autowired private SubscriptionRepository subscriptionRepository;
+    @Autowired private SubscriptionPausePeriodRepository pausePeriodRepository;
     @Autowired private UserRepository userRepository;
     @Autowired private SocialAccountRepository socialAccountRepository;
 
@@ -90,7 +94,6 @@ class BillingRecordServiceTest {
 
     /**
      * 정지 중인 구독은 결제되지 않는다 → <b>행이 아예 안 생기고, 그래서 그 달 지출이 0이 된다.</b>
-     * 정지 이력 테이블을 따로 두지 않는 이유가 이것이다.
      */
     @Test
     void 정지된_구독은_기록되지_않는다() {
@@ -100,6 +103,49 @@ class BillingRecordServiceTest {
         billingRecordService.recordDueBillings(today);
 
         assertThat(기록()).isEmpty();
+    }
+
+    /**
+     * 정지 중에 결제일이 지나고 LOOKBACK_DAYS 안에 재개하면, 재개 후의 배치가 "지금 ACTIVE" 만 보고
+     * 정지 중이던 날짜를 결제로 만들어 버렸다. 일어나지 않은 결제라 정지 구간으로 걸러야 한다.
+     */
+    @Test
+    void 정지_중이던_날짜는_재개_후_배치가_거슬러_올라가도_기록하지_않는다() {
+        Subscription subscription =
+                구독(17000L, BillingCycle.MONTHLY, LocalDate.of(2026, 8, 15), SubscriptionStatus.ACTIVE);
+
+        // 8/14 정지 → 8/15 결제일에는 기록되지 않는다
+        pausePeriodRepository.save(SubscriptionPausePeriod.open(
+                subscription.getId(), LocalDateTime.of(2026, 8, 14, 9, 0)));
+        subscription.updateStatus(SubscriptionStatus.PAUSED);
+        billingRecordService.recordDueBillings(LocalDate.of(2026, 8, 15));
+        assertThat(기록()).isEmpty();
+
+        // 8/16 재개 → 같은 날 배치가 8/13~8/16 을 다시 훑는다
+        pausePeriodRepository.findBySubscriptionIdAndEndedAtIsNull(subscription.getId())
+                .orElseThrow()
+                .close(LocalDateTime.of(2026, 8, 16, 10, 0));
+        subscription.updateStatus(SubscriptionStatus.ACTIVE);
+
+        billingRecordService.recordDueBillings(LocalDate.of(2026, 8, 16));
+
+        assertThat(기록()).isEmpty();
+    }
+
+    /** 반대로 결제가 나간 뒤에 정지했다면 그 결제는 실제로 일어났으므로 기록이 남는다. */
+    @Test
+    void 결제일_이후에_정지했으면_그_결제는_기록된다() {
+        Subscription subscription =
+                구독(17000L, BillingCycle.MONTHLY, LocalDate.of(2026, 8, 15), SubscriptionStatus.ACTIVE);
+
+        // 8/16 정지 — 8/15 결제는 이미 나간 뒤다
+        pausePeriodRepository.save(SubscriptionPausePeriod.open(
+                subscription.getId(), LocalDateTime.of(2026, 8, 16, 9, 0)));
+
+        billingRecordService.recordDueBillings(LocalDate.of(2026, 8, 16));
+
+        assertThat(기록()).singleElement()
+                .satisfies(r -> assertThat(r.getBillingDate()).isEqualTo(LocalDate.of(2026, 8, 15)));
     }
 
     @Test

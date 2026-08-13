@@ -49,6 +49,17 @@ class ExpenseControllerTest {
     @Autowired
     private SocialAccountRepository socialAccountRepository;
 
+    @Autowired
+    private com.scrumble.gudocs.billing.repository.BillingRecordRepository billingRecordRepository;
+
+    @Autowired
+    private com.scrumble.gudocs.subscriptions.repository.SubscriptionRepository subscriptionRepository;
+
+    /** 기록을 직접 지우는 테스트용. 상세 응답에는 userId 가 없어서 구독에서 꺼낸다. */
+    private Long userIdOf(long subscriptionId) {
+        return subscriptionRepository.findById(subscriptionId).orElseThrow().getUser().getId();
+    }
+
     private MockHttpSession session;
 
     @BeforeEach
@@ -498,6 +509,28 @@ class ExpenseControllerTest {
                         .value("PAUSED"))
                 .andExpect(jsonPath("$.data.subscriptions[?(@.subscriptionId == " + netflixId + ")].billingDate")
                         .value((Object) null));
+    }
+
+    /**
+     * 기록이 없다고 전부 0원이라고 말하면 안 된다. 정지라서 0원인 달과, billing_records 도입 이전이라
+     * 그 달을 <b>모르는</b> 것은 다르다. 정지가 아닌 달은 행을 만들지 않는다(예전처럼 목록에서 빠진다).
+     */
+    @Test
+    void 월별_상세_정지가_아닌데_기록만_없는_달은_0원_행을_만들지_않는다() throws Exception {
+        long netflixId = 구독_등록("Netflix", SubscriptionCategory.OTT, 17000L, BillingCycle.MONTHLY, 15, null);
+
+        // 도입 이전이라 기록이 비어 있는 달을 흉내낸다(구독은 계속 ACTIVE 였다).
+        YearMonth prev = 현재월().minusMonths(1);
+        billingRecordRepository.findByUserIdAndBillingDateBetween(
+                        userIdOf(netflixId), prev.atDay(1), prev.atEndOfMonth())
+                .forEach(billingRecordRepository::delete);
+
+        mockMvc.perform(get("/api/subscriptions/expenses/monthly/details")
+                        .session(session)
+                        .param("year", String.valueOf(prev.getYear()))
+                        .param("month", String.valueOf(prev.getMonthValue())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.subscriptions.length()").value(0));
     }
 
     /**

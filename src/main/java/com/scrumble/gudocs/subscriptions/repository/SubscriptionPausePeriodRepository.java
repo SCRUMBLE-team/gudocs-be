@@ -15,6 +15,9 @@ public interface SubscriptionPausePeriodRepository extends JpaRepository<Subscri
     /** 아직 재개되지 않은 구간. 구독당 최대 1개다(정지 중일 때만 존재). */
     Optional<SubscriptionPausePeriod> findBySubscriptionIdAndEndedAtIsNull(Long subscriptionId);
 
+    /** 청구 기록을 만들기 전에 "그날 정지였나"를 확인하는 용도. */
+    List<SubscriptionPausePeriod> findBySubscriptionId(Long subscriptionId);
+
     /** 지출 상세에서 여러 구독의 "그 달 상태"를 한 번에 판정하려고 통째로 읽는다. */
     List<SubscriptionPausePeriod> findBySubscriptionIdIn(List<Long> subscriptionIds);
 

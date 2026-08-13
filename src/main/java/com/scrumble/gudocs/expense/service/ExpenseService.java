@@ -193,12 +193,17 @@ public class ExpenseService {
     }
 
     /**
-     * 그 달에 청구가 하나도 없던 구독을 <b>0원 행</b>으로 만든다.
+     * 그 달에 <b>정지 중이라</b> 청구가 없던 구독을 <b>0원 행</b>으로 만든다.
      *
      * <p>없으면 정지한 구독이 목록에서 통째로 사라져 "등록해둔 구독이 없어졌다"처럼 보인다. 금액은
      * 전부 0이라 합계는 그대로이고, 지출이 없었다는 사실도 그대로 표현된다.
      *
-     * <p>그 달에 <b>존재하지 않던</b> 구독은 넣지 않는다 — 등록 전의 달에 유령 행이 뜨기 때문이다.
+     * <p><b>기록이 없다고 전부 0원이라고 말하지는 않는다.</b> 기록 부재에는 두 가지 뜻이 있다 —
+     * ① 정지라서 실제로 0원, ② {@code billing_records} 도입(V8) 이전이라 그 달을 <b>모름</b>.
+     * 정지 이력으로 ①만 골라낸다. ②까지 0원으로 그리면 모르는 것을 안다고 말하게 된다.
+     *
+     * <p>정지가 아닌데 이번 달 청구가 아직 안 온 구독은 여기가 아니라 예정분(projection)이 만든다.
+     * 그 달에 <b>존재하지 않던</b> 구독은 넣지 않는다 — 등록 전의 달에 유령 행이 뜨기 때문이다.
      * 첫 결제일이 아직 오지 않은 구독도 같은 이유로 뺀다. 삭제된 구독은 이미 청구된 과거만 이력으로
      * 남기고 여기서는 만들지 않는다.
      */
@@ -211,6 +216,8 @@ public class ExpenseService {
                 .filter(s -> !s.isDeleted())
                 .filter(s -> !YearMonth.from(s.getCreatedAt()).isAfter(target))
                 .filter(s -> !s.getFirstBillingDate().isAfter(monthEnd))
+                // 정지였던 달만. 기록이 없는 다른 이유(V8 이전)는 0원이 아니라 "모름"이다.
+                .filter(s -> pauseHistory.statusIn(s, target) == SubscriptionStatus.PAUSED)
                 .map(s -> new SubscriptionExpenseDetail(
                         s.getId(),
                         s.getServiceName(),
@@ -225,7 +232,7 @@ public class ExpenseService {
                         s.getFirstBillingDate(),
                         null,       // 그 달에 도래한 청구가 없다
                         s.getStatus(),
-                        pauseHistory.statusIn(s, target),
+                        SubscriptionStatus.PAUSED,   // 위 필터를 통과한 구독은 그 달 정지였다
                         false       // 삭제된 구독은 위에서 걸러진다
                 ));
     }

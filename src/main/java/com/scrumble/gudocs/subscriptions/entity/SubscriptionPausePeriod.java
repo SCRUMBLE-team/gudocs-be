@@ -6,6 +6,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -65,5 +66,20 @@ public class SubscriptionPausePeriod extends BaseEntity {
             return false;
         }
         return endedAt == null || endedAt.isAfter(instant);
+    }
+
+    /**
+     * 그 <b>날짜</b>에 정지 구간이 조금이라도 걸쳤는지. 청구 기록을 만들지 말지 판단하는 데 쓴다.
+     *
+     * <p>하루 안에서 정지·재개가 갈리면 보수적으로 "정지였다"고 본다 — 일어나지 않은 결제를
+     * 기록으로 만드는 쪽이 그 반대보다 나쁘다(지출이 실제보다 커지고, 스냅샷은 고치지 않는다).
+     */
+    public boolean coversDate(LocalDate date) {
+        LocalDateTime dayStart = date.atStartOfDay();
+        LocalDateTime nextDayStart = date.plusDays(1).atStartOfDay();
+        if (!startedAt.isBefore(nextDayStart)) {
+            return false;
+        }
+        return endedAt == null || endedAt.isAfter(dayStart);
     }
 }
