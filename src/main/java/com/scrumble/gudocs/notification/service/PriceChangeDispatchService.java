@@ -80,7 +80,19 @@ public class PriceChangeDispatchService {
 
     /** 공식 변경 발표 — 공식 안내로 보내 원문을 확인하게 한다. */
     private NotificationDraft announceDraft(DeclaredPriceChange declared, Subscription subscription) {
-        ServiceCatalog.PriceChange change = declared.change();
+        return announceDraft(subscription, declared.plan().name(), declared.change());
+    }
+
+    /**
+     * 가격 변경 알림 1건의 문구·페이로드. 카탈로그 레코드가 아니라 <b>요금제명 + 변경 내용</b>만 받는다.
+     *
+     * <p>시연·검증용 미리보기({@code NotificationPreviewService})가 이 문구 생성기를 그대로 쓰기
+     * 위해서다. 미리보기가 문구를 따로 만들면 시연에서 보여주는 게 진짜 알림이 아니게 되고, 문구를
+     * 고칠 때 두 곳이 갈라진다. 카탈로그에는 아직 선언된 변경이 없어 미리보기가 {@link DeclaredPriceChange}
+     * 를 넘길 수 없으므로, 공유 지점을 레코드가 아니라 이 값들로 잡는다.
+     */
+    NotificationDraft announceDraft(Subscription subscription, String planName,
+                                    ServiceCatalog.PriceChange change) {
         long oldPrice = change.oldPrice();
         long newPrice = change.newPrice();
         return new NotificationDraft(
@@ -91,7 +103,7 @@ public class PriceChangeDispatchService {
                 subscription.getId(),
                 subscription.getServiceName() + " 요금이 변경될 예정이에요",
                 String.format(Locale.KOREA, "%s 요금제가 %s부터 %,d원으로 %s될 예정이에요. 공식 안내를 확인해보세요.",
-                        declared.plan().name(), change.effectiveOn().format(EFFECTIVE_ON_FORMAT),
+                        planName, change.effectiveOn().format(EFFECTIVE_ON_FORMAT),
                         newPrice, newPrice > oldPrice ? "인상" : "인하"),
                 Map.of("type", NotificationType.PRICE_CHANGE.name(),
                         "subscriptionId", String.valueOf(subscription.getId()),

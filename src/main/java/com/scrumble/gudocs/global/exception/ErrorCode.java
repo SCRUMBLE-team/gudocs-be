@@ -21,7 +21,15 @@ public enum ErrorCode {
     SERVICE_NOT_SELECTABLE(HttpStatus.BAD_REQUEST, "더 이상 신규 등록할 수 없는 서비스입니다."),
     EXTERNAL_API_ERROR(HttpStatus.BAD_GATEWAY, "OCR 처리 중 오류가 발생했습니다."),
     PUSH_REGISTRATION_NOT_FOUND(HttpStatus.NOT_FOUND, "푸시 등록 정보를 찾을 수 없습니다."),
-    PUSH_REGISTRATION_FORBIDDEN(HttpStatus.FORBIDDEN, "해당 푸시 등록 정보에 접근할 권한이 없습니다.");
+    PUSH_REGISTRATION_FORBIDDEN(HttpStatus.FORBIDDEN, "해당 푸시 등록 정보에 접근할 권한이 없습니다."),
+    UNSUPPORTED_PREVIEW_TYPE(HttpStatus.BAD_REQUEST, "미리보기를 지원하지 않는 알림 종류입니다."),
+    INVALID_PREVIEW_DAYS_UNTIL(HttpStatus.BAD_REQUEST, "daysUntil은 3(D-3) 또는 0(당일)이어야 합니다."),
+    PRICE_CHANGE_PREVIEW_REQUIRES_CHANGE(HttpStatus.BAD_REQUEST,
+            "가격 변경 미리보기는 newPrice와 effectiveOn이 필요합니다."),
+    PRICE_CHANGE_PREVIEW_SAME_PRICE(HttpStatus.BAD_REQUEST,
+            "변경 후 금액이 현재 금액과 같습니다. 인상 또는 인하 금액을 지정해 주세요."),
+    PRICE_CHANGE_PREVIEW_NO_SOURCE_URL(HttpStatus.BAD_REQUEST,
+            "이 서비스는 카탈로그에 안내 링크가 없습니다. sourceUrl을 직접 지정해 주세요.");
 
     private final HttpStatus status;
     private final String message;

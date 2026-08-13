@@ -110,6 +110,7 @@ enum:
 | POST | `/api/push-registrations` (FCM 기기 등록 upsert) | ○ |
 | DELETE | `/api/push-registrations/{registrationId}` (등록 해제 = enabled false, 멱등) | ○ |
 | POST | `/api/push-registrations/test` (진단용 — 현재 사용자 활성 기기에 즉시 테스트 푸시, 기기별 결과 반환) | ○ |
+| POST | `/api/push-registrations/test/preview` (시연·검증용 — 결제 예정/해지/가격 변경 알림을 즉시 발송) | ○ |
 | POST | `/api/ocr/subscriptions/scan` | ○ |
 
 계층: Controller → Service → Repository
@@ -240,7 +241,16 @@ ServiceCatalog.java (BE 단일 소스)
 - **회원 탈퇴**: `UserService.deleteAccount`가 user 삭제 전에 `user_notifications`·`push_registrations`를 먼저 정리
 - **발송 대상**: `fid`는 Firebase Installation ID. `firebase-admin` 9.10.0+의 `Message.Builder.setFid()`로 발송(구 `setToken`은 legacy registration token 호환용으로 deprecated → 미사용)
 - **의존성**: `com.google.firebase:firebase-admin:9.10.0`. 크레덴셜은 `GOOGLE_APPLICATION_CREDENTIALS`(서비스 계정 JSON). 스키마는 Flyway 관리(아래 참고)
-- **진단**: `POST /api/push-registrations/test`(`PushTestController` → `PushTestService`)는 스케줄러/중복이력 로직을 건너뛰고 현재 사용자 활성 기기에 `PushSender`로 즉시 테스트 푸시를 쏜다. 응답의 `senderType`(FcmPushSender/NoopPushSender)·기기별 결과(SUCCESS/INVALID_TOKEN/FAILED)로 `setFid` 실기기 도달 여부를 확인한다. `FIREBASE_ENABLED=false`면 Noop이라 항상 SUCCESS(실발송 아님)
+- **진단**: `POST /api/push-registrations/test`(`PushTestController` → `PushTestService`)는 스케줄러/중복이력 로직을 건너뛰고 현재 사용자 활성 기기에 `PushSender`로 즉시 테스트 푸시를 쏜다. 응답의 `senderType`(FcmPushSender/NoopPushSender)·기기별 결과(SUCCESS/INVALID_TOKEN/FAILED)로 `setFid` 실기기 도달 여부를 확인한다. `FIREBASE_ENABLED=false`면 Noop이라 항상 SUCCESS(실발송 아님). **문구가 고정이고 `link`가 없어 눌러도 이동하지 않는다** — 전달 경로 진단 전용
+- **미리보기(시연·검증)**: `POST /api/push-registrations/test/preview`(`NotificationPreviewService`)는 결제 예정·해지 알림을 **원하는 순간에, 반복해서** 발송한다. 배치는 ①cron 시각에만 돌고 ②D-3·당일 대상만 고르며 ③dedup 때문에 같은 단계가 한 번만 나가서, 리허설하면 본 발표에서 알림이 오지 않는다
+  - **배치와 같은 draft 생성 코드를 재사용**한다(`NotificationDispatchService.toBillingDraft/toCancelDraft`를 package-private으로 열어 공유). 문구를 따로 만들면 시연에서 보여주는 게 진짜 알림이 아니게 되고 문구 수정 시 두 곳이 갈라진다
+  - **`NotificationSender`를 거치지 않고 `PushSender`로 직접 발송**한다. 거치면 dedup에 막혀 두 번째 호출부터 안 나가고, `user_notifications`에 행이 남아 **그날 진짜 알림을 잡아먹는다.** 그래서 이력을 남기지 않는다
+  - 그 대가로 **dedup·발송 단계 판정은 이 API로 검증되지 않는다**(배치 테스트의 몫)
+  - 해지 알림도 `savings_selected_at` 설정 없이 바로 띄운다(시연 준비를 줄이려고). 본인 구독만 지정 가능(403)
+  - 종류별 입력이 다르다: BILLING_REMINDER·CANCEL_REMINDER는 `daysUntil`(3·0만), PRICE_CHANGE는 `newPrice`+`effectiveOn` 필수에 `sourceUrl` 선택. 애너테이션 대신 서비스에서 종류별로 검사한다 — 한쪽 필수값이 다른 쪽엔 의미가 없어 `@NotNull`로는 틀린 요구를 하게 된다
+  - **가격 변경만 성격이 다르다 — "형식 미리보기"다.** 결제·해지는 문구에 필요한 값이 전부 구독에 있어 *실제로 받게 될 그 알림*이지만, 가격 변경의 내용은 원래 `ServiceCatalog`에 **사람이 공식 발표를 확인해 등록한 선언**에서 온다(그 검증이 곧 카탈로그 PR 리뷰다). 선언이 없으면 미리보기에 줄 데이터가 없으므로 요청 값으로 `PriceChange`를 만들어 넘긴다. 따라서 **거기 실린 인상·인하 내용은 검증된 공식 발표가 아니다.** 시연에서 이 알림을 보여줄 때는 "실제로는 공식 발표를 확인해 카탈로그에 등록했을 때만 발송된다"를 함께 말할 것
+  - 문구 생성은 배치와 공유한다. 그래서 `PriceChangeDispatchService.announceDraft`의 공유 지점을 `DeclaredPriceChange`가 아니라 **(구독, 요금제명, PriceChange)** 로 잡았다 — 미리보기가 카탈로그 레코드를 가짜로 조립하지 않아도 되게. 요금제명은 배치와 같은 방식(코드+현재 금액)으로 찾고 못 찾으면 서비스명으로 대체, `link`는 `sourceUrl` 없으면 카탈로그 링크(둘 다 없으면 400 — 눌러도 아무 일 없으면 고장으로 보인다)
+  - 인상/인하 문구는 구독의 현재 가격과 비교해 자동으로 갈린다. 인하 시연도 별도 입력이 필요 없다
 
 ---
 

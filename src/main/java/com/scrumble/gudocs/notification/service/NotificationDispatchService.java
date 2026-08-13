@@ -66,7 +66,12 @@ public class NotificationDispatchService {
         return due.daysUntil() == CANCEL_REMINDER_OFFSET && due.subscription().isSavingsSelected();
     }
 
-    private NotificationDraft toCancelDraft(DueBilling due) {
+    /**
+     * 시연·검증용 미리보기({@code NotificationPreviewService})가 <b>실제와 같은 문구</b>를 쓰도록
+     * package-private 으로 연다. 미리보기가 문구를 따로 만들면 시연에서 보여주는 것이 진짜 알림이
+     * 아니게 되고, 문구를 고칠 때 두 곳이 갈라진다.
+     */
+    NotificationDraft toCancelDraft(DueBilling due) {
         Subscription subscription = due.subscription();
         Map<String, String> data = Map.of(
                 "type", NotificationType.CANCEL_REMINDER.name(),
@@ -85,7 +90,8 @@ public class NotificationDispatchService {
                 data);
     }
 
-    private NotificationDraft toBillingDraft(DueBilling due) {
+    /** 미리보기와 공유한다 — 위 {@link #toCancelDraft} 주석 참고. */
+    NotificationDraft toBillingDraft(DueBilling due) {
         Subscription subscription = due.subscription();
         Map<String, String> data = Map.of(
                 "type", NotificationType.BILLING_REMINDER.name(),
