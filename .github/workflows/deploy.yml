@@ -94,7 +94,11 @@ jobs:
             DB_USER=gudocs
             DB_PASSWORD=${DB_PASSWORD}
             CORS_ALLOWED_ORIGINS=https://gudocs-fe-v2.vercel.app,http://localhost:5173,http://localhost:5174
-            COOKIE_SAME_SITE=lax
+            # 프론트(Vercel)와 백엔드(sslip.io)는 서로 다른 사이트다. lax 로 두면 브라우저가
+            # 크로스 사이트 fetch 에 세션 쿠키를 싣지 않아 로그인 이후 모든 API 가 401 이 된다
+            # (OAuth 리다이렉트는 top-level 이동이라 lax 에서도 통과해서, 로그인만 되고 화면은
+            # 전부 비는 형태로 드러난다). none 은 secure=true 가 필수다.
+            COOKIE_SAME_SITE=none
             COOKIE_SECURE=true
             GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
             GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
