@@ -211,7 +211,19 @@ class SubscriptionControllerTest {
                         .content(objectMapper.writeValueAsString(statusRequest)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.status").value("PAUSED"));
+                .andExpect(jsonPath("$.data.status").value("PAUSED"))
+                // "7월 3일부터 일시정지 중" 표시용. 언제부터 결제가 멈췄는지 화면에서 알 수 있어야 한다.
+                .andExpect(jsonPath("$.data.pausedAt").isNotEmpty());
+
+        // 재개하면 지워진다 — 현재 상태에 대한 사실이라 과거 이력은 여기 남지 않는다.
+        mockMvc.perform(put("/api/subscriptions/" + id + "/status")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new SubscriptionStatusUpdateRequest(SubscriptionStatus.ACTIVE))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.data.pausedAt").value((Object) null));
     }
 
     @Test

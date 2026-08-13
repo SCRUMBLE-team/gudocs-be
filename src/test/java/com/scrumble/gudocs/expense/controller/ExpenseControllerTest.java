@@ -471,6 +471,79 @@ class ExpenseControllerTest {
                 .andExpect(jsonPath("$.data.subscriptions[0].serviceCode").value("NETFLIX"));
     }
 
+    /**
+     * 정지한 구독은 그 달 청구 기록이 없어 목록에서 사라졌었다. 사용자에게는 등록해둔 구독이
+     * 없어진 것처럼 보이므로 0원 행으로 남긴다. 금액이 전부 0이라 합계는 그대로다.
+     */
+    @Test
+    void 월별_상세_정지한_구독은_0원_행으로_남는다() throws Exception {
+        long netflixId = 구독_등록("Netflix", SubscriptionCategory.OTT, 17000L, BillingCycle.MONTHLY, 15, null);
+        구독_등록("Spotify", SubscriptionCategory.MUSIC, 11990L, BillingCycle.MONTHLY, 15, null);
+        구독_일시정지(netflixId);
+
+        YearMonth next = 현재월().plusMonths(1);   // 정지 이후의 달 — 청구가 하나도 없다
+        mockMvc.perform(get("/api/subscriptions/expenses/monthly/details")
+                        .session(session)
+                        .param("year", String.valueOf(next.getYear()))
+                        .param("month", String.valueOf(next.getMonthValue())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.subscriptions[?(@.subscriptionId == " + netflixId + ")]").isNotEmpty())
+                .andExpect(jsonPath("$.data.subscriptions[?(@.subscriptionId == " + netflixId + ")].billedAmount")
+                        .value(0))
+                .andExpect(jsonPath("$.data.subscriptions[?(@.subscriptionId == " + netflixId + ")].appliedMonthlyAmount")
+                        .value(0))
+                .andExpect(jsonPath("$.data.subscriptions[?(@.subscriptionId == " + netflixId + ")].statusInMonth")
+                        .value("PAUSED"))
+                .andExpect(jsonPath("$.data.subscriptions[?(@.subscriptionId == " + netflixId + ")].billingDate")
+                        .value((Object) null));
+    }
+
+    /**
+     * 지금 정지 중이라는 사실을 과거 달에 투영하면, 정상 결제된 달에 "일시정지" 라벨이 붙는다.
+     * statusInMonth 는 정지 구간 이력으로 판정하므로 정지 이전 달은 ACTIVE 여야 한다.
+     */
+    @Test
+    void 월별_상세_현재_정지_상태를_과거_달에_투영하지_않는다() throws Exception {
+        long netflixId = 구독_등록("Netflix", SubscriptionCategory.OTT, 17000L, BillingCycle.MONTHLY, 15, null);
+        구독_일시정지(netflixId);
+
+        YearMonth prev = 현재월().minusMonths(1);   // 정지 전이라 실제로 청구된 달
+        mockMvc.perform(get("/api/subscriptions/expenses/monthly/details")
+                        .session(session)
+                        .param("year", String.valueOf(prev.getYear()))
+                        .param("month", String.valueOf(prev.getMonthValue())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.subscriptions[0].subscriptionId").value(netflixId))
+                .andExpect(jsonPath("$.data.subscriptions[0].status").value("PAUSED"))         // 지금 상태
+                .andExpect(jsonPath("$.data.subscriptions[0].statusInMonth").value("ACTIVE"))  // 그 달 상태
+                .andExpect(jsonPath("$.data.subscriptions[0].billedAmount").value(17000));
+    }
+
+    /** billedAmount 는 그 달에 청구가 도래한 금액이다. 연간 구독이 커버만 하는 달은 0. */
+    @Test
+    void 월별_상세_연간_구독은_청구월에만_billedAmount가_잡힌다() throws Exception {
+        YearMonth billedMonth = 현재월().minusMonths(2);
+        구독_등록("Adobe", SubscriptionCategory.DESIGN, 120000L, BillingCycle.YEARLY,
+                billedMonth.atDay(1));
+
+        mockMvc.perform(get("/api/subscriptions/expenses/monthly/details")
+                        .session(session)
+                        .param("year", String.valueOf(billedMonth.getYear()))
+                        .param("month", String.valueOf(billedMonth.getMonthValue())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.subscriptions[0].billedAmount").value(120000))
+                .andExpect(jsonPath("$.data.subscriptions[0].appliedMonthlyAmount").value(10000));
+
+        YearMonth coveredMonth = billedMonth.plusMonths(1);   // 청구는 없고 커버만 하는 달
+        mockMvc.perform(get("/api/subscriptions/expenses/monthly/details")
+                        .session(session)
+                        .param("year", String.valueOf(coveredMonth.getYear()))
+                        .param("month", String.valueOf(coveredMonth.getMonthValue())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.subscriptions[0].billedAmount").value(0))
+                .andExpect(jsonPath("$.data.subscriptions[0].appliedMonthlyAmount").value(10000));
+    }
+
     @Test
     void 미인증_카테고리별_지출_401() throws Exception {
         mockMvc.perform(get("/api/subscriptions/expenses/categories")

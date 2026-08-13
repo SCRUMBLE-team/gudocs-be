@@ -10,6 +10,7 @@ import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionUpdateRequest;
 import com.scrumble.gudocs.subscriptions.catalog.ServiceCatalog;
 import com.scrumble.gudocs.subscriptions.dto.response.SubscriptionResponse;
 import com.scrumble.gudocs.subscriptions.entity.*;
+import com.scrumble.gudocs.subscriptions.repository.SubscriptionPausePeriodRepository;
 import com.scrumble.gudocs.subscriptions.repository.SubscriptionRepository;
 import com.scrumble.gudocs.subscriptions.util.NextBillingDateCalculator;
 import com.scrumble.gudocs.users.entity.User;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -29,6 +31,7 @@ import java.util.stream.Collectors;
 public class SubscriptionService {
 
     private final SubscriptionRepository subscriptionRepository;
+    private final SubscriptionPausePeriodRepository pausePeriodRepository;
     private final BillingRecordService billingRecordService;
     private final UserRepository userRepository;
 
@@ -115,14 +118,37 @@ public class SubscriptionService {
         return subscriptionRepository.existsByUserAndServiceNameIgnoreCaseAndDeletedAtIsNull(user, serviceName.strip());
     }
 
+    /**
+     * 상태 변경. 구독의 현재 상태를 바꾸면서 <b>정지 구간 이력</b>도 함께 기록한다.
+     *
+     * <p>이력을 따로 남기는 이유는 {@link SubscriptionPausePeriod} 주석 참고 — {@code paused_at} 은
+     * 재개하면 지워져서 "그 달에 정지였나"를 답하지 못한다. 상태가 실제로 바뀔 때만 구간을 열고 닫으므로
+     * 같은 상태로 두 번 요청해도 이력이 늘지 않는다.
+     */
     @Transactional
     public SubscriptionResponse updateStatus(Long userId, Long subscriptionId,
                                              SubscriptionStatusUpdateRequest request) {
         User user = findUser(userId);
         Subscription subscription = findSubscription(subscriptionId);
         checkOwnership(subscription, user);
+
+        boolean changed = subscription.getStatus() != request.status();
         subscription.updateStatus(request.status());
+        if (changed) {
+            recordPauseTransition(subscription, request.status());
+        }
         return toResponse(subscription);
+    }
+
+    private void recordPauseTransition(Subscription subscription, SubscriptionStatus status) {
+        if (status == SubscriptionStatus.PAUSED) {
+            pausePeriodRepository.save(
+                    SubscriptionPausePeriod.open(subscription.getId(), subscription.getPausedAt()));
+            return;
+        }
+        // 재개: 열린 구간을 닫는다. 없으면(이 기능 이전에 정지된 구독 등) 남길 것이 없으므로 넘어간다.
+        pausePeriodRepository.findBySubscriptionIdAndEndedAtIsNull(subscription.getId())
+                .ifPresent(period -> period.close(LocalDateTime.now()));
     }
 
     /**

@@ -14,7 +14,9 @@ import com.scrumble.gudocs.global.exception.ErrorCode;
 import com.scrumble.gudocs.subscriptions.entity.BillingCycle;
 import com.scrumble.gudocs.subscriptions.entity.Subscription;
 import com.scrumble.gudocs.subscriptions.entity.SubscriptionCategory;
+import com.scrumble.gudocs.subscriptions.entity.SubscriptionPausePeriod;
 import com.scrumble.gudocs.subscriptions.entity.SubscriptionStatus;
+import com.scrumble.gudocs.subscriptions.repository.SubscriptionPausePeriodRepository;
 import com.scrumble.gudocs.subscriptions.repository.SubscriptionRepository;
 import com.scrumble.gudocs.subscriptions.util.NextBillingDateCalculator;
 import com.scrumble.gudocs.users.entity.User;
@@ -24,14 +26,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 /**
  * 지출 분석. <b>모든 금액은 {@code billing_records}(등록정보 기반 청구 스냅샷)에서 나온다.</b>
@@ -63,6 +69,7 @@ public class ExpenseService {
 
     private final BillingRecordRepository billingRecordRepository;
     private final SubscriptionRepository subscriptionRepository;
+    private final SubscriptionPausePeriodRepository pausePeriodRepository;
     private final UserRepository userRepository;
 
     @Transactional(readOnly = true)
@@ -149,22 +156,63 @@ public class ExpenseService {
         long totalAmount = burden(covering, target);
 
         // 현재 상태·삭제 여부는 "지금 이 구독이 어떤가"라서 스냅샷에 없다. 표시용으로만 붙인다.
-        Map<Long, Subscription> current = subscriptionRepository.findAllByUserIncludingDeleted(user).stream()
+        List<Subscription> subscriptions = subscriptionRepository.findAllByUserIncludingDeleted(user);
+        Map<Long, Subscription> current = subscriptions.stream()
                 .collect(Collectors.toMap(Subscription::getId, Function.identity(), (a, b) -> a));
+        PauseHistory pauseHistory = loadPauseHistory(subscriptions);
 
-        List<SubscriptionExpenseDetail> details = covering.stream()
-                .collect(Collectors.groupingBy(BillingRecord::getSubscriptionId))
-                .values().stream()
-                // 한 달에 같은 구독의 결제가 둘 이상일 일은 없지만(주기 최소 1개월), 있어도 합산한다.
-                .map(rows -> toDetail(rows, target, current))
+        Map<Long, List<BillingRecord>> bySubscription = covering.stream()
+                .collect(Collectors.groupingBy(BillingRecord::getSubscriptionId));
+
+        List<SubscriptionExpenseDetail> details = Stream.concat(
+                        // 한 달에 같은 구독의 결제가 둘 이상일 일은 없지만(주기 최소 1개월), 있어도 합산한다.
+                        bySubscription.values().stream().map(rows -> toDetail(rows, target, current, pauseHistory)),
+                        billedNothing(subscriptions, bySubscription.keySet(), target, pauseHistory))
                 .sorted(Comparator.comparingLong(SubscriptionExpenseDetail::appliedMonthlyAmount).reversed())
                 .toList();
 
         return new MonthlyExpenseDetailResponse(target.getYear(), target.getMonthValue(), totalAmount, details);
     }
 
+    /**
+     * 그 달에 청구가 하나도 없던 구독을 <b>0원 행</b>으로 만든다.
+     *
+     * <p>없으면 정지한 구독이 목록에서 통째로 사라져 "등록해둔 구독이 없어졌다"처럼 보인다. 금액은
+     * 전부 0이라 합계는 그대로이고, 지출이 없었다는 사실도 그대로 표현된다.
+     *
+     * <p>그 달에 <b>존재하지 않던</b> 구독은 넣지 않는다 — 등록 전의 달에 유령 행이 뜨기 때문이다.
+     * 첫 결제일이 아직 오지 않은 구독도 같은 이유로 뺀다. 삭제된 구독은 이미 청구된 과거만 이력으로
+     * 남기고 여기서는 만들지 않는다.
+     */
+    private Stream<SubscriptionExpenseDetail> billedNothing(List<Subscription> subscriptions,
+                                                            Set<Long> alreadyListed, YearMonth target,
+                                                            PauseHistory pauseHistory) {
+        LocalDate monthEnd = target.atEndOfMonth();
+        return subscriptions.stream()
+                .filter(s -> !alreadyListed.contains(s.getId()))
+                .filter(s -> !s.isDeleted())
+                .filter(s -> !YearMonth.from(s.getCreatedAt()).isAfter(target))
+                .filter(s -> !s.getFirstBillingDate().isAfter(monthEnd))
+                .map(s -> new SubscriptionExpenseDetail(
+                        s.getId(),
+                        s.getServiceName(),
+                        s.getServiceCode(),
+                        s.getCategory(),
+                        s.getCategory().getDisplayName(),
+                        s.getBillingCycle(),
+                        0L,
+                        0L,
+                        0L,
+                        s.getFirstBillingDate(),
+                        null,       // 그 달에 도래한 청구가 없다
+                        s.getStatus(),
+                        pauseHistory.statusIn(s, target),
+                        false       // 삭제된 구독은 위에서 걸러진다
+                ));
+    }
+
     private SubscriptionExpenseDetail toDetail(List<BillingRecord> rows, YearMonth target,
-                                               Map<Long, Subscription> current) {
+                                               Map<Long, Subscription> current, PauseHistory pauseHistory) {
         BillingRecord latest = rows.stream()
                 .max(Comparator.comparing(BillingRecord::getBillingDate))
                 .orElseThrow();
@@ -179,12 +227,52 @@ public class ExpenseService {
                 latest.getBillingCycle(),
                 latest.getAmount(),
                 burden(rows, target),
+                billedAmount(rows, target),
                 // 앵커는 구독의 현재 값, 청구일은 스냅샷의 값 — 서로 다른 사실이라 필드를 나눠 싣는다.
                 subscription != null ? subscription.getFirstBillingDate() : latest.getBillingDate(),
                 latest.getBillingDate(),
                 subscription != null ? subscription.getStatus() : null,
+                subscription != null ? pauseHistory.statusIn(subscription, target) : null,
                 subscription == null || subscription.isDeleted()
         );
+    }
+
+    /** 그 달에 청구일이 도래한 금액. 연간 구독의 커버 중인 달은 청구가 없으므로 0이다. */
+    private long billedAmount(List<BillingRecord> rows, YearMonth target) {
+        return rows.stream()
+                .filter(r -> YearMonth.from(r.getBillingDate()).equals(target))
+                .mapToLong(BillingRecord::getAmount)
+                .sum();
+    }
+
+    private PauseHistory loadPauseHistory(List<Subscription> subscriptions) {
+        List<Long> ids = subscriptions.stream().map(Subscription::getId).toList();
+        return new PauseHistory(ids.isEmpty()
+                ? Map.of()
+                : pausePeriodRepository.findBySubscriptionIdIn(ids).stream()
+                        .collect(Collectors.groupingBy(SubscriptionPausePeriod::getSubscriptionId)));
+    }
+
+    /**
+     * 정지 구간 이력으로 "그 달 상태"를 판정한다. 판정 시점은 <b>그 달의 끝</b>이고, 진행 중인 달이면
+     * 오늘이다 — 아직 오지 않은 시점의 상태를 단정하지 않기 위해서다.
+     *
+     * <p>이력이 없는 구독은 현재 상태가 아니라 {@code ACTIVE} 로 답한다. 현재 정지 중이라는 사실을
+     * 과거 달에 투영하면 정상 결제된 달에 "일시정지" 라벨이 붙는다 — 이 표를 만든 이유가 그것이다.
+     * 다만 이력이 생기기 전부터 정지 중이던 구독은 마이그레이션이 열린 구간을 만들어 두므로,
+     * 그 시작 시각 이후의 달은 정상적으로 PAUSED 로 나온다.
+     */
+    private record PauseHistory(Map<Long, List<SubscriptionPausePeriod>> periodsBySubscription) {
+
+        SubscriptionStatus statusIn(Subscription subscription, YearMonth target) {
+            LocalDateTime monthEnd = target.atEndOfMonth().atTime(LocalTime.MAX);
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime instant = now.isBefore(monthEnd) ? now : monthEnd;
+
+            boolean paused = periodsBySubscription.getOrDefault(subscription.getId(), List.of()).stream()
+                    .anyMatch(period -> period.covers(instant));
+            return paused ? SubscriptionStatus.PAUSED : SubscriptionStatus.ACTIVE;
+        }
     }
 
     /**
