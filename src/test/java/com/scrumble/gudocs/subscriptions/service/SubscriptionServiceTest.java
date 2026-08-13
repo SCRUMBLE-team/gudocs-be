@@ -9,6 +9,7 @@ import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionStatusUpdateReq
 import com.scrumble.gudocs.subscriptions.dto.request.SubscriptionUpdateRequest;
 import com.scrumble.gudocs.subscriptions.dto.response.SubscriptionResponse;
 import com.scrumble.gudocs.subscriptions.entity.*;
+import com.scrumble.gudocs.subscriptions.repository.SubscriptionPausePeriodRepository;
 import com.scrumble.gudocs.subscriptions.repository.SubscriptionRepository;
 import com.scrumble.gudocs.users.entity.User;
 import com.scrumble.gudocs.users.repository.UserRepository;
@@ -19,6 +20,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -35,6 +37,9 @@ class SubscriptionServiceTest {
 
     @Mock
     private SubscriptionRepository subscriptionRepository;
+
+    @Mock
+    private SubscriptionPausePeriodRepository pausePeriodRepository;
 
     @Mock
     private BillingRecordService billingRecordService;
@@ -182,6 +187,8 @@ class SubscriptionServiceTest {
 
         assertThat(response.status()).isEqualTo(SubscriptionStatus.PAUSED);
         assertThat(subscription.getPausedAt()).isNotNull();
+        // 정지 구간 이력이 열린다 — paused_at 은 재개하면 지워져서 과거 달을 답하지 못한다
+        verify(pausePeriodRepository).save(any(SubscriptionPausePeriod.class));
     }
 
     @Test
@@ -192,9 +199,14 @@ class SubscriptionServiceTest {
         SubscriptionStatusUpdateRequest request = new SubscriptionStatusUpdateRequest(SubscriptionStatus.ACTIVE);
         given(userRepository.findById(1L)).willReturn(Optional.of(user));
         given(subscriptionRepository.findById(1L)).willReturn(Optional.of(subscription));
+        // 정지 구간 이력: 재개하면 열린 구간을 닫는다
+        SubscriptionPausePeriod openPeriod = SubscriptionPausePeriod.open(1L, LocalDateTime.now().minusDays(3));
+        given(pausePeriodRepository.findBySubscriptionIdAndEndedAtIsNull(any()))
+                .willReturn(Optional.of(openPeriod));
 
         SubscriptionResponse response = subscriptionService.updateStatus(1L, 1L, request);
 
+        assertThat(openPeriod.getEndedAt()).isNotNull();
         assertThat(response.status()).isEqualTo(SubscriptionStatus.ACTIVE);
         assertThat(subscription.getPausedAt()).isNull();
     }

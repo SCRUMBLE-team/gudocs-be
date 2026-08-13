@@ -35,17 +35,39 @@ public record SubscriptionExpenseDetail(
                 example = "17000")
         long appliedMonthlyAmount,
 
+        @Schema(description = "그 달에 청구 예정일이 도래한 금액(원). 청구가 없었으면 0 — "
+                + "연간 구독의 커버 중인 달(청구는 작년), 그 달 정지, 청구일이 아직 안 온 경우가 그렇다. "
+                + "프론트가 결제주기·앵커로 '이 달 청구인지'를 되계산하지 않아도 되게 서버가 내려준다.",
+                example = "17000")
+        long billedAmount,
+
+        @Schema(description = "그 달에 아직 결제일이 오지 않은 예정 금액(원). <b>진행 중인 달에만</b> "
+                + "값이 있고 지난 달·미래 달은 0이다. 정지 중인 구독도 0(결제가 나가지 않는다). "
+                + "'이번 달에 N원 더 결제 예정이에요' 문구를 이 값의 합으로 만들면 된다. "
+                + "billedAmount와 더해도 그 달 부담(appliedMonthlyAmount)과 같지 않다 — "
+                + "연간 구독은 청구액을 12개월에 나눠 싣기 때문이다.",
+                example = "0")
+        long scheduledAmount,
+
         @Schema(description = "최초 결제일(다음 결제일 계산의 기준 앵커). 구독의 현재 값이며, "
                 + "그 달의 청구일은 billingDate", example = "2026-01-15")
         LocalDate firstBillingDate,
 
         @Schema(description = "그 달에 청구 예정일이 도래한 날짜. 연간 구독처럼 그 달에 청구가 없고 "
-                + "이전 청구가 커버 중이면 그 청구일(과거 날짜)이 들어간다", example = "2026-07-15")
+                + "이전 청구가 커버 중이면 그 청구일(과거 날짜)이 들어간다. 그 달에 청구 기록이 "
+                + "하나도 없으면(정지 등) null", example = "2026-07-15", nullable = true)
         LocalDate billingDate,
 
         @Schema(description = "구독의 현재 상태(표시용). 스냅샷이 아니라 지금 값이다", example = "ACTIVE",
                 nullable = true)
         SubscriptionStatus status,
+
+        @Schema(description = "그 달 기준 상태(표시용). 정지 구간 이력으로 판정하며 그 달 말(진행 중인 "
+                + "달이면 오늘) 시점을 본다. 현재 상태(status)와 달리 과거 달에도 맞는 값이다. "
+                + "이력이 남기 전(2026-08 이전)의 정지·재개는 복원할 수 없어 ACTIVE로 답한다. "
+                + "표시용 라벨일 뿐이며 이 값으로 금액을 계산하지 않는다", example = "PAUSED",
+                nullable = true)
+        SubscriptionStatus statusInMonth,
 
         @Schema(description = "삭제 여부(soft delete)", example = "false")
         boolean deleted

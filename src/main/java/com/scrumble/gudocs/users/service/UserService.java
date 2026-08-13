@@ -5,6 +5,7 @@ import com.scrumble.gudocs.global.exception.BusinessException;
 import com.scrumble.gudocs.global.exception.ErrorCode;
 import com.scrumble.gudocs.notification.repository.PushRegistrationRepository;
 import com.scrumble.gudocs.notification.repository.UserNotificationRepository;
+import com.scrumble.gudocs.subscriptions.repository.SubscriptionPausePeriodRepository;
 import com.scrumble.gudocs.subscriptions.repository.SubscriptionRepository;
 import com.scrumble.gudocs.users.dto.UserInfoResponse;
 import com.scrumble.gudocs.users.dto.UserNameUpdateRequest;
@@ -21,6 +22,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final SubscriptionRepository subscriptionRepository;
+    private final SubscriptionPausePeriodRepository pausePeriodRepository;
     private final BillingRecordRepository billingRecordRepository;
     private final SocialAccountRepository socialAccountRepository;
     private final PushRegistrationRepository pushRegistrationRepository;
@@ -40,6 +42,7 @@ public class UserService {
         userNotificationRepository.deleteAllByUserId(userId);
         pushRegistrationRepository.deleteAllByUser(user);
         billingRecordRepository.deleteAllByUser(user);   // 구독보다 먼저 — FK cascade가 없는 값 컬럼이라 남으면 고아 행이 된다
+        pausePeriodRepository.deleteAllByUser(user);     // 구독보다 먼저 — 이쪽은 FK가 걸려 있어 남으면 구독 삭제가 실패한다
         subscriptionRepository.hardDeleteAllByUser(user);
         socialAccountRepository.deleteAllByUser(user);
         userRepository.delete(user);

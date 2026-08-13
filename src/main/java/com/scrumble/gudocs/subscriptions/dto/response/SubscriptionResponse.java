@@ -35,6 +35,12 @@ public record SubscriptionResponse(
         @Schema(description = "구독 상태", example = "ACTIVE")
         SubscriptionStatus status,
 
+        @Schema(description = "현재 정지 상태가 시작된 시각. ACTIVE면 null. "
+                + "'7월 3일부터 일시정지 중' 같은 표시에 쓴다. 현재 상태에 대한 사실이며, "
+                + "과거에 정지했다 재개한 이력은 여기 남지 않는다(지출 상세의 statusInMonth 참고).",
+                example = "2026-07-03T14:20:00", nullable = true)
+        LocalDateTime pausedAt,
+
         @Schema(description = "다음 결제일", example = "2026-07-31")
         LocalDate nextBillingDate,
 
@@ -76,6 +82,7 @@ public record SubscriptionResponse(
                 subscription.getBillingCycle(),
                 subscription.getFirstBillingDate(),
                 subscription.getStatus(),
+                subscription.getPausedAt(),
                 nextBillingDate,
                 // 해지 링크는 저장하지 않고 code 로 카탈로그에서 그때그때 찾는다 —
                 // 링크가 바뀌면 카탈로그만 고치면 되고, 이미 저장된 구독도 함께 최신 링크를 받는다.

@@ -49,6 +49,17 @@ class ExpenseControllerTest {
     @Autowired
     private SocialAccountRepository socialAccountRepository;
 
+    @Autowired
+    private com.scrumble.gudocs.billing.repository.BillingRecordRepository billingRecordRepository;
+
+    @Autowired
+    private com.scrumble.gudocs.subscriptions.repository.SubscriptionRepository subscriptionRepository;
+
+    /** 기록을 직접 지우는 테스트용. 상세 응답에는 userId 가 없어서 구독에서 꺼낸다. */
+    private Long userIdOf(long subscriptionId) {
+        return subscriptionRepository.findById(subscriptionId).orElseThrow().getUser().getId();
+    }
+
     private MockHttpSession session;
 
     @BeforeEach
@@ -469,6 +480,130 @@ class ExpenseControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.subscriptions[0].serviceName").value("넷플릭스"))
                 .andExpect(jsonPath("$.data.subscriptions[0].serviceCode").value("NETFLIX"));
+    }
+
+    /**
+     * 정지한 구독은 그 달 청구 기록이 없어 목록에서 사라졌었다. 사용자에게는 등록해둔 구독이
+     * 없어진 것처럼 보이므로 0원 행으로 남긴다. 금액이 전부 0이라 합계는 그대로다.
+     */
+    @Test
+    void 월별_상세_정지한_구독은_0원_행으로_남는다() throws Exception {
+        long netflixId = 구독_등록("Netflix", SubscriptionCategory.OTT, 17000L, BillingCycle.MONTHLY, 15, null);
+        구독_등록("Spotify", SubscriptionCategory.MUSIC, 11990L, BillingCycle.MONTHLY, 15, null);
+        구독_일시정지(netflixId);
+
+        YearMonth next = 현재월().plusMonths(1);   // 정지 이후의 달 — 청구가 하나도 없다
+        mockMvc.perform(get("/api/subscriptions/expenses/monthly/details")
+                        .session(session)
+                        .param("year", String.valueOf(next.getYear()))
+                        .param("month", String.valueOf(next.getMonthValue())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.subscriptions[?(@.subscriptionId == " + netflixId + ")]").isNotEmpty())
+                .andExpect(jsonPath("$.data.subscriptions[?(@.subscriptionId == " + netflixId + ")].billedAmount")
+                        .value(0))
+                .andExpect(jsonPath("$.data.subscriptions[?(@.subscriptionId == " + netflixId + ")].appliedMonthlyAmount")
+                        .value(0))
+                .andExpect(jsonPath("$.data.subscriptions[?(@.subscriptionId == " + netflixId + ")].scheduledAmount")
+                        .value(0))
+                .andExpect(jsonPath("$.data.subscriptions[?(@.subscriptionId == " + netflixId + ")].statusInMonth")
+                        .value("PAUSED"))
+                .andExpect(jsonPath("$.data.subscriptions[?(@.subscriptionId == " + netflixId + ")].billingDate")
+                        .value((Object) null));
+    }
+
+    /**
+     * 기록이 없다고 전부 0원이라고 말하면 안 된다. 정지라서 0원인 달과, billing_records 도입 이전이라
+     * 그 달을 <b>모르는</b> 것은 다르다. 정지가 아닌 달은 행을 만들지 않는다(예전처럼 목록에서 빠진다).
+     */
+    @Test
+    void 월별_상세_정지가_아닌데_기록만_없는_달은_0원_행을_만들지_않는다() throws Exception {
+        long netflixId = 구독_등록("Netflix", SubscriptionCategory.OTT, 17000L, BillingCycle.MONTHLY, 15, null);
+
+        // 도입 이전이라 기록이 비어 있는 달을 흉내낸다(구독은 계속 ACTIVE 였다).
+        YearMonth prev = 현재월().minusMonths(1);
+        billingRecordRepository.findByUserIdAndBillingDateBetween(
+                        userIdOf(netflixId), prev.atDay(1), prev.atEndOfMonth())
+                .forEach(billingRecordRepository::delete);
+
+        mockMvc.perform(get("/api/subscriptions/expenses/monthly/details")
+                        .session(session)
+                        .param("year", String.valueOf(prev.getYear()))
+                        .param("month", String.valueOf(prev.getMonthValue())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.subscriptions.length()").value(0));
+    }
+
+    /**
+     * 지금 정지 중이라는 사실을 과거 달에 투영하면, 정상 결제된 달에 "일시정지" 라벨이 붙는다.
+     * statusInMonth 는 정지 구간 이력으로 판정하므로 정지 이전 달은 ACTIVE 여야 한다.
+     */
+    @Test
+    void 월별_상세_현재_정지_상태를_과거_달에_투영하지_않는다() throws Exception {
+        long netflixId = 구독_등록("Netflix", SubscriptionCategory.OTT, 17000L, BillingCycle.MONTHLY, 15, null);
+        구독_일시정지(netflixId);
+
+        YearMonth prev = 현재월().minusMonths(1);   // 정지 전이라 실제로 청구된 달
+        mockMvc.perform(get("/api/subscriptions/expenses/monthly/details")
+                        .session(session)
+                        .param("year", String.valueOf(prev.getYear()))
+                        .param("month", String.valueOf(prev.getMonthValue())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.subscriptions[0].subscriptionId").value(netflixId))
+                .andExpect(jsonPath("$.data.subscriptions[0].status").value("PAUSED"))         // 지금 상태
+                .andExpect(jsonPath("$.data.subscriptions[0].statusInMonth").value("ACTIVE"))  // 그 달 상태
+                .andExpect(jsonPath("$.data.subscriptions[0].billedAmount").value(17000));
+    }
+
+    /**
+     * 이번 달 부담에는 아직 결제일이 오지 않은 예정분이 얹히지만, 청구액에는 섞이면 안 된다.
+     * 예정분은 저장되지 않는 임시 객체라 "청구됐다"고 말할 수 없다(월별 응답의 actualAmount 와 같은 규칙).
+     */
+    @Test
+    void 월별_상세_이번달_예정분은_billedAmount에_섞이지_않는다() throws Exception {
+        LocalDate today = LocalDate.now();
+        LocalDate lastDayOfMonth = 현재월().atEndOfMonth();
+        if (!today.isBefore(lastDayOfMonth)) {
+            return;     // 말일에는 "아직 오지 않은 결제일"을 만들 수 없다
+        }
+        구독_등록("Netflix", SubscriptionCategory.OTT, 17000L, BillingCycle.MONTHLY, lastDayOfMonth);
+
+        YearMonth now = 현재월();
+        mockMvc.perform(get("/api/subscriptions/expenses/monthly/details")
+                        .session(session)
+                        .param("year", String.valueOf(now.getYear()))
+                        .param("month", String.valueOf(now.getMonthValue())))
+                .andExpect(status().isOk())
+                // 부담에는 잡히고
+                .andExpect(jsonPath("$.data.subscriptions[0].appliedMonthlyAmount").value(17000))
+                // 청구액에는 잡히지 않으며
+                .andExpect(jsonPath("$.data.subscriptions[0].billedAmount").value(0))
+                // "앞으로 나갈 돈"으로 따로 내려간다
+                .andExpect(jsonPath("$.data.subscriptions[0].scheduledAmount").value(17000));
+    }
+
+    /** billedAmount 는 그 달에 청구가 도래한 금액이다. 연간 구독이 커버만 하는 달은 0. */
+    @Test
+    void 월별_상세_연간_구독은_청구월에만_billedAmount가_잡힌다() throws Exception {
+        YearMonth billedMonth = 현재월().minusMonths(2);
+        구독_등록("Adobe", SubscriptionCategory.DESIGN, 120000L, BillingCycle.YEARLY,
+                billedMonth.atDay(1));
+
+        mockMvc.perform(get("/api/subscriptions/expenses/monthly/details")
+                        .session(session)
+                        .param("year", String.valueOf(billedMonth.getYear()))
+                        .param("month", String.valueOf(billedMonth.getMonthValue())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.subscriptions[0].billedAmount").value(120000))
+                .andExpect(jsonPath("$.data.subscriptions[0].appliedMonthlyAmount").value(10000));
+
+        YearMonth coveredMonth = billedMonth.plusMonths(1);   // 청구는 없고 커버만 하는 달
+        mockMvc.perform(get("/api/subscriptions/expenses/monthly/details")
+                        .session(session)
+                        .param("year", String.valueOf(coveredMonth.getYear()))
+                        .param("month", String.valueOf(coveredMonth.getMonthValue())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.subscriptions[0].billedAmount").value(0))
+                .andExpect(jsonPath("$.data.subscriptions[0].appliedMonthlyAmount").value(10000));
     }
 
     @Test

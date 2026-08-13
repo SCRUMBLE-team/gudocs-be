@@ -3,6 +3,8 @@ package com.scrumble.gudocs.billing.service;
 import com.scrumble.gudocs.billing.entity.BillingRecord;
 import com.scrumble.gudocs.billing.repository.BillingRecordRepository;
 import com.scrumble.gudocs.subscriptions.entity.Subscription;
+import com.scrumble.gudocs.subscriptions.entity.SubscriptionPausePeriod;
+import com.scrumble.gudocs.subscriptions.repository.SubscriptionPausePeriodRepository;
 import com.scrumble.gudocs.subscriptions.repository.SubscriptionRepository;
 import com.scrumble.gudocs.subscriptions.util.NextBillingDateCalculator;
 import lombok.RequiredArgsConstructor;
@@ -32,9 +34,10 @@ public class BillingRecordService {
     /**
      * 일일 배치가 거슬러 올라가 확인하는 일수. 배포·장애로 배치를 며칠 걸러도 그만큼은 저절로 메워진다.
      *
-     * <p>짧게 두는 데는 이유가 있다: 이 구간은 "지금 ACTIVE 면 그때도 ACTIVE 였다"고 가정하는데,
-     * 멀리 거슬러 갈수록 그 가정이 틀릴 여지가 커진다(그 사이 정지했다 재개했으면 정지 구간까지
-     * 결제로 만들어 버린다). 며칠 수준이면 실질적으로 안전하다.
+     * <p>거슬러 올라가는 구간은 "지금 ACTIVE 면 그때도 ACTIVE 였다"는 가정이 필요한데, 그 가정은
+     * 실제로 깨진다 — 정지 중에 결제일이 지나고 3일 안에 재개하면 정지 중이던 날짜가 결제로
+     * 기록된다. 그래서 {@code subscription_pause_periods} 로 그날이 정지 구간이었는지 확인해
+     * 걸러낸다({@link #record}). 짧게 두는 것은 그와 별개로 불필요한 조회를 줄이기 위해서다.
      */
     private static final int LOOKBACK_DAYS = 3;
 
@@ -43,13 +46,15 @@ public class BillingRecordService {
 
     private final BillingRecordRepository billingRecordRepository;
     private final SubscriptionRepository subscriptionRepository;
+    private final SubscriptionPausePeriodRepository pausePeriodRepository;
 
     /**
      * 일일 배치 진입점. {@code today} 와 직전 {@link #LOOKBACK_DAYS} 일 사이에 결제일이 있는
      * 활성·미삭제 구독의 결제를 기록한다.
      *
      * <p>정지·삭제된 구독은 조회 대상이 아니라 <b>행이 생기지 않고, 그래서 그 달 지출이 0이 된다.</b>
-     * 정지 이력을 따로 관리하지 않는 이유가 이것이다.
+     * 지금 정지 중인 구독뿐 아니라, 거슬러 올라간 날짜가 그때 정지 구간이었으면 그 날짜도 기록하지
+     * 않는다 — 안 그러면 "정지 중이었는데 청구된" 행이 생긴다.
      */
     public int recordDueBillings(LocalDate today) {
         LocalDate from = today.minusDays(LOOKBACK_DAYS);
@@ -89,10 +94,19 @@ public class BillingRecordService {
 
         Set<LocalDate> already = new HashSet<>(
                 billingRecordRepository.findBillingDates(subscription.getId(), from, to));
+        // 과거 날짜를 복구할 때 그날이 정지 구간이었으면 만들지 않는다. 정지 중에 결제일이 지나고
+        // LOOKBACK_DAYS 안에 재개하면, 재개 후의 배치가 "지금 ACTIVE"만 보고 그 날짜를 결제로
+        // 만들어 버린다(일어나지 않은 결제다).
+        List<SubscriptionPausePeriod> pausePeriods =
+                pausePeriodRepository.findBySubscriptionId(subscription.getId());
 
         int created = 0;
         for (LocalDate date : dates) {
             if (already.contains(date)) {
+                continue;
+            }
+            if (pausePeriods.stream().anyMatch(period -> period.coversDate(date))) {
+                log.debug("정지 구간이라 결제 기록 건너뜀 subscriptionId={} date={}", subscription.getId(), date);
                 continue;
             }
             try {

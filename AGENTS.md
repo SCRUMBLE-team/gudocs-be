@@ -55,17 +55,25 @@ deploy/             # EC2 배포 리소스 (setup.sh, systemd, Caddyfile, mysql-
 - `service_code`: 카탈로그 서비스의 불변 키(`ServiceCatalog.code`, 예 `NETFLIX`). **프론트가 로고를 찾는 기준**이다. 표시 이름은 오타 수정·브랜드 변경으로 바뀌므로 조인 키로 쓸 수 없다. 카탈로그에 없는 서비스를 직접 입력해 등록하면 null(로고 없음). 쓰기 시점에 카탈로그 존재 여부를 검증해 없는 코드면 400(`UNKNOWN_SERVICE_CODE`) — 저장돼 버리면 영영 로고를 못 찾기 때문. `V4__subscription_service_code.sql`
 - `savings_selected_at`: 절약하기 화면에서 **해지 후보로 체크한 시각**(NULL = 선택 안 함). 나중에 이 목록으로 알림을 보내야 하므로 화면 로컬이 아니라 서버에 남긴다. boolean이 아니라 시각인 이유는 "고른 지 N일 지났다" 같은 알림 문구·주기를 만들 수 있어서다. 이미 선택된 구독을 다시 선택해도 시각을 갱신하지 않는다(화면 저장할 때마다 기준이 초기화되면 안 됨). `V6__subscription_savings_selection.sql`
 - `first_billing_date`: 다음 결제일 계산의 단일 기준 앵커. 기존 `billing_day`+`billing_month`를 통합. 다음 결제일은 저장하지 않고 `NextBillingDateCalculator`가 앵커+주기로 재계산(월말 드리프트 없음)
-- `status`·`price`·`category`는 **현재 값**이다. 과거 지출은 이 값들로 계산하지 않는다 → `billing_records` 참고. `paused_at`은 "언제 정지했나"라는 현재 상태 정보로만 남아 있고, **지출 판정에 쓰지 말 것**(마지막 정지 시각 하나뿐이라 재개하면 지워진다)
+- `status`·`price`·`category`는 **현재 값**이다. 과거 지출은 이 값들로 계산하지 않는다 → `billing_records` 참고. `paused_at`은 "현재 정지가 시작된 시각"이고 재개하면 지워진다 — 상세 화면의 "7월 3일부터 일시정지 중" 표시(`SubscriptionResponse.pausedAt`)에만 쓴다. **과거 달 판정에 쓰지 말 것**(그건 `subscription_pause_periods`), **지출 판정에도 쓰지 말 것**
 
 **billing_records** — id, user_id(값 컬럼), subscription_id(값 컬럼), billing_date, amount, service_name, service_code, category, billing_cycle, created_at, updated_at
 - **지출 분석의 단일 소스.** 청구 예정일이 도래할 때 그 시점의 구독 등록정보를 통째로 얼려 한 줄 남긴다. 만들고 나면 **수정하지 않는다**
 - **카드·은행의 실제 결제 증빙이 아니다.** `billing_date`는 앵커+주기로 계산하고 `amount`는 당시 `Subscription.price`를 복사한다. 실제 승인 여부·승인 금액 판단이나 가격 변경 배너 판정에 사용하지 않는다
 - 신규 등록 시 과거 백필은 현재 입력값으로 최대 24개월의 청구 일정을 추정한 값이다. 과거 카드 승인 내역을 복원한 것이 아니다
 - **왜 스냅샷인가**: 과거 지출을 subscriptions 에서 매번 계산하면 사용자가 나중에 가격·카테고리를 바꾸거나 정지·삭제할 때 **과거가 따라 움직인다.** 필드마다 변경 이력 테이블을 두는 방법도 있지만(가격 이력·카테고리 이력·상태 이력 …) 가변 필드가 늘 때마다 이력이 늘고 조회는 시점 조인이 된다. 결제 시점 값을 얼려 두면 그게 전부 필요 없어진다
-- **일시정지는 행의 부재로 표현된다.** 정지 중인 달은 배치가 도는 시점에 ACTIVE 가 아니라 행이 생기지 않고, 그래서 그 달 지출이 0이다. 정지/재개를 몇 번 반복해도 저절로 맞는다 — **상태 이력 테이블이 필요 없는 이유**
+- **일시정지는 행의 부재로 표현된다.** 정지 중인 달은 배치가 도는 시점에 ACTIVE 가 아니라 행이 생기지 않고, 그래서 그 달 지출이 0이다. 정지/재개를 몇 번 반복해도 저절로 맞는다 — **금액을 상태로 되계산할 필요가 없는 이유**
+- 단, 배치는 `LOOKBACK_DAYS`(3일)만큼 거슬러 올라가 빠진 날짜를 메우는데, 그 구간은 "지금 ACTIVE 면 그때도 ACTIVE 였다"고 가정한다. **정지 중에 결제일이 지나고 3일 안에 재개하면 일어나지 않은 결제가 기록됐다.** 그래서 `BillingRecordService`가 `subscription_pause_periods`로 그날이 정지 구간이었는지 확인해 거른다(하루 안에서 정지·재개가 갈리면 보수적으로 "정지"로 본다). **이건 이미 기록된 금액을 상태로 되계산하는 것이 아니라, 애초에 기록을 만들지 말지 판정하는 것이다** — 기록된 스냅샷은 여전히 수정하지 않는다
 - `UNIQUE(subscription_id, billing_date)` — 배치가 지난 며칠치를 다시 훑어도 중복이 생기지 않는 멱등 키
 - `user_id`가 값 컬럼이라 지출 조회가 구독 조인 없이 사용자+기간만으로 끝난다. FK cascade 가 없으므로 **회원 탈퇴 시 `UserService.deleteAccount`가 구독보다 먼저 명시적으로 정리**한다
 - 쓰는 쪽은 `BillingRecordService`(배치 + 등록 시 백필), 읽는 쪽은 `ExpenseService`. `V8__billing_records.sql`
+
+**subscription_pause_periods** — id, subscription_id(FK), started_at, ended_at, created_at, updated_at
+- **정지/재개 구간 이력.** 정지할 때 열고(`ended_at` NULL) 재개할 때 닫는다. 구독당 열린 구간은 최대 1개
+- **왜 필요한가**: `subscriptions.paused_at`은 마지막 정지 시각 하나뿐이라 재개하면 지워진다. 6월 정지 → 7월 재개 → 8월 재정지면 `paused_at`은 8월이라 "6월은 정상이었다"고 **틀리게** 답한다. 되돌릴 수 있는 사건은 값 컬럼이 아니라 사건 기록으로 남긴다
+- 쓰는 곳은 `SubscriptionService.updateStatus`(상태가 실제로 바뀔 때만). 읽는 곳은 둘이다 — `ExpenseService`의 `statusInMonth`(표시용 라벨), `BillingRecordService`(그날 정지였으면 **청구 기록을 만들지 않는다**)
+- **금액에는 쓰지 않는다.** 지출은 `billing_records`가 단일 소스이고 이 표는 표시용 라벨 전용이다 — 상태로 금액을 되계산하면 이력과 기록이 어긋날 때 있지도 않았던 결제를 만들어낸다
+- 과거의 정지·재개는 백필하지 않는다(어디에도 남아 있지 않다). 이 표가 생기기 전의 달은 ACTIVE로 답한다 — 모르는 것을 지어내지 않는다. 승격 시점에 이미 정지 중이던 구독만 `paused_at`으로 열린 구간을 만든다. FK가 걸려 있어 **회원 탈퇴 시 구독보다 먼저 정리**한다. `V10__subscription_pause_periods.sql`
 
 **push_registrations** — id, user_id(FK), fid, platform, device_name, enabled, last_registered_at, created_at, updated_at
 - users 1:N. `UNIQUE(fid)` — 동일 fid 재등록 시 새 행 없이 소유자/상태 갱신. 해제는 hard delete가 아니라 `enabled=false`
@@ -206,6 +214,7 @@ ServiceCatalog.java (BE 단일 소스)
   - `V7__cancel_reminder.sql` — `type` enum에 `CANCEL_REMINDER` 추가 + dedup 키에 `subscription_id` 포함(NULL→`0` 백필 후 NOT NULL). 해지 알림은 구독별 발송이라 같은 날 같은 단계의 서로 다른 구독을 구분해야 한다.
   - `V8__billing_records.sql` — `billing_records` 생성. 지출 분석을 "구독에서 매번 계산" → "등록정보 기반 청구 스냅샷 조회"로 전환. 기존 구독의 과거 기록은 **백필하지 않는다**(과거 변경 이력이 없어 현재 값으로 채우면 추정치가 되기 때문). 신규 등록 시 백필은 사용자가 입력한 현재값 기반 추정이며, 배치 행도 카드 승인 증빙이 아니다.
   - `V9__price_change_notification.sql` — `type` enum에 `PRICE_CHANGE` 추가. **가격 변경 기능의 스키마 변경은 이것이 전부다** — 변경 이벤트는 DB가 아니라 `ServiceCatalog`에 선언한다(아래 참고).
+  - `V10__subscription_pause_periods.sql` — 정지/재개 구간 이력. 지출 상세의 `statusInMonth`(그 달 기준 상태)를 위해 필요하다. 현재 정지 중인 구독만 열린 구간으로 백필.
   - `V5__nullable_email.sql` — `users.email`·`social_accounts.email`을 nullable로. 엔티티는 이미 nullable이었으나 스키마가 `NOT NULL`로 남아 카카오 이메일 미동의 계정의 최초 로그인이 500으로 실패했다.
 - **배포**: Flyway가 앱 기동 시 자동 실행 → `systemctl restart gudocs` 만으로 마이그레이션 반영(수동 SSH SQL 불필요).
 - **local/test**: H2라 `flyway.enabled=false` + `ddl-auto=create-drop` 유지(MySQL 방언 마이그레이션 미적용). 세션 테이블은 local은 `session.jdbc.initialize-schema=embedded`로 H2 자동 생성, **test는 `SessionAutoConfiguration` 제외**(테스트는 `MockHttpSession`에 SecurityContext를 직접 심어 인증 → Spring Session 필터가 켜지면 인증 유실). `spring.session.store-type`은 Boot 3.4+에서 제거된 프로퍼티라 무효.
@@ -282,6 +291,11 @@ ServiceCatalog.java (BE 단일 소스)
 - `changeRate = (현재월 - 전월) / 전월 * 100`, 전월 0이면 0.0
 - 비율: `Math.round(x * 100.0) / 100.0`
 - 상세 응답의 `status`·`deleted`는 **현재 구독 상태**를 표시용으로 붙인 것이다(스냅샷에 없음). 금액에는 관여하지 않는다
+- 상세 응답의 `statusInMonth`는 **그 달 기준 상태**다(`subscription_pause_periods`로 판정, 그 달 말 — 진행 중인 달이면 오늘 — 시점). 과거 달에 `status`(현재 값)를 투영하면 정상 결제된 달에 "일시정지" 라벨이 붙는다. 역시 표시용이고 금액에 관여하지 않는다
+- 상세 응답의 `billedAmount`는 **그 달에 청구가 도래한 금액**이다(없으면 0 — 연간 구독의 커버 중인 달, 정지, 청구일 미도래). **이번 달 예정분(projection)은 섞지 않는다** — 월별 응답의 `actualAmount`와 같은 규칙이고, 부담(`appliedMonthlyAmount`)에만 얹힌다
+- 상세 응답의 `scheduledAmount`는 반대로 **그 달에 아직 결제일이 오지 않은 예정 금액**이다(진행 중인 달에만, 정지 구독은 0). "이번 달에 N원 더 결제 예정" 문구용. 프론트가 결제일·정지 여부를 날짜 비교로 되짚으면 정지·삭제·연간 경계에서 어긋나므로 서버가 답한다. `billedAmount + scheduledAmount ≠ appliedMonthlyAmount`다 — 연간 구독은 청구액을 12개월에 나눠 싣기 때문 프론트가 결제주기·앵커로 "이 달 청구인지"를 되계산하지 않게 서버가 내려준다. `originalPrice`는 그 달을 커버하는 기록의 금액이라 커버 중인 달에는 0이 아니다 — 둘은 다른 값이다
+- **그 달에 정지 중이라 청구가 없던 구독은 0원 행으로 내려간다**(정지한 구독이 목록에서 통째로 사라져 "구독이 없어졌다"처럼 보이던 문제). 금액이 전부 0이라 합계는 변하지 않고, `billingDate`는 null이다. 그 달에 존재하지 않던 구독(등록 이전·첫 결제일 이전)과 삭제된 구독은 넣지 않는다
+- **기록이 없다고 전부 0원이라고 말하지 않는다.** 기록 부재에는 두 뜻이 있다 — ① 정지라서 실제로 0원, ② `billing_records` 도입(V8) 이전이라 그 달을 **모름**. 정지 이력으로 ①만 골라 0원 행을 만든다. ②까지 0원으로 그리면 모르는 것을 안다고 말하게 된다. 정지가 아닌데 이번 달 청구가 아직 안 온 구독은 예정분(projection)이 처리한다
 - 이미 기록된 스냅샷은 **수정하지 않는다.** 사용자가 가격을 고쳐도 과거 행은 당시 등록값을 보존한다. 이는 실제 결제를 확정한다는 뜻이 아니라, 사후 변경으로 과거 분석이 따라 움직이지 않게 하려는 정책이다
 
 ---
