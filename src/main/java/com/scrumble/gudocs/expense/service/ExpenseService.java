@@ -151,9 +151,17 @@ public class ExpenseService {
     public MonthlyExpenseDetailResponse getMonthlyExpenseDetail(Long userId, int year, int month) {
         User user = findUser(userId);
         YearMonth target = parseYearMonth(year, month);
+        List<BillingRecord> recorded = loadRecords(userId, target, target);
         List<BillingRecord> covering = covering(
-                withCurrentMonthProjection(user, loadRecords(userId, target, target), target, target), target);
+                withCurrentMonthProjection(user, recorded, target, target), target);
         long totalAmount = burden(covering, target);
+
+        // 청구액은 저장된 기록만 센다. 부담(covering)에는 이번 달 예정분이 섞여 있는데, 예정분은
+        // 아직 결제일이 오지 않은 임시 객체라 "청구됐다"고 말하면 안 된다(월별 응답의 actualAmount 와 같은 규칙).
+        Map<Long, Long> billedBySubscription = recorded.stream()
+                .filter(r -> r.billedIn(target))
+                .collect(Collectors.groupingBy(BillingRecord::getSubscriptionId,
+                        Collectors.summingLong(BillingRecord::getAmount)));
 
         // 현재 상태·삭제 여부는 "지금 이 구독이 어떤가"라서 스냅샷에 없다. 표시용으로만 붙인다.
         List<Subscription> subscriptions = subscriptionRepository.findAllByUserIncludingDeleted(user);
@@ -166,7 +174,8 @@ public class ExpenseService {
 
         List<SubscriptionExpenseDetail> details = Stream.concat(
                         // 한 달에 같은 구독의 결제가 둘 이상일 일은 없지만(주기 최소 1개월), 있어도 합산한다.
-                        bySubscription.values().stream().map(rows -> toDetail(rows, target, current, pauseHistory)),
+                        bySubscription.values().stream()
+                                .map(rows -> toDetail(rows, target, current, pauseHistory, billedBySubscription)),
                         billedNothing(subscriptions, bySubscription.keySet(), target, pauseHistory))
                 .sorted(Comparator.comparingLong(SubscriptionExpenseDetail::appliedMonthlyAmount).reversed())
                 .toList();
@@ -212,7 +221,8 @@ public class ExpenseService {
     }
 
     private SubscriptionExpenseDetail toDetail(List<BillingRecord> rows, YearMonth target,
-                                               Map<Long, Subscription> current, PauseHistory pauseHistory) {
+                                               Map<Long, Subscription> current, PauseHistory pauseHistory,
+                                               Map<Long, Long> billedBySubscription) {
         BillingRecord latest = rows.stream()
                 .max(Comparator.comparing(BillingRecord::getBillingDate))
                 .orElseThrow();
@@ -227,7 +237,7 @@ public class ExpenseService {
                 latest.getBillingCycle(),
                 latest.getAmount(),
                 burden(rows, target),
-                billedAmount(rows, target),
+                billedBySubscription.getOrDefault(latest.getSubscriptionId(), 0L),
                 // 앵커는 구독의 현재 값, 청구일은 스냅샷의 값 — 서로 다른 사실이라 필드를 나눠 싣는다.
                 subscription != null ? subscription.getFirstBillingDate() : latest.getBillingDate(),
                 latest.getBillingDate(),
@@ -235,14 +245,6 @@ public class ExpenseService {
                 subscription != null ? pauseHistory.statusIn(subscription, target) : null,
                 subscription == null || subscription.isDeleted()
         );
-    }
-
-    /** 그 달에 청구일이 도래한 금액. 연간 구독의 커버 중인 달은 청구가 없으므로 0이다. */
-    private long billedAmount(List<BillingRecord> rows, YearMonth target) {
-        return rows.stream()
-                .filter(r -> YearMonth.from(r.getBillingDate()).equals(target))
-                .mapToLong(BillingRecord::getAmount)
-                .sum();
     }
 
     private PauseHistory loadPauseHistory(List<Subscription> subscriptions) {

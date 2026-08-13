@@ -519,6 +519,31 @@ class ExpenseControllerTest {
                 .andExpect(jsonPath("$.data.subscriptions[0].billedAmount").value(17000));
     }
 
+    /**
+     * 이번 달 부담에는 아직 결제일이 오지 않은 예정분이 얹히지만, 청구액에는 섞이면 안 된다.
+     * 예정분은 저장되지 않는 임시 객체라 "청구됐다"고 말할 수 없다(월별 응답의 actualAmount 와 같은 규칙).
+     */
+    @Test
+    void 월별_상세_이번달_예정분은_billedAmount에_섞이지_않는다() throws Exception {
+        LocalDate today = LocalDate.now();
+        LocalDate lastDayOfMonth = 현재월().atEndOfMonth();
+        if (!today.isBefore(lastDayOfMonth)) {
+            return;     // 말일에는 "아직 오지 않은 결제일"을 만들 수 없다
+        }
+        구독_등록("Netflix", SubscriptionCategory.OTT, 17000L, BillingCycle.MONTHLY, lastDayOfMonth);
+
+        YearMonth now = 현재월();
+        mockMvc.perform(get("/api/subscriptions/expenses/monthly/details")
+                        .session(session)
+                        .param("year", String.valueOf(now.getYear()))
+                        .param("month", String.valueOf(now.getMonthValue())))
+                .andExpect(status().isOk())
+                // 부담에는 잡히고
+                .andExpect(jsonPath("$.data.subscriptions[0].appliedMonthlyAmount").value(17000))
+                // 청구액에는 잡히지 않는다
+                .andExpect(jsonPath("$.data.subscriptions[0].billedAmount").value(0));
+    }
+
     /** billedAmount 는 그 달에 청구가 도래한 금액이다. 연간 구독이 커버만 하는 달은 0. */
     @Test
     void 월별_상세_연간_구독은_청구월에만_billedAmount가_잡힌다() throws Exception {
